@@ -6,7 +6,7 @@ export default function Home() {
       {/* 헤더 */}
       <header className="border-b bg-white">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <h1 className="text-2xl font-bold text-primary-600">DevLens</h1>
+          <h1 className="text-2xl font-bold text-primary-600">TeamA</h1>
           <nav className="flex items-center gap-4">
             <Link
               href="/login"
@@ -32,7 +32,7 @@ export default function Home() {
           <span className="text-primary-600">취업 준비는 스마트하게</span>
         </h2>
         <p className="mx-auto mb-8 max-w-2xl text-xl text-gray-600">
-          DevLens는 개발자와 취업 준비생을 위한 통합 플랫폼입니다.
+          TeamA는 개발자와 취업 준비생을 위한 통합 플랫폼입니다.
           실시간 기술 트렌드 분석, 이력서 매칭, AI 면접 준비까지 한 곳에서.
         </p>
         <div className="flex justify-center gap-4">
@@ -100,7 +100,7 @@ export default function Home() {
       {/* 푸터 */}
       <footer className="border-t bg-gray-50 py-8">
         <div className="container mx-auto px-4 text-center text-gray-600">
-          <p>© 2025 DevLens. 2025 Winter Bootcamp Team A</p>
+          <p>© 2025 TeamA. 2025 Winter Bootcamp Team A</p>
         </div>
       </footer>
     </main>
