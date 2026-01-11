@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Providers } from './providers';
+import "pretendard/dist/web/variable/pretendardvariable.css"; // 폰트 추가
 
 export const metadata: Metadata = {
   title: 'DevLens - 개발 트렌드 분석 플랫폼',
@@ -14,7 +15,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body>
+      <body className='font-sans'> {/* 폰트 적용 */}
         <Providers>{children}</Providers>
       </body>
     </html>
