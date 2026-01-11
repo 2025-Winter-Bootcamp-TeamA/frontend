@@ -28,7 +28,7 @@ const config: Config = {
         error: '#ef4444',
       },
       fontFamily: {
-        sans: ['Pretendard', 'system-ui', 'sans-serif'],
+        sans: ['Pretendard', 'system-ui', 'ui-sans-serif'],
       },
     },
   },
