@@ -10,6 +10,7 @@ const nextConfig = {
       },
     ],
   },
+  /*
   // API 프록시 설정
   async rewrites() {
     return [
@@ -19,6 +20,7 @@ const nextConfig = {
       },
     ];
   },
+  */
 };
 
 module.exports = nextConfig;
