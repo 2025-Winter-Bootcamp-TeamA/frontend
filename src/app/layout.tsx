@@ -1,28 +1,26 @@
-import type { Metadata } from 'next';
-import './globals.css';
-import { Providers } from './providers';
-import "pretendard/dist/web/variable/pretendardvariable.css"; // 폰트 추가
-import Navbar from '@/components/Navbar'; // Navbar 컴포넌트 추가
+// src/app/layout.tsx
+import AuthContext from "@/components/AuthContext"; // 방금 만든 컴포넌트 임포트
+import Navbar from "@/components/Navbar";
+import "./globals.css";
+import { Providers } from "./providers";
 
-export const metadata: Metadata = {
+// 서버 컴포넌트이므로 메타데이터 설정도 가능해집니다
+export const metadata = {
   title: 'DevRoad',
-  description: '개발 트렌드 분석 및 취업 지원 플랫폼',
-  // 파비콘 설정 추가
-  icons: {
-    icon:'/logo.png',
+  icons:{
+    icon: '/logo.png',
   },
-};
+  description: '취준생을 위한 IT 트렌드 분석 서비스',
+}
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body className='font-sans'> {/* 폰트 적용 */}
-        <Navbar /> {/* Navbar 컴포넌트 렌더링 */}
-        <Providers>{children}</Providers>
+      <body className="bg-[#1A1B1E] text-white">
+        <AuthContext> {/* 클라이언트 컴포넌트인 Provider로 감싸기 */}
+          <Navbar />
+          <Providers>{children}</Providers>
+        </AuthContext>
       </body>
     </html>
   );

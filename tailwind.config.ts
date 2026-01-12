@@ -8,6 +8,17 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      keyframes: {
+        wave: {
+          '0%': { transform: 'translateX(-90px)' },
+          '100%' : { transform: 'translateX(85px)' },
+        }
+      },
+      animation: {
+        'wave-slow': 'wave 20s linear infinite',
+        'wave-mid': 'wave 15s linear infinite',
+        'wave-fast': 'wave 10s linear infinite',
+      },
       colors: {
         // 브랜드 컬러
         primary: {
