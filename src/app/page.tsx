@@ -5,7 +5,7 @@ import Top5Section from '@/components/home/Top5Section';
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#1A1B1E] overflow-x-hidden">
+    <main className="min-h-screen bg-[#1A1B1E]">
       <Hero />
       
       {/* 12컬럼 그리드 시스템 도입 */}
