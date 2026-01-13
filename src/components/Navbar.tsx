@@ -16,7 +16,7 @@ export default function Navbar() {
     // 마이페이지를 메뉴 리스트에서 제거
     const navItems = [
         { name: '홈 피드', href: '/' },
-        { name: '트렌드 분석', href: '/trend' },
+        { name: '트렌드 분석', href: '/trend-analysis' },
         { name: '채용 지도', href: '/map' },
         { name: 'AI 면접', href: '/ai-interview' },
     ];
