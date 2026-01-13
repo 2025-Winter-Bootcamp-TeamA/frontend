@@ -1,4 +1,4 @@
-# DevLens Frontend
+# TeamA Frontend
 
 Next.js 14 기반 프론트엔드 애플리케이션입니다.
 **Vercel**을 통해 배포됩니다.
@@ -117,7 +117,7 @@ Vercel 대시보드에서 다음 환경변수를 설정하세요:
 
 | 변수명 | 설명 | 예시 |
 |--------|------|------|
-| `NEXT_PUBLIC_API_URL` | Backend API URL | `https://api.devlens.com` |
+| `NEXT_PUBLIC_API_URL` | Backend API URL | `https://api.teamA.com` |
 
 ---
 
