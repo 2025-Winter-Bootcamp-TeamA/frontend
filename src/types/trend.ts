@@ -1,23 +1,46 @@
-// src/types/trend.ts
+import * as d3 from 'd3';
 
-export interface TechNode {
-  id: string;    // 노드 이름 (예: 'React')
-  group: number; // 그룹 번호 (중심부, 주변부 구분 등)
-  value?: number; // (선택) 노드의 중요도나 크기
+// 1. 차트의 개별 데이터 포인트 (일, 월, 년 공통)
+export interface ChartDataPoint {
+  label: string;  // '1일', '1월', '2024년' 등
+  mentions: number;
 }
 
-export interface TechLink {
-  source: string; // 시작 노드 ID
-  target: string; // 끝 노드 ID
-  value?: number; // (선택) 선의 두께나 관계의 강도
+// 2. 일/월/년 데이터를 모두 포함하는 타임라인 구조
+export interface TimelineData {
+  daily: ChartDataPoint[];
+  monthly: ChartDataPoint[];
+  yearly: ChartDataPoint[];
 }
 
-export interface TrendData {
+// 3. D3 그래프용 노드 정의
+export interface GraphNode extends d3.SimulationNodeDatum {
+  id: string;
+  group: number;
+  value: number;
+  desc: string; // 기술 스택에 대한 설명 (예: 웹/앱 UI 라이브러리)
+}
+
+// 4. D3 그래프용 링크 정의
+export interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
+  source: string | GraphNode;
+  target: string | GraphNode;
+}
+
+// 5. 기업/커뮤니티 탭별 데이터 구조 (그래프 데이터 + 타임라인 데이터)
+export interface TabData {
+  nodes: GraphNode[];
+  links: GraphLink[];
+  timeline: TimelineData; // 이 부분이 핵심입니다.
+}
+
+// 6. 카테고리별 전체 상세 정보
+export interface CategoryDetail {
   name: string;
   color: string;
-  nodes: TechNode[];
-  links: TechLink[];
+  company: TabData;
+  community: TabData;
 }
 
-// 카테고리 전체 목록 타입
-export type CategoryInfoMap = Record<string, TrendData>;
+// 7. 카테고리 맵 타입 (frontend, backend 등)
+export type CategoryInfoMap = Record<string, CategoryDetail>;
