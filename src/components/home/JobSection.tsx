@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from 'react';
 import JobCard from './JobCard';
 
+// 추천 채용 공고 Mock 데이터
 const MOCK_JOBS = [
     { 
         id: 1, 
@@ -52,19 +53,23 @@ export default function JobSection() {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [scrollPosition, setScrollPosition] = useState<'start' | 'middle' | 'end'>('start');
     
+    // 드래그 슬라이드 로직을 위한 Ref
     const isDown = useRef(false);
     const startX = useRef(0);
     const scrollLeft = useRef(0);
 
+    // 스크롤 위치에 따른 화살표 상태 업데이트
     const updateScrollStatus = () => {
         const el = scrollRef.current;
         if (!el) return;
         const { scrollLeft: sLeft, scrollWidth, clientWidth } = el;
+        
         if (sLeft <= 10) setScrollPosition('start');
         else if (sLeft + clientWidth >= scrollWidth - 10) setScrollPosition('end');
         else setScrollPosition('middle');
     };
 
+    // 마우스 드래그 핸들러
     const handleMouseDown = (e: React.MouseEvent) => {
         isDown.current = true;
         if (scrollRef.current) {
@@ -101,44 +106,46 @@ export default function JobSection() {
             <div className="border border-[#9FA0A8]/30 rounded-[20px] p-8 bg-transparent">
                 <h3 className="text-white text-xl font-bold mb-8 ml-2">추천 채용 공고</h3>
 
-                {/* relative 컨테이너: 이 안에서 화살표가 카드 높이의 중앙(top-1/2)에 위치하게 됩니다 */}
-                <div className="relative">
+                {/* 화살표를 위한 좌우 여백(px-12)이 확보된 컨테이너 */}
+                <div className="relative px-12">
                     
                     {/* 좌측 화살표 */}
                     <button 
                         onClick={() => scrollRef.current?.scrollBy({ left: -400, behavior: 'smooth' })}
                         className={`absolute left-0 top-1/2 -translate-y-1/2 z-20 p-2 transition-all hover:scale-110 active:scale-95 ${
-                            scrollPosition === 'start' ? 'text-[#9FA0A8]' : 'text-white'
+                            scrollPosition === 'start' ? 'text-[#9FA0A8] opacity-30 cursor-default' : 'text-white opacity-100 hover:text-blue-400'
                         }`}
+                        disabled={scrollPosition === 'start'}
                     >
-                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                         </svg>
                     </button>
 
-                    {/* 우측 화살표 (누락되었던 SVG 추가) */}
+                    {/* 우측 화살표 */}
                     <button 
                         onClick={() => scrollRef.current?.scrollBy({ left: 400, behavior: 'smooth' })}
                         className={`absolute right-0 top-1/2 -translate-y-1/2 z-20 p-2 transition-all hover:scale-110 active:scale-95 ${
-                            scrollPosition === 'end' ? 'text-[#9FA0A8]' : 'text-white'
+                            scrollPosition === 'end' ? 'text-[#9FA0A8] opacity-30 cursor-default' : 'text-white opacity-100 hover:text-blue-400'
                         }`}
+                        disabled={scrollPosition === 'end'}
                     >
-                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
                     </button>
 
-                    {/* 카드 슬라이드 구역 */}
+                    {/* 슬라이드 영역 (화살표 바깥쪽에 위치) */}
                     <div 
                         ref={scrollRef}
                         onMouseDown={handleMouseDown}
                         onMouseMove={handleMouseMove}
                         onMouseUp={handleMouseUp}
                         onMouseLeave={handleMouseUp}
-                        className="flex gap-2 overflow-x-auto scroll-smooth cursor-grab select-none no-scrollbar px-16 py-2"
+                        className="flex gap-4 overflow-x-auto scroll-smooth cursor-grab select-none no-scrollbar py-2"
                     >
                         {MOCK_JOBS.map((job) => (
-                            <div key={job.id} className="min-w-[300px] flex-shrink-0">
+                            <div key={job.id} className="min-w-[320px] flex-shrink-0">
                                 <JobCard {...job} />
                             </div>
                         ))}
