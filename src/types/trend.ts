@@ -1,23 +1,39 @@
-// src/types/trend.ts
+import * as d3 from 'd3';
 
-export interface TechNode {
-  id: string;    // 노드 이름 (예: 'React')
-  group: number; // 그룹 번호 (중심부, 주변부 구분 등)
-  value?: number; // (선택) 노드의 중요도나 크기
+export interface ChartDataPoint {
+  label: string;
+  mentions: number;
 }
 
-export interface TechLink {
-  source: string; // 시작 노드 ID
-  target: string; // 끝 노드 ID
-  value?: number; // (선택) 선의 두께나 관계의 강도
+export interface TimelineData {
+  daily: ChartDataPoint[];
+  monthly: ChartDataPoint[];
+  yearly: ChartDataPoint[];
 }
 
-export interface TrendData {
+export interface GraphNode extends d3.SimulationNodeDatum {
+  id: string;
+  group: number;
+  value: number;
+  desc: string;
+}
+
+export interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
+  source: string | GraphNode;
+  target: string | GraphNode;
+}
+
+export interface TabData {
+  nodes: GraphNode[];
+  links: GraphLink[];
+  timeline: TimelineData;
+}
+
+export interface CategoryDetail {
   name: string;
   color: string;
-  nodes: TechNode[];
-  links: TechLink[];
+  company: TabData;
+  community: TabData;
 }
 
-// 카테고리 전체 목록 타입
-export type CategoryInfoMap = Record<string, TrendData>;
+export type CategoryInfoMap = Record<string, CategoryDetail>;

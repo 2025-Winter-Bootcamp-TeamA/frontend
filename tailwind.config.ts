@@ -9,6 +9,14 @@ const config: Config = {
   theme: {
     extend: {
       keyframes: {
+        fadeInUp: {
+          "0%": { opacity: "0", transform: "translateY(20px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        fadeIn: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
         wave: {
           '0%': { transform: 'translateX(-90px)' },
           '100%' : { transform: 'translateX(85px)' },
@@ -18,6 +26,8 @@ const config: Config = {
         'wave-slow': 'wave 20s linear infinite',
         'wave-mid': 'wave 15s linear infinite',
         'wave-fast': 'wave 10s linear infinite',
+        fadeInUp: "fadeInUp 1s ease-out forwards",
+        fadeIn: "fadeIn 2s ease-in forwards",
       },
       colors: {
         // 브랜드 컬러

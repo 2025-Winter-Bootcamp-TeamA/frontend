@@ -1,8 +1,9 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-// 1. 확장된 데이터셋 (7개 카테고리 x 5개 아이템)
+// 데이터셋 (동일함)
 const ALL_TOP_5_DATA = [
     // Front
     { id: 1, rank: 1, name: 'React', category: '웹 프레임워크', type: 'Front', logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg' },
@@ -63,13 +64,13 @@ export default function Top5Section() {
     const startX = useRef(0);
     const scrollLeft = useRef(0);
 
-    // 드래그 로직 (이전과 동일)
+    // 드래그 로직
     const handleMouseDown = (e: React.MouseEvent) => {
         isDown.current = true;
         if (scrollRef.current) {
-        scrollRef.current.classList.add('cursor-grabbing');
-        startX.current = e.pageX - scrollRef.current.offsetLeft;
-        scrollLeft.current = scrollRef.current.scrollLeft;
+            scrollRef.current.classList.add('cursor-grabbing');
+            startX.current = e.pageX - scrollRef.current.offsetLeft;
+            scrollLeft.current = scrollRef.current.scrollLeft;
         }
     };
 
@@ -89,53 +90,71 @@ export default function Top5Section() {
     const filteredData = ALL_TOP_5_DATA.filter(item => item.type === selectedCategory);
 
     return (
-        /* 1. 전체 컨테이너 */
-        <div className="border border-[#9FA0A8]/30 rounded-[20px] p-8 sticky top-[64px] bg-[#1A1B1E] w-full shadow-2xl z-10 transition-all duration-300">
-        <div className="flex items-center gap-4 mb-6">
-            <span className="text-2xl font-bold">🔥</span>
-            <h3 className="text-white text-xl font-bold uppercase tracking-tight">요즘 뜨는 Top 5</h3>
-        </div>
-
-        {/* 2. 카테고리 탭 사이즈 및 간격 확대 */}
-        <div 
-            ref={scrollRef}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            className="flex gap-3 mb-8 overflow-x-auto no-scrollbar pb-3 cursor-grab select-none active:cursor-grabbing select-none"
-        >
-            {CATEGORIES.map((tab) => (
-            <button 
-                key={tab} 
-                onClick={() => setSelectedCategory(tab)}
-                className={`px-4 py-2 border rounded-full text-base transition-all shrink-0 ${
-                selectedCategory === tab 
-                    ? 'bg-[#1C89AD] border-[#1C89AD] text-white font-medium shadow-lg shadow-[#1C89AD]/20'
-                    : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10'
-                }`}
-            >
-                {tab}
-            </button>
-            ))}
-        </div>
-
-        {/* 3. 리스트 아이템 사이즈 및 간격 */}
-        <div className="flex flex-col gap-6">
-            {filteredData.map((item) => (
-            <div key={item.id} className="flex items-center gap-6 group cursor-pointer">
-                {/* 아이콘 사이즈 확대 (w-16 h-16) */}
-                <div className="w-14 h-14 bg-white rounded-xl overflow-hidden flex items-center justify-center p-3 shrink-0 group-hover:scale-105 transition-transform shadow-md">
-                <img src={item.logo} alt={item.name} className="object-contain" />
-                </div>
-                <div className="overflow-hidden">
-                {/* 텍스트 사이즈 확대 (text-sm, text-xl) */}
-                <p className="text-[#9FA0A8] text-sm uppercase mb-1 font-semibold tracking-wider">{item.category}</p>
-                <h4 className="text-white font-bold text-xl truncate leading-tight">{item.name}</h4>
-                </div>
+        <div className="border border-[#9FA0A8]/30 rounded-[20px] p-8 sticky top-[64px] bg-[#1A1B1E] w-full shadow-2xl z-10">
+            <div className="flex items-center gap-4 mb-6">
+                <span className="text-2xl font-bold">🔥</span>
+                <h3 className="text-white text-xl font-bold uppercase tracking-tight">요즘 뜨는 Top 5</h3>
             </div>
-            ))}
-        </div>
+
+            {/* 카테고리 탭 */}
+            <div 
+                ref={scrollRef}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                className="flex gap-3 mb-8 overflow-x-auto no-scrollbar pb-3 cursor-grab select-none"
+            >
+                {CATEGORIES.map((tab) => (
+                    <button 
+                        key={tab} 
+                        onClick={() => setSelectedCategory(tab)}
+                        className={`px-4 py-2 border rounded-full text-base transition-all shrink-0 ${
+                        selectedCategory === tab 
+                            ? 'bg-[#1C89AD] border-[#1C89AD] text-white font-medium shadow-lg shadow-[#1C89AD]/20'
+                            : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10'
+                        }`}
+                    >
+                        {tab}
+                    </button>
+                ))}
+            </div>
+
+            {/* 애니메이션 리스트 구역 */}
+            <div className="relative min-h-[400px]">
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={selectedCategory} // 카테고리 변경 시 애니메이션 트리거
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                        className="flex flex-col gap-6"
+                    >
+                        {filteredData.map((item, index) => (
+                            <motion.div 
+                                key={item.id} 
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: index * 0.05 }} // 아이템별 순차적 등장(Stagger)
+                                className="flex items-center gap-6 group cursor-pointer"
+                            >
+                                <div className="w-14 h-14 bg-white rounded-xl overflow-hidden flex items-center justify-center p-3 shrink-0 group-hover:scale-105 transition-transform shadow-md">
+                                    <img src={item.logo} alt={item.name} className="object-contain w-full h-full" />
+                                </div>
+                                <div className="overflow-hidden">
+                                    <p className="text-[#9FA0A8] text-sm uppercase mb-1 font-semibold tracking-wider">
+                                        {item.category}
+                                    </p>
+                                    <h4 className="text-white font-bold text-xl truncate leading-tight">
+                                        {item.name}
+                                    </h4>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </motion.div>
+                </AnimatePresence>
+            </div>
         </div>
     );
 }
