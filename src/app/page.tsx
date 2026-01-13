@@ -1,10 +1,28 @@
+import Hero from '@/components/home/Hero';
+import JobSection from '@/components/home/JobSection';
+import TrendSection from '@/components/home/TrendSection';
+import Top5Section from '@/components/home/Top5Section';
+
 export default function Home() {
   return (
-    <div className="bg-[#1A1B1E] text-white">
-      {/* 여기에 메인 페이지의 본문(배너, 트렌드 리포트 등)을 작성할 예정입니다 */}
-      <section className="py-20 text-center">
-        <h1 className="text-4xl font-bold">여기에 메인 페이지 본문이 들어갑니다.</h1>
-      </section>
-    </div>
+    <main className="min-h-screen bg-[#1A1B1E]">
+      <Hero />
+      
+      {/* 12컬럼 그리드 시스템 도입 */}
+      <div className="max-w-7xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* 왼쪽 (9컬럼 점유): 채용 공고 + 트렌드 리포트 */}
+        <div className="lg:col-span-9 min-w-0 flex flex-col gap-10">
+          <JobSection />
+          <TrendSection />
+        </div>
+
+        {/* 오른쪽 (3컬럼 점유): 요즘 뜨는 Top 5 */}
+        <aside className="lg:col-span-3">
+          <Top5Section />
+        </aside>
+      </div>
+      
+    </main>
   );
 }
