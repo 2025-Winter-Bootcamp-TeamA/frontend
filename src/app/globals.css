@@ -19,6 +19,19 @@ body {
   color: rgb(var(--foreground-rgb));
   background: rgb(var(--background-rgb));
   font-family: 'Pretendard', system-ui, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* 다크 모드 기본 스타일 */
+.dark body {
+  background-color: #1A1B1E;
+  color: #ffffff;
+}
+
+/* 라이트 모드 기본 스타일 */
+.light body {
+  background-color: #ffffff;
+  color: #1A1B1E;
 }
 
 /* 스크롤바 스타일 */

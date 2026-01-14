@@ -6,6 +6,8 @@ import SideNav from "./SideNav";
 import ResumeSection from "./resume/ResumeSection";
 import AIReportModal from "./resume/AIReportModal";
 import DeleteConfirmModal from "./resume/DeleteConfirmModal";
+import SettingsSection from "./settings/SettingsSection";
+import FavoritesSection from "./favorites/FavoritesSection";
 
 import type { Resume } from "../_models/resume.types";
 import { mockResumes } from "../_models/resume.mock";
@@ -89,19 +91,9 @@ export default function MyPageShell() {
               />
             )}
 
-            {tab === "favorites" && (
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-                <div className="text-lg font-semibold">즐겨찾기 목록</div>
-                <p className="mt-2 text-sm text-zinc-400">여기는 다음 단계에서 붙이면 돼.</p>
-              </div>
-            )}
+            {tab === "favorites" && <FavoritesSection />}
 
-            {tab === "settings" && (
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-                <div className="text-lg font-semibold">설정</div>
-                <p className="mt-2 text-sm text-zinc-400">여기도 다음 단계에서.</p>
-              </div>
-            )}
+            {tab === "settings" && <SettingsSection />}
           </main>
         </div>
       </div>

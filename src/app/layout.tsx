@@ -1,6 +1,7 @@
 // src/app/layout.tsx
 import AuthContext from "@/components/AuthContext"; // 방금 만든 컴포넌트 임포트
 import Navbar from "@/components/Navbar";
+import ThemeProvider from "@/components/ThemeProvider";
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -15,12 +16,14 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko">
-      <body className="bg-[#1A1B1E] text-white">
-        <AuthContext> {/* 클라이언트 컴포넌트인 Provider로 감싸기 */}
-          <Navbar />
-          <Providers>{children}</Providers>
-        </AuthContext>
+    <html lang="ko" className="dark">
+      <body className="bg-[#1A1B1E] text-white dark:bg-[#1A1B1E] light:bg-white light:text-zinc-900">
+        <ThemeProvider>
+          <AuthContext> {/* 클라이언트 컴포넌트인 Provider로 감싸기 */}
+            <Navbar />
+            <Providers>{children}</Providers>
+          </AuthContext>
+        </ThemeProvider>
       </body>
     </html>
   );
