@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useThemeStore } from "@/store/themeStore";
 import LeaveConfirmModal from "./LeaveConfirmModal";
 
 export default function SettingsSection() {
-  const { theme, toggleTheme } = useThemeStore();
   const [isLeaveOpen, setIsLeaveOpen] = useState(false);
 
   return (
@@ -13,59 +11,6 @@ export default function SettingsSection() {
       <h2 className="text-lg font-semibold text-zinc-50">설정</h2>
 
       <div className="mt-8 space-y-8">
-        {/* 테마 설정 영역 */}
-        <section className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-zinc-200">테마</p>
-            <p className="mt-1 text-xs text-zinc-500">
-              화면의 밝기를 조절할 수 있습니다.
-            </p>
-          </div>
-
-          <div className="inline-flex items-center rounded-full border border-zinc-700 bg-zinc-900 px-1 py-1 text-xs text-zinc-300 shadow-inner">
-            <button
-              type="button"
-              onClick={() => useThemeStore.getState().setTheme("light")}
-              className={[
-                "px-3 py-1 rounded-full text-[11px] font-semibold transition-colors flex items-center gap-1",
-                theme === "light"
-                  ? "bg-blue-600 text-white"
-                  : "text-zinc-400 hover:text-zinc-200",
-              ].join(" ")}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="5" />
-                <line x1="12" y1="1" x2="12" y2="3" />
-                <line x1="12" y1="21" x2="12" y2="23" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                <line x1="1" y1="12" x2="3" y2="12" />
-                <line x1="21" y1="12" x2="23" y2="12" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-              </svg>
-              라이트
-            </button>
-            <button
-              type="button"
-              onClick={() => useThemeStore.getState().setTheme("dark")}
-              className={[
-                "px-3 py-1 rounded-full text-[11px] font-semibold transition-colors flex items-center gap-1",
-                theme === "dark"
-                  ? "bg-blue-600 text-white"
-                  : "text-zinc-400 hover:text-zinc-200",
-              ].join(" ")}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-              다크
-            </button>
-          </div>
-        </section>
-
-        <hr className="border-zinc-800" />
-
         {/* 회원탈퇴 영역 */}
         <section className="flex items-center justify-between">
           <div>
