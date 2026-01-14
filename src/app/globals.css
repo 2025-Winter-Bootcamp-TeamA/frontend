@@ -3,73 +3,30 @@
 @tailwind utilities;
 
 /* 기본 스타일 */
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-rgb: 10, 10, 10;
-  }
-}
-
 body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
   font-family: 'Pretendard', system-ui, sans-serif;
+  background-color: #1A1B1E;
+  color: #ffffff;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* 다크 모드 기본 스타일 */
-.dark body {
-  background-color: #1A1B1E;
-  color: #ffffff;
-}
-
-/* 라이트 모드 기본 스타일 */
-.light body {
-  background-color: #ffffff;
-  color: #1A1B1E;
-}
-
-/* 스크롤바 스타일 - 다크 모드 */
-.dark ::-webkit-scrollbar {
+/* 스크롤바 스타일 */
+::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-.dark ::-webkit-scrollbar-track {
+::-webkit-scrollbar-track {
   background: #1a1a1a;
 }
 
-.dark ::-webkit-scrollbar-thumb {
+::-webkit-scrollbar-thumb {
   background: #404040;
   border-radius: 4px;
 }
 
-.dark ::-webkit-scrollbar-thumb:hover {
+::-webkit-scrollbar-thumb:hover {
   background: #505050;
-}
-
-/* 스크롤바 스타일 - 라이트 모드 */
-.light ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.light ::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-.light ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 4px;
-}
-
-.light ::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
 }
 
 @layer utilities {
