@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import { CATEGORY_INFO } from '@/constants/mockTrends';
 import { TimeLineDropdown } from '@/components/trend-analysis/TimeLineDropdown';
+import { useFavoritesStore, createTechStackFromNode } from '@/store/favoritesStore';
 
 // --- [인터페이스] ---
 interface GraphNode extends d3.SimulationNodeDatum {
@@ -157,11 +158,13 @@ export default function CategoryDetailPage() {
   const [activeTab, setActiveTab] = useState<'company' | 'community'>('company');
   const [timeRange, setTimeRange] = useState<'weekly' | 'monthly' | 'yearly'>('weekly');
   const [isMobile, setIsMobile] = useState(false);
-  const [isFavorited, setIsFavorited] = useState(false);
-
+  
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const currentCategory = CATEGORY_INFO[category as string];
+  
+  // 즐겨찾기 store
+  const { isTechStackFavorite, toggleTechStack } = useFavoritesStore();
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -217,7 +220,6 @@ export default function CategoryDetailPage() {
 
   const handleNodeFocus = (node: GraphNode) => {
     setSelectedNode(node);
-    setIsFavorited(false);
     if (!svgRef.current || !zoomRef.current) return;
     const { clientWidth: w, clientHeight: h } = svgRef.current;
     const targetX = isMobile ? w / 2 : w * 0.375;
@@ -268,8 +270,28 @@ export default function CategoryDetailPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-2xl font-bold tracking-tighter">{selectedNode.id}</h2>
-                    <button onClick={() => setIsFavorited(!isFavorited)} className="p-1 hover:scale-110 transition-transform">
-                      <Star size={22} className={isFavorited ? 'fill-yellow-400 stroke-yellow-400' : 'stroke-white/20 hover:stroke-white/50'} />
+                    <button 
+                      onClick={() => {
+                        if (currentCategory && selectedNode) {
+                          const techStack = createTechStackFromNode(
+                            selectedNode.id,
+                            selectedNode.desc,
+                            currentCategory.name,
+                            currentCategory.color
+                          );
+                          toggleTechStack(techStack);
+                        }
+                      }} 
+                      className="p-1 hover:scale-110 transition-transform"
+                    >
+                      <Star 
+                        size={22} 
+                        className={
+                          selectedNode && isTechStackFavorite(selectedNode.id)
+                            ? 'fill-yellow-400 stroke-yellow-400' 
+                            : 'stroke-white/20 hover:stroke-white/50'
+                        } 
+                      />
                     </button>
                   </div>
                   <p className="text-xs text-white/40 mt-1 font-light">{selectedNode.desc}</p>
