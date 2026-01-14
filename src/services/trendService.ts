@@ -1,12 +1,12 @@
 // src/services/trendService.ts
 import api from '@/lib/api';
 import { CATEGORY_INFO } from '@/constants/mockTrends';
-import { TrendData } from '@/types/trend';
+import { CategoryDetail } from '@/types/trend';
 
 // true면 목데이터 사용, false면 실제 API 호출
 const USE_MOCK = true; 
 
-export const getTrendDataByCategory = async (category: string): Promise<TrendData> => {
+export const getTrendDataByCategory = async (category: string): Promise<CategoryDetail> => {
   if (USE_MOCK) {
     // 목데이터 반환 (0.5초 지연으로 네트워크 느낌만 냄)
     return new Promise((resolve) => {
@@ -17,6 +17,6 @@ export const getTrendDataByCategory = async (category: string): Promise<TrendDat
   }
 
   // 실제 백엔드 연동 시 (팀장님이 만든 axios 인스턴스 사용)
-  const response = await api.get<TrendData>(`/trends/${category}/`);
+  const response = await api.get<CategoryDetail>(`/trends/${category}/`);
   return response.data;
 };
