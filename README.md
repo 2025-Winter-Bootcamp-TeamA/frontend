@@ -87,10 +87,9 @@ npm run dev
 
 ### 3. Backend 서버 실행 (별도 터미널)
 
-```bash
-cd ../backend
-docker compose -f docker-compose.dev.yml up -d
-```
+| 변수명 | 설명 | 예시 |
+|--------|------|------|
+| `NEXT_PUBLIC_API_URL` | Backend API URL | `https://api.teamA.com` |
 
 ---
 

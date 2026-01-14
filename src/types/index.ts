@@ -109,3 +109,7 @@ export interface AuthResponse {
   refresh: string;
   user: User;
 }
+
+
+// src/types/trend.ts
+export * from './trend';
