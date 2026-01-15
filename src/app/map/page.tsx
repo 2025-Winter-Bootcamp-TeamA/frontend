@@ -65,7 +65,7 @@ export default function JobMapPage() {
 
   // 회사 클릭 핸들러
   const handleCompanyClick = (company: Company) => {
-    setSelectedCompany(company);
+    setSelectedCompany((prev) => (prev?.id === company.id ? null : company));
   };
 
   return (
@@ -289,44 +289,7 @@ export default function JobMapPage() {
           })}
         </div>
 
-        {/* 선택된 회사 정보 오버레이 */}
-        {selectedCompany && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-zinc-900 border border-zinc-700 rounded-lg p-4 min-w-[300px] shadow-xl z-20">
-            <div className="flex items-start gap-4">
-              <img
-                src={selectedCompany.logoUrl}
-                alt={selectedCompany.name}
-                className="w-12 h-12 rounded-lg object-contain bg-white p-1"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src =
-                    "https://ui-avatars.com/api/?name=" +
-                    selectedCompany.name +
-                    "&background=3b82f6&color=fff";
-                }}
-              />
-              <div className="flex-1">
-                <h3 className="font-semibold text-white mb-1">
-                  {selectedCompany.name}
-                </h3>
-                <p className="text-sm text-zinc-400 mb-2">
-                  {selectedCompany.industry}
-                </p>
-                <p className="text-xs text-zinc-500 mb-3">
-                  {selectedCompany.address}
-                </p>
-                <button className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium text-white transition-colors">
-                  채용 정보 보기
-                </button>
-              </div>
-              <button
-                onClick={() => setSelectedCompany(null)}
-                className="text-zinc-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
+        {/* 하단 오버레이 제거: "채용 정보 보기" 버튼 중복 방지 */}
       </main>
     </div>
   );
