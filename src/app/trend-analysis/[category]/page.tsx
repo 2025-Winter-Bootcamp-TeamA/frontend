@@ -190,13 +190,23 @@ export default function CategoryDetailPage() {
     svg.call(zoom).call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2));
 
     const simulation = d3.forceSimulation<GraphNode>(nodes)
-      .force('link', d3.forceLink<GraphNode, GraphLink>(links).id(d => d.id).distance(isMobile ? 100 : 150))
+      .velocityDecay(0.4)
+      .force('link', d3.forceLink<GraphNode, GraphLink>(links).id(d => d.id).strength(0.5).distance(isMobile ? 100 : 150))
       .force('charge', d3.forceManyBody().strength(isMobile ? -400 : -800))
       .force('center', d3.forceCenter(0, 0))
-      .force('collision', d3.forceCollide<GraphNode>().radius(d => (d.value ? d.value / 2 : 15) + 15));
+      .force('collision', d3.forceCollide<GraphNode>().radius(d => (d.value ? d.value / 2.5 : 20) + 10));
 
     const link = g.append('g').selectAll('line').data(links).enter().append('line')
-      .attr('stroke', '#333').attr('stroke-width', 1.5).attr('stroke-opacity', 0.2);
+      .attr('stroke', '#757373').attr('stroke-width', 5).attr('stroke-opacity', 0.15);
+
+    const flowLink = g.append('g').selectAll('line.flow')
+    .data(links).enter().append('line')
+    .attr('class', 'flowing-line') // ✅ CSS 애니메이션 연결
+    .attr('stroke', currentCategory.color)
+    .attr('stroke-width', 2)
+    .attr('stroke-dasharray', '4 12') // ✅ 점의 크기 4, 간격 12 (점처럼 보이게 설정)
+    .attr('stroke-opacity', 0.6)
+    .style('pointer-events', 'none'); // 클릭 방해 방지
 
     const nodeGroup = g.append('g').selectAll('g').data(nodes).enter().append('g')
       .style('cursor', 'pointer').on('click', (e, d) => { handleNodeFocus(d); e.stopPropagation(); });
@@ -209,14 +219,36 @@ export default function CategoryDetailPage() {
     nodeGroup.append('text').text(d => d.id).attr('text-anchor', 'middle').attr('dy', '.35em').attr('fill', '#fff')
       .style('font-size', '11px').style('font-weight', 'bold').style('pointer-events', 'none');
 
-    simulation.on('tick', () => {
-      link.attr('x1', d => (d.source as any).x).attr('y1', d => (d.source as any).y)
-          .attr('x2', d => (d.target as any).x).attr('y2', d => (d.target as any).y);
-      nodeGroup.attr('transform', d => `translate(${d.x},${d.y})`);
-    });
+    let ticking = false;
 
-    return () => { simulation.stop(); };
-  }, [category, currentCategory, isMobile, activeTab]);
+    simulation.on('tick', () => {
+        if (!ticking) {
+          /* ✅ 브라우저의 주사율에 맞춰 업데이트 예약 */
+          window.requestAnimationFrame(() => {
+            updateGraphics();
+            ticking = false;
+          });
+          ticking = true;
+        }
+      });
+      function updateGraphics() {
+          link
+            .attr('x1', d => Math.round((d.source as any).x))
+            .attr('y1', d => Math.round((d.source as any).y))
+            .attr('x2', d => Math.round((d.target as any).x))
+            .attr('y2', d => Math.round((d.target as any).y));
+
+          flowLink
+            .attr('x1', d => Math.round((d.source as any).x))
+            .attr('y1', d => Math.round((d.source as any).y))
+            .attr('x2', d => Math.round((d.target as any).x))
+            .attr('y2', d => Math.round((d.target as any).y));
+
+          nodeGroup.attr('transform', d => `translate(${Math.round(d.x!)},${Math.round(d.y!)})`);
+        }
+
+        return () => { simulation.stop(); };
+      }, [category, currentCategory, isMobile, activeTab]);
 
   const handleNodeFocus = (node: GraphNode) => {
     setSelectedNode(node);

@@ -90,7 +90,7 @@ export default function Top5Section() {
     const filteredData = ALL_TOP_5_DATA.filter(item => item.type === selectedCategory);
 
     return (
-        <div className="border border-[#9FA0A8]/30 rounded-[20px] p-8 sticky top-[64px] bg-[#1A1B1E] w-full shadow-2xl z-10">
+        <div className="border border-[#9FA0A8]/30 rounded-[20px] p-8 sticky top-[80px] bg-[#1A1B1E] w-full shadow-2xl z-10">
             <div className="flex items-center gap-4 mb-6">
                 <span className="text-2xl font-bold">🔥</span>
                 <h3 className="text-white text-xl font-bold uppercase tracking-tight">요즘 뜨는 Top 5</h3>
