@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   mockFavoriteCompanies,
 } from "../../_models/favorites.mock";
@@ -10,6 +10,8 @@ import type {
   FavoriteTechStack,
   TechCategory,
 } from "../../_models/favorites.types";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 
 type FavoritesTab = "tech" | "company";
 type TechFilter = "all" | TechCategory;
@@ -27,12 +29,137 @@ const TECH_CATEGORY_LABEL: Record<TechFilter, string> = {
 const TECH_PAGE_SIZE = 6;
 const COMPANY_PAGE_SIZE = 4;
 
+const TECH_CATEGORY_COLOR: Record<TechFilter, string> = {
+  all: "#94A3B8",
+  frontend: "#277FA9",
+  backend: "#4CAF50",
+  "ai-data": "#9C27B0",
+  mobile: "#60A5FA",
+  devops: "#FF9800",
+  etc: "#94A3B8",
+};
+
+const TECH_CATEGORY_UPPER: Record<TechCategory, string> = {
+  frontend: "Frontend",
+  backend: "Backend",
+  "ai-data": "AI / Data",
+  mobile: "Mobile",
+  devops: "DevOps",
+  etc: "기타",
+};
+
+function hashToInt(input: string) {
+  let h = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    h = (h << 5) - h + input.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h);
+}
+
+function getMiniReport(tech: FavoriteTechStack) {
+  const seed = hashToInt(tech.id);
+  const share = 18 + (seed % 63); // 18~80
+  const growth = -8 + (seed % 29); // -8~20
+  const mentions = 1200 + (seed % 9800);
+  const timeline = Array.from({ length: 6 }, (_, i) => {
+    const v = (seed * (i + 3) * 13) % 100;
+    return 25 + (v % 70); // 25~94
+  });
+  return { share, growth, mentions, timeline };
+}
+
+function FilterDropdown({
+  value,
+  onChange,
+}: {
+  value: TechFilter;
+  onChange: (v: TechFilter) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const currentLabel = TECH_CATEGORY_LABEL[value];
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((v) => !v)}
+        className="flex items-center gap-2 bg-black/40 border border-white/10 hover:border-white/20 transition-all px-4 py-2 rounded-2xl text-sm font-bold text-white/80"
+      >
+        <span className="inline-flex items-center gap-2">
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-full"
+            style={{ backgroundColor: TECH_CATEGORY_COLOR[value] }}
+          />
+          {currentLabel}
+        </span>
+        <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+          <ChevronDown size={16} className="text-white/40" />
+        </motion.div>
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.ul
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 6, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="absolute right-0 z-50 min-w-[160px] bg-[#2A2B30] border border-white/10 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-xl"
+          >
+            {Object.entries(TECH_CATEGORY_LABEL).map(([key, label]) => {
+              const k = key as TechFilter;
+              const active = k === value;
+              return (
+                <li key={key}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange(k);
+                      setIsOpen(false);
+                    }}
+                    className={[
+                      "w-full text-left px-4 py-3 text-sm font-medium transition-colors flex items-center gap-2",
+                      active
+                        ? "bg-blue-600 text-white"
+                        : "text-white/70 hover:bg-white/5 hover:text-white",
+                    ].join(" ")}
+                  >
+                    <span
+                      className="inline-block h-2 w-2 rounded-full"
+                      style={{ backgroundColor: TECH_CATEGORY_COLOR[k] }}
+                    />
+                    {label}
+                  </button>
+                </li>
+              );
+            })}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export default function FavoritesSection() {
   const [tab, setTab] = useState<FavoritesTab>("tech");
 
   const [techFilter, setTechFilter] = useState<TechFilter>("all");
   const [techPage, setTechPage] = useState(1);
   const [companyPage, setCompanyPage] = useState(1);
+  const [hoveredTechId, setHoveredTechId] = useState<string | null>(null);
 
   // 즐겨찾기 store에서 읽어오기
   const { techStacks, toggleTechStack } = useFavoritesStore();

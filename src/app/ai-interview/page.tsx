@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, FileUp, User, Monitor } from 'lucide-react';
 
@@ -11,6 +12,8 @@ import AnalysisSummary from '@/components/ai-interview/AnalysisSummary';
 import { EmptyState, AnalyzingState } from '@/components/ai-interview/States';
 import ReportModal from '@/components/ai-interview/ReportModal';
 
+import type { Resume } from '@/app/mypage/_models/resume.types';
+import { mockResumes } from '@/app/mypage/_models/resume.mock';
 
 // --- [Constants & Mock Data] ---
 const INITIAL_COMPANIES = [
@@ -84,9 +87,12 @@ return {
     }
 
 export default function AIInterviewPage() {
+    const searchParams = useSearchParams();
     const [isModalOpen, setIsModalOpen] = useState(false); // 모달 상태 추가
     const [step, setStep] = useState<'empty' | 'analyzing' | 'result'>('result');
     const [showDropdown, setShowDropdown] = useState(false);
+    const [isResumePickerOpen, setIsResumePickerOpen] = useState(false);
+    const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
     
     const {
         sortedCompanies,
@@ -98,10 +104,28 @@ export default function AIInterviewPage() {
         toggleFavorite
     } = useAnalysisResult();
 
+    useEffect(() => {
+        // 마이페이지에서 "이력서 등록 +"로 이동한 경우 자동으로 이력서 선택 모달 오픈
+        if (searchParams?.get('pickResume') === '1') {
+            setIsResumePickerOpen(true);
+        }
+    }, [searchParams]);
+
     const handleStartAnalysis = () => {
         setShowDropdown(false);
         setStep('analyzing');
         setTimeout(() => setStep('result'), 3000);
+    };
+
+    const handlePickFromMyPage = () => {
+        setShowDropdown(false);
+        setIsResumePickerOpen(true);
+    };
+
+    const handleSelectResume = (resume: Resume) => {
+        setSelectedResume(resume);
+        setIsResumePickerOpen(false);
+        handleStartAnalysis();
     };
 
     return (
@@ -112,6 +136,9 @@ export default function AIInterviewPage() {
             <header className="flex justify-between items-center mb-5">
             <div className="space-y-1">
                 <h1 className="text-4xl font-black tracking-tighter uppercase">내 이력서 분석</h1>
+                <p className="text-sm text-[#9FA0A8]">
+                    {selectedResume ? `선택된 이력서: ${selectedResume.title}` : '이력서를 선택해 분석을 시작하세요.'}
+                </p>
             </div>
 
             <div className="relative">
@@ -128,13 +155,20 @@ export default function AIInterviewPage() {
                     initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
                     className="absolute right-0 mt-3 w-60 bg-[#212226] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50"
                     >
-                    <DropdownButton onClick={handleStartAnalysis} icon={<User size={18} className="text-blue-400" />} text="마이페이지에서 선택" hasBorder />
+                    <DropdownButton onClick={handlePickFromMyPage} icon={<User size={18} className="text-blue-400" />} text="마이페이지에서 선택" hasBorder />
                     <DropdownButton onClick={handleStartAnalysis} icon={<Monitor size={18} className="text-purple-400" />} text="내 컴퓨터에서 선택" />
                     </motion.div>
                 )}
                 </AnimatePresence>
             </div>
             </header>
+
+            <ResumePickerModal
+                open={isResumePickerOpen}
+                resumes={mockResumes}
+                onClose={() => setIsResumePickerOpen(false)}
+                onSelect={handleSelectResume}
+            />
 
             {/* --- [MAIN CONTENT SECTION] --- */}
             <main>
@@ -203,6 +237,84 @@ function DropdownButton({ onClick, icon, text, hasBorder = false }: any) {
       {icon} {text}
     </button>
   );
+}
+
+function ResumePickerModal({
+    open,
+    resumes,
+    onClose,
+    onSelect,
+}: {
+    open: boolean;
+    resumes: Resume[];
+    onClose: () => void;
+    onSelect: (r: Resume) => void;
+}) {
+    return (
+        <AnimatePresence>
+            {open && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={onClose}
+                        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                    />
+                    <motion.div
+                        initial={{ scale: 0.96, opacity: 0, y: 10 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.96, opacity: 0, y: 10 }}
+                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                        className="relative w-[min(720px,92vw)] rounded-[24px] border border-white/10 bg-[#1A1B1E] p-6 shadow-2xl"
+                        role="dialog"
+                        aria-modal="true"
+                    >
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <div className="text-lg font-bold text-white">마이페이지 이력서 선택</div>
+                                <div className="mt-1 text-sm text-[#9FA0A8]">
+                                    분석할 이력서를 하나 선택하세요.
+                                </div>
+                            </div>
+                            <button
+                                className="rounded-xl bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                                onClick={onClose}
+                                aria-label="닫기"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="mt-5 space-y-3">
+                            {resumes.map((r) => (
+                                <button
+                                    key={r.id}
+                                    type="button"
+                                    onClick={() => onSelect(r)}
+                                    className="w-full rounded-2xl border border-white/10 bg-[#25262B] p-4 text-left transition-all hover:border-white/30 hover:bg-[#2C2D33] active:scale-[0.99]"
+                                >
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div className="min-w-0">
+                                            <div className="truncate text-sm font-semibold text-white">
+                                                {r.title}
+                                            </div>
+                                            <div className="mt-1 text-xs text-[#9FA0A8]">
+                                                {r.company ? `${r.company} · ` : ''}등록일: {r.createdAt}
+                                            </div>
+                                        </div>
+                                        <span className="shrink-0 rounded-full bg-blue-600 px-3 py-1 text-[11px] font-bold text-white">
+                                            선택
+                                        </span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+        </AnimatePresence>
+    );
 }
 
 /** 전역 스크롤바 스타일 컴포넌트 */

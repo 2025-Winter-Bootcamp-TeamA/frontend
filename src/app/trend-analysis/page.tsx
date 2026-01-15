@@ -1,8 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { motion, Variants } from 'framer-motion'; // Variants 타입 추가
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { AnimatePresence, motion, Variants } from 'framer-motion'; // Variants 타입 추가
 import HeroBackground from '@/components/trend-analysis/HeroBackground';
+import { CATEGORY_INFO } from '@/constants/mockTrends';
 
 // 카테고리 데이터
 const CATEGORIES = [
@@ -34,10 +37,81 @@ const itemVariants: Variants = {
 };
 
 export default function TrendAnalysisMain() {
+  const router = useRouter();
+  const [query, setQuery] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const allKeywords = useMemo(() => {
+    const items: Array<{
+      category: string;
+      categoryLabel: string;
+      color: string;
+      id: string;
+      desc: string;
+    }> = [];
+
+    Object.entries(CATEGORY_INFO).forEach(([categoryKey, categoryData]) => {
+      const addNodes = (nodes: any[]) => {
+        nodes.forEach((n) => {
+          items.push({
+            category: categoryKey,
+            categoryLabel: categoryData.name,
+            color: categoryData.color,
+            id: n.id,
+            desc: n.desc,
+          });
+        });
+      };
+      addNodes(categoryData.company.nodes);
+      addNodes(categoryData.community.nodes);
+    });
+
+    // 중복 id 제거(카테고리/탭에 중복이 있을 수 있음) - 첫번째를 사용
+    const seen = new Set<string>();
+    return items.filter((it) => {
+      const key = `${it.category}:${it.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, []);
+
+  const suggestions = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const matched = allKeywords.filter(
+      (k) => k.id.toLowerCase().includes(q) || k.desc.toLowerCase().includes(q),
+    );
+    // id prefix 우선
+    matched.sort((a, b) => {
+      const aStarts = a.id.toLowerCase().startsWith(q) ? 0 : 1;
+      const bStarts = b.id.toLowerCase().startsWith(q) ? 0 : 1;
+      if (aStarts !== bStarts) return aStarts - bStarts;
+      return a.id.localeCompare(b.id);
+    });
+    return matched.slice(0, 8);
+  }, [allKeywords, query]);
+
+  const goToKeyword = (category: string, keywordId: string) => {
+    // 카테고리 페이지에서 focus로 자동 선택하도록 파라미터 전달
+    router.push(`/trend-analysis/${category}?focus=${encodeURIComponent(keywordId)}`);
+  };
+
   return (
     <main className="min-h-screen bg-[#1A1B1E] text-white overflow-x-hidden">
       {/* --- Hero Section --- */}
-      <section className="relative h-screen flex flex-col items-center justify-center px-6">
+      <section className="relative h-[100dvh] flex flex-col items-center justify-center px-6">
         <HeroBackground />
         <div className="relative z-10 text-center">
           <motion.h1 
@@ -82,6 +156,91 @@ export default function TrendAnalysisMain() {
           </motion.div>
         </div>
         <div className="absolute bottom-0 left-0 w-full h-40 bg-gradient-to-t from-[#1A1B1E] to-transparent z-10" />
+
+        {/* --- 하단 기술 키워드 검색 --- */}
+        <div ref={searchRef} className="absolute bottom-10 left-0 right-0 z-20 px-6">
+          <div className="mx-auto max-w-2xl">
+            <div className="relative">
+              <div className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-white/30">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="M21 21l-4.3-4.3" />
+                </svg>
+              </div>
+              <input
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setIsOpen(true);
+                }}
+                onFocus={() => setIsOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && suggestions[0]) {
+                    goToKeyword(suggestions[0].category, suggestions[0].id);
+                    setIsOpen(false);
+                  }
+                  if (e.key === 'Escape') setIsOpen(false);
+                }}
+                placeholder="기술 키워드를 검색해보세요 (예: React, Kubernetes, LLM)"
+                className="w-full rounded-[24px] bg-black/40 border border-white/10 hover:border-white/20 focus:border-white/30 outline-none px-12 py-4 text-base md:text-lg text-white placeholder:text-white/30 transition-all backdrop-blur-xl shadow-2xl"
+              />
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (suggestions[0]) goToKeyword(suggestions[0].category, suggestions[0].id);
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-2xl bg-blue-600 px-5 py-3 text-sm md:text-base font-black text-white transition-all shadow-lg shadow-blue-600/20 hover:bg-blue-500 active:scale-95"
+              >
+                검색
+              </button>
+            </div>
+
+            <AnimatePresence>
+              {isOpen && suggestions.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  className="mt-3 overflow-hidden rounded-[24px] border border-white/10 bg-[#2A2B30]/95 backdrop-blur-xl shadow-2xl"
+                >
+                  {suggestions.map((s) => (
+                    <button
+                      key={`${s.category}:${s.id}`}
+                      type="button"
+                      onClick={() => {
+                        goToKeyword(s.category, s.id);
+                        setIsOpen(false);
+                      }}
+                      className="w-full px-6 py-4 text-left transition-colors hover:bg-white/5"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base md:text-lg font-black text-white truncate">
+                              {s.id}
+                            </span>
+                            <span className="text-xs font-bold uppercase tracking-widest text-white/30">
+                              {s.categoryLabel}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-sm text-white/50 line-clamp-1">
+                            {s.desc}
+                          </div>
+                        </div>
+                        <span
+                          className="mt-1 h-2.5 w-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: s.color }}
+                        />
+                      </div>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
       </section>
 
       {/* --- Category Grid Section --- */}

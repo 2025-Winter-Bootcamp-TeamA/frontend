@@ -31,9 +31,9 @@ export default function ResumeList({
         ))}
       </div>
 
-      <div className="mt-6 flex items-center justify-center gap-2 text-sm text-zinc-300">
+      <div className="mt-6 flex items-center justify-center gap-2 text-sm text-[#9FA0A8]">
         <button
-          className="rounded-lg px-2 py-1 hover:bg-zinc-800 disabled:opacity-40"
+          className="rounded-xl bg-white/5 px-3 py-2 hover:bg-white/10 disabled:opacity-40 transition-colors"
           onClick={() => onPageChange(Math.max(1, page - 1))}
           disabled={page === 1}
         >
@@ -47,8 +47,10 @@ export default function ResumeList({
             <button
               key={p}
               className={[
-                "rounded-lg px-3 py-1",
-                active ? "bg-zinc-200 text-zinc-900" : "hover:bg-zinc-800",
+                "rounded-xl px-3 py-2 transition-colors",
+                active
+                  ? "bg-white text-[#1A1B1E] font-bold"
+                  : "bg-white/5 text-[#9FA0A8] hover:bg-white/10 hover:text-white",
               ].join(" ")}
               onClick={() => onPageChange(p)}
             >
@@ -58,7 +60,7 @@ export default function ResumeList({
         })}
 
         <button
-          className="rounded-lg px-2 py-1 hover:bg-zinc-800 disabled:opacity-40"
+          className="rounded-xl bg-white/5 px-3 py-2 hover:bg-white/10 disabled:opacity-40 transition-colors"
           onClick={() => onPageChange(Math.min(totalPages, page + 1))}
           disabled={page === totalPages}
         >
