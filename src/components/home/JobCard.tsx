@@ -14,7 +14,7 @@ export default function JobCard({ company, position, logo, description }: JobCar
     return (
         <motion.div 
         whileHover={{ y: -5 }}
-        className="min-w-[280px] bg-[#25262B] border border-white/5 rounded-2xl p-6 cursor-pointer hover:bg-[#2C2D33] transition-colors"
+        className="w-full min-w-[280px] bg-[#25262B] border border-white/5 rounded-2xl p-6 cursor-pointer hover:bg-[#2C2D33] transition-colors"
         >
         <div className="flex items-center gap-4 mb-4">
             <div className="w-12 h-12 bg-white rounded-xl overflow-hidden flex items-center justify-center p-2">

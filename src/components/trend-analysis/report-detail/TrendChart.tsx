@@ -57,7 +57,7 @@ import {
     };
 
     return (
-        <div className="w-full bg-[#1e2125] p-8 rounded-3xl border border-gray-800 shadow-2xl">
+        <div className="w-full bg-[#25262B] p-8 rounded-[24px] border border-white/10 shadow-2xl">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
             <h3 className="text-white text-xl font-bold tracking-tight">언급량 추이</h3>
             
@@ -105,9 +105,16 @@ import {
         
         <div className="h-[450px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={mergedData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
+            <LineChart data={mergedData} margin={{ top: 20, right: 20, left: 0, bottom: 28 }}>
                 <CartesianGrid strokeDasharray="0" vertical={false} stroke="#2d3135" />
-                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={15} />
+                <XAxis
+                  dataKey="label"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#94a3b8', fontSize: 12 }}
+                  tickMargin={12}
+                  interval="preserveStartEnd"
+                />
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={(val) => `${(val / 10000).toFixed(0)}만`} />
                 <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#374151', strokeWidth: 2 }} />
                 
@@ -116,8 +123,8 @@ import {
                 name="company"
                 type="monotone"
                 dataKey="company"
-                stroke={activeSegment === 'company' ? categoryColor : '#4b5563'} // 선택 안되면 회색
-                strokeOpacity={activeSegment === 'company' ? 1 : 0.4} // 비활성 시 희미하게
+                stroke={activeSegment === 'company' ? categoryColor : '#94a3b8'} // 비선택도 더 밝게
+                strokeOpacity={activeSegment === 'company' ? 1 : 0.45} // 비활성 시 희미하게
                 strokeWidth={activeSegment === 'company' ? 4 : 2}
                 dot={false}
                 activeDot={{ r: 6, fill: categoryColor, stroke: '#fff', strokeWidth: 2 }}
@@ -128,8 +135,8 @@ import {
                 name="community"
                 type="monotone"
                 dataKey="community"
-                stroke={activeSegment === 'community' ? categoryColor : '#4b5563'} // 선택 안되면 회색
-                strokeOpacity={activeSegment === 'community' ? 1 : 0.4} // 비활성 시 희미하게
+                stroke={activeSegment === 'community' ? categoryColor : '#94a3b8'} // 비선택도 더 밝게
+                strokeOpacity={activeSegment === 'community' ? 1 : 0.45} // 비활성 시 희미하게
                 strokeWidth={activeSegment === 'community' ? 4 : 2}
                 dot={false}
                 activeDot={{ r: 6, fill: categoryColor, stroke: '#fff', strokeWidth: 2 }}

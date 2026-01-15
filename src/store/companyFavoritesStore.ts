@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Company } from '@/app/map/_models/companies.types';
 
 interface CompanyFavoritesState {
@@ -8,6 +8,11 @@ interface CompanyFavoritesState {
   isFavorite: (companyId: string) => boolean;
   getFavoriteCompanyIds: () => string[];
 }
+
+// 저장될 때의 타입 (Set을 배열로 변환)
+type PersistedState = {
+  favoriteCompanyIds: string[];
+};
 
 export const useCompanyFavoritesStore = create<CompanyFavoritesState>()(
   persist(
@@ -36,23 +41,21 @@ export const useCompanyFavoritesStore = create<CompanyFavoritesState>()(
     }),
     {
       name: 'company-favorites-storage',
-      // Set을 배열로 변환하여 저장
-      serialize: (state) => {
-        return JSON.stringify({
-          favoriteCompanyIds: Array.from(state?.favoriteCompanyIds || []),
-        });
-      },
-      deserialize: (str) => {
-        try {
-          const parsed = JSON.parse(str);
-          return {
-            favoriteCompanyIds: new Set(parsed?.favoriteCompanyIds || []),
-          };
-        } catch (error) {
-          return {
-            favoriteCompanyIds: new Set<string>(),
-          };
-        }
+      storage: createJSONStorage(() => localStorage),
+      // 저장 시 Set을 배열로 변환
+      partialize: (state): PersistedState => ({
+        favoriteCompanyIds: Array.from(state.favoriteCompanyIds),
+      }),
+      // 불러올 때 배열을 Set으로 변환
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as PersistedState;
+        return {
+          ...currentState,
+          favoriteCompanyIds:
+            persisted?.favoriteCompanyIds && Array.isArray(persisted.favoriteCompanyIds)
+              ? new Set(persisted.favoriteCompanyIds)
+              : new Set<string>(),
+        };
       },
     }
   )

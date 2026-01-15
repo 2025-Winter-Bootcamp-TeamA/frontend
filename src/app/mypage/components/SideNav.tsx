@@ -13,10 +13,10 @@ export default function SideNav({
     <button
       onClick={() => onChange(id)}
       className={[
-        "w-full rounded-xl px-4 py-3 text-left text-sm transition",
+        "w-full rounded-xl px-4 py-3 text-left text-sm transition-all",
         active === id
-          ? "bg-zinc-800 text-zinc-100"
-          : "bg-transparent text-zinc-300 hover:bg-zinc-900/60 hover:text-zinc-100",
+          ? "bg-white/10 text-white"
+          : "bg-transparent text-[#9FA0A8] hover:bg-white/5 hover:text-white",
       ].join(" ")}
     >
       {label}
@@ -24,7 +24,7 @@ export default function SideNav({
   );
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
+    <div className="rounded-[20px] border border-[#9FA0A8]/30 bg-[#25262B] p-4 shadow-sm">
       <div className="space-y-2">
         <Item id="resume" label="이력서 관리" />
         <Item id="favorites" label="즐겨찾기 목록" />

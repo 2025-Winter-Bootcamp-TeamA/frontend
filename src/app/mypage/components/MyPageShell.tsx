@@ -71,14 +71,20 @@ export default function MyPageShell() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        <div className="grid grid-cols-12 gap-6">
-          <aside className="col-span-3">
+    <div className="relative min-h-screen overflow-hidden bg-[#1A1B1E] text-white">
+      {/* 배경 그라데이션(메인 Hero 느낌) */}
+      <div className="pointer-events-none absolute inset-0 z-0">
+        <div className="absolute top-[-10%] left-[-10%] h-[80%] w-[50%] rounded-full bg-blue-600/20 blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] h-[70%] w-[40%] rounded-full bg-purple-600/10 blur-[100px]" />
+      </div>
+
+      <div className="relative z-10 mx-auto max-w-7xl px-6 py-12">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+          <aside className="lg:col-span-3">
             <SideNav active={tab} onChange={setTab} />
           </aside>
 
-          <main className="col-span-9">
+          <main className="lg:col-span-9 min-w-0">
             {tab === "resume" && (
               <ResumeSection
                 resumes={pagedResumes}

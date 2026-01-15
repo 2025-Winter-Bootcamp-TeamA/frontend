@@ -14,25 +14,25 @@ export default function AIReportModal({
 }) {
   return (
     <ModalBase open={open} title="AI 분석 결과 통합 리포트" onClose={onClose}>
-      <div className="text-xs text-zinc-400">
-        대상: <span className="text-zinc-200">{resume?.title ?? "-"}</span>
+      <div className="text-xs text-[#9FA0A8]">
+        대상: <span className="text-white">{resume?.title ?? "-"}</span>
       </div>
 
       <div className="mt-4 space-y-4">
         <section>
-          <div className="mb-2 text-xs font-semibold text-zinc-200">분석내용</div>
-          <div className="h-44 rounded-xl border border-zinc-800 bg-zinc-900/30" />
+          <div className="mb-2 text-xs font-semibold text-white">분석내용</div>
+          <div className="h-44 rounded-2xl border border-white/10 bg-white/5" />
         </section>
 
         <section>
-          <div className="mb-2 text-xs font-semibold text-zinc-200">예상 질문</div>
-          <div className="h-44 rounded-xl border border-zinc-800 bg-zinc-900/30" />
+          <div className="mb-2 text-xs font-semibold text-white">예상 질문</div>
+          <div className="h-44 rounded-2xl border border-white/10 bg-white/5" />
         </section>
       </div>
 
       <div className="mt-6 flex items-center justify-center">
         <button
-          className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-400"
+          className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition-all shadow-lg shadow-blue-600/20 hover:bg-blue-500 active:scale-95"
           onClick={() => alert("PDF 다운로드(목업)!")}
         >
           PDF 파일 다운로드

@@ -36,14 +36,14 @@ interface DropdownProps {
         {/* 선택된 값 표시 버튼 */}
         <button
             onClick={() => setIsOpen(!isOpen)}
-            className="flex items-center gap-2 bg-black/40 border border-white/10 hover:border-white/20 transition-all px-3 py-1.5 rounded-xl text-[11px] font-bold text-white/80"
+            className="flex items-center gap-2 bg-black/40 border border-white/10 hover:border-white/20 transition-all px-4 py-2 rounded-2xl text-sm font-bold text-white/80"
         >
             {currentLabel}
             <motion.div
             animate={{ rotate: isOpen ? 180 : 0 }}
             transition={{ duration: 0.2 }}
             >
-            <ChevronDown size={14} className="text-white/40" />
+            <ChevronDown size={16} className="text-white/40" />
             </motion.div>
         </button>
 
@@ -55,7 +55,7 @@ interface DropdownProps {
                 animate={{ opacity: 1, y: 5, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="absolute right-0 z-50 min-w-[80px] bg-[#2A2B30] border border-white/10 rounded-xl shadow-2xl overflow-hidden backdrop-blur-xl"
+                className="absolute right-0 z-50 min-w-[110px] bg-[#2A2B30] border border-white/10 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-xl"
             >
                 {options.map((opt) => (
                 <li key={opt.value}>
@@ -64,7 +64,7 @@ interface DropdownProps {
                         onChange(opt.value as any);
                         setIsOpen(false);
                     }}
-                    className={`w-full text-left px-4 py-2.5 text-[11px] font-medium transition-colors
+                    className={`w-full text-left px-4 py-3 text-sm font-medium transition-colors
                         ${value === opt.value 
                         ? 'bg-blue-600 text-white' 
                         : 'text-white/60 hover:bg-white/5 hover:text-white'}

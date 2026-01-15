@@ -3,35 +3,11 @@
 @tailwind utilities;
 
 /* 기본 스타일 */
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-rgb: 10, 10, 10;
-  }
-}
-
 body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
   font-family: 'Pretendard', system-ui, sans-serif;
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-/* 다크 모드 기본 스타일 */
-.dark body {
   background-color: #1A1B1E;
   color: #ffffff;
-}
-
-/* 라이트 모드 기본 스타일 */
-.light body {
-  background-color: #ffffff;
-  color: #1A1B1E;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* 스크롤바 스타일 */
@@ -41,16 +17,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #1a1a1a;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: #404040;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+  background: #505050;
 }
 
 @layer utilities {

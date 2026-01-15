@@ -43,7 +43,9 @@ export default function Navbar() {
                                 <Link
                                     href={item.href}
                                     className={`text-[18px] transition-all duration-300 hover:text-white py-1 ${
-                                        pathname === item.href ? 'text-white font-bold' : 'text-[#9FA0A8]'
+                                        pathname === item.href 
+                                            ? 'text-white font-bold' 
+                                            : 'text-[#9FA0A8]'
                                     }`}
                                 >
                                     {item.name}
