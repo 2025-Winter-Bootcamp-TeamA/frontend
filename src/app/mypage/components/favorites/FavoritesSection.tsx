@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  mockFavoriteCompanies,
-} from "../../_models/favorites.mock";
 import { useFavoritesStore } from "@/store/favoritesStore";
+import { useCompanyFavoritesStore } from "@/store/companyFavoritesStore";
+import { mockCompanies } from "@/app/map/_models/companies.mock";
+import type { Company } from "@/app/map/_models/companies.types";
 import type {
-  FavoriteCompany,
   FavoriteTechStack,
   TechCategory,
 } from "../../_models/favorites.types";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
+import { useSession } from "next-auth/react";
+import LoginModal from "@/components/LoginModal";
 
 type FavoritesTab = "tech" | "company";
 type TechFilter = "all" | TechCategory;
@@ -160,13 +161,20 @@ export default function FavoritesSection() {
   const [techPage, setTechPage] = useState(1);
   const [companyPage, setCompanyPage] = useState(1);
   const [hoveredTechId, setHoveredTechId] = useState<string | null>(null);
+  const { data: session } = useSession();
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   // 즐겨찾기 store에서 읽어오기
   const { techStacks, toggleTechStack } = useFavoritesStore();
   const techFavorites = techStacks;
-  
-  const [companyFavorites, setCompanyFavorites] =
-    useState<FavoriteCompany[]>(mockFavoriteCompanies);
+
+  const favoriteCompanyIdsSet = useCompanyFavoritesStore((s) => s.favoriteCompanyIds);
+  const favoriteCompanyIdsArray = Array.from(favoriteCompanyIdsSet);
+  const { isFavorite, toggleFavorite } = useCompanyFavoritesStore();
+
+  const companyFavorites: Company[] = useMemo(() => {
+    return mockCompanies.map((c) => ({ ...c, isFavorite: isFavorite(c.id) }));
+  }, [favoriteCompanyIdsArray, isFavorite]);
 
   const filteredTech = useMemo(() => {
     let list = techFavorites.filter((t) => t.isFavorite);
@@ -190,10 +198,9 @@ export default function FavoritesSection() {
     Math.ceil(filteredTech.length / TECH_PAGE_SIZE),
   );
 
-  const favoriteCompanies = useMemo(
-    () => companyFavorites.filter((c) => c.isFavorite),
-    [companyFavorites],
-  );
+  const favoriteCompanies = useMemo(() => {
+    return companyFavorites.filter((c) => isFavorite(c.id));
+  }, [companyFavorites, favoriteCompanyIdsArray, isFavorite]);
 
   const pagedCompanies = useMemo(() => {
     const start = (companyPage - 1) * COMPANY_PAGE_SIZE;
@@ -209,12 +216,12 @@ export default function FavoritesSection() {
     toggleTechStack(tech);
   };
 
-  const handleToggleCompanyFavorite = (id: string) => {
-    setCompanyFavorites((prev) =>
-      prev.map((c) =>
-        c.id === id ? { ...c, isFavorite: !c.isFavorite } : c,
-      ),
-    );
+  const handleToggleCompanyFavorite = (company: Company) => {
+    if (!session) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+    toggleFavorite(company.id);
   };
 
   const renderEmpty = (label: string) => (
@@ -431,25 +438,31 @@ export default function FavoritesSection() {
                           {company.name}
                         </p>
                         <p className="mt-1 text-xs text-zinc-400 line-clamp-2">
-                          {company.description}
+                          {company.description || company.industry}
                         </p>
                         <p className="mt-1 text-[11px] text-zinc-500">
-                          기술 스택: {company.techStacks.join(", ")}
+                          지역: {company.area} · {company.address}
                         </p>
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      <a
-                        href={company.siteUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-full bg-zinc-800 px-3 py-1 text-[11px] font-medium text-zinc-100 hover:bg-zinc-700"
-                      >
-                        채용 사이트
-                      </a>
+                      {company.siteUrl ? (
+                        <a
+                          href={company.siteUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-full bg-zinc-800 px-3 py-1 text-[11px] font-medium text-zinc-100 hover:bg-zinc-700"
+                        >
+                          채용 사이트
+                        </a>
+                      ) : (
+                        <span className="rounded-full bg-zinc-900 px-3 py-1 text-[11px] font-medium text-zinc-500">
+                          링크 없음
+                        </span>
+                      )}
                       <button
                         type="button"
-                        onClick={() => handleToggleCompanyFavorite(company.id)}
+                        onClick={() => handleToggleCompanyFavorite(company)}
                         className="text-yellow-400 hover:text-zinc-500"
                         aria-label="즐겨찾기 해제"
                       >
@@ -468,6 +481,12 @@ export default function FavoritesSection() {
           )}
         </section>
       )}
+
+      {/* 비로그인 시 즐겨찾기 제한 */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+      />
     </div>
   );
 }
