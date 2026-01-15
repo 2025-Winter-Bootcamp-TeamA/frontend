@@ -19,7 +19,7 @@ export default function Navbar() {
         { name: '홈 피드', href: '/' },
         { name: '트렌드 분석', href: '/trend-analysis' },
         { name: '채용 지도', href: '/map' },
-        { name: 'AI 면접', href: '/ai-interview' },
+        { name: 'AI 면접', href: '/ai-interview/onboarding' },
     ];
 
     // 로그아웃 확인 후 실행될 함수
