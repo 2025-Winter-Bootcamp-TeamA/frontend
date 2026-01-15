@@ -212,11 +212,6 @@ export default function JobMapPage() {
             ))}
           </div>
         </section>
-
-        {/* 하단 크레딧 */}
-        <p className="mt-8 text-xs text-zinc-600 text-center">
-          지도 UI는 목업이며, 추후 지도 라이브러리 교체 가능
-        </p>
       </aside>
 
       {/* 오른쪽 지도 영역 */}
