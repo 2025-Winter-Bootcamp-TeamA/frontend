@@ -1,18 +1,22 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import type { MouseEvent } from "react";
+import { useMemo, useState } from "react";
 import { Search, Star } from "lucide-react";
-import { mockCompanies, getCompaniesByArea } from "./_models/companies.mock";
+import { getCompaniesByArea, mockCompanies } from "./_models/companies.mock";
 import type { Company, LocationArea } from "./_models/companies.types";
 import { useCompanyFavoritesStore } from "@/store/companyFavoritesStore";
+import { useSession } from "next-auth/react";
+import LoginModal from "@/components/LoginModal";
 
 export default function JobMapPage() {
-  const [selectedArea, setSelectedArea] = useState<LocationArea>("강남");
+  type AreaFilter = "전체" | LocationArea;
+  const [selectedArea, setSelectedArea] = useState<AreaFilter>("전체");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [mapZoom, setMapZoom] = useState(1);
-  const [mapCenter, setMapCenter] = useState({ x: 0, y: 0 });
-  const [companies, setCompanies] = useState<Company[]>(mockCompanies);
+  const { data: session } = useSession();
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   // 즐겨찾기 store (전체 상태 구독)
   const favoriteCompanyIdsSet = useCompanyFavoritesStore((state) => state.favoriteCompanyIds);
@@ -21,7 +25,9 @@ export default function JobMapPage() {
 
   // 지역별 회사 필터링 (즐겨찾기 상태 포함)
   const areaCompanies = useMemo(() => {
-    return getCompaniesByArea(selectedArea).map((company) => ({
+    const base =
+      selectedArea === "전체" ? mockCompanies : getCompaniesByArea(selectedArea);
+    return base.map((company) => ({
       ...company,
       isFavorite: isFavorite(company.id),
     }));
@@ -50,8 +56,12 @@ export default function JobMapPage() {
   }, [filteredCompanies, favoriteCompanyIdsArray, isFavorite]); // favoriteCompanyIdsArray 변경 시 재계산
 
   // 즐겨찾기 토글
-  const handleToggleFavorite = (company: Company, e?: React.MouseEvent) => {
+  const handleToggleFavorite = (company: Company, e?: MouseEvent) => {
     if (e) e.stopPropagation();
+    if (!session) {
+      setIsLoginModalOpen(true);
+      return;
+    }
     toggleFavorite(company.id);
     // store 업데이트로 인해 자동으로 리렌더링됨
   };
@@ -65,7 +75,7 @@ export default function JobMapPage() {
 
   // 회사 클릭 핸들러
   const handleCompanyClick = (company: Company) => {
-    setSelectedCompany(company);
+    setSelectedCompany((prev) => (prev?.id === company.id ? null : company));
   };
 
   return (
@@ -74,20 +84,32 @@ export default function JobMapPage() {
       <aside className="w-[400px] bg-[#212226] border-r border-white/10 p-6 overflow-y-auto">
         <h1 className="text-2xl font-bold mb-6">채용 지도</h1>
 
-        {/* 지역 선택 드롭다운 */}
-        <div className="mb-4">
-          <select
-            value={selectedArea}
-            onChange={(e) => {
-              setSelectedArea(e.target.value as LocationArea);
-              setSearchQuery("");
-              setSelectedCompany(null);
-            }}
-            className="w-full px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-sm text-white focus:outline-none focus:border-blue-500"
-          >
-            <option value="강남">강남</option>
-            <option value="판교">판교</option>
-          </select>
+        {/* 지역 토글: 전체 / 강남 / 판교 */}
+        <div className="mb-5">
+          <div className="inline-flex rounded-2xl bg-black/30 border border-white/10 p-1">
+            {(["전체", "강남", "판교"] as AreaFilter[]).map((area) => {
+              const active = selectedArea === area;
+              return (
+                <button
+                  key={area}
+                  type="button"
+                  onClick={() => {
+                    setSelectedArea(area);
+                    setSearchQuery("");
+                    setSelectedCompany(null);
+                  }}
+                  className={[
+                    "px-4 py-2 rounded-2xl text-sm font-semibold transition-all",
+                    active
+                      ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
+                      : "text-white/70 hover:text-white hover:bg-white/5",
+                  ].join(" ")}
+                >
+                  {area}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* 검색 바 */}
@@ -190,17 +212,13 @@ export default function JobMapPage() {
             ))}
           </div>
         </section>
-
-        {/* 하단 크레딧 */}
-        <p className="mt-8 text-xs text-zinc-600 text-center">
-          By Naver 지도 API
-        </p>
       </aside>
 
       {/* 오른쪽 지도 영역 */}
       <main
         className="flex-1 relative bg-zinc-900 overflow-hidden"
         onWheel={handleWheel}
+        onClick={() => setSelectedCompany(null)}
       >
         {/* 간단한 지도 배경 (SVG 또는 Canvas로 구현 가능) */}
         <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-800">
@@ -224,110 +242,97 @@ export default function JobMapPage() {
             <rect width="100%" height="100%" fill="url(#grid)" />
           </svg>
 
-          {/* 회사 마커 (강남 + 판교 모든 회사 표시) */}
-          {mockCompanies.map((company) => {
-            // 모든 회사의 즐겨찾기 상태 반영
-            const companyWithFavorite = {
+          {/* 회사 마커 (현재 필터/검색 결과만 표시) */}
+          {filteredCompanies.map((company) => {
+            const companyWithFavorite: Company = {
               ...company,
               isFavorite: isFavorite(company.id),
             };
-            
-            // 선택된 지역이 아니면 반투명하게 표시
-            const isInSelectedArea = company.area === selectedArea;
+
             // 강남 기준: 37.36 ~ 37.37, 127.10 ~ 127.11
             // 판교 기준: 37.39 ~ 37.40, 127.11 ~ 127.12
             const baseLat = company.area === "강남" ? 37.36 : 37.39;
             const baseLng = company.area === "강남" ? 127.10 : 127.11;
             const latRange = 0.01;
             const lngRange = 0.01;
-            
+
             const latPercent = ((company.latitude - baseLat) / latRange) * 100;
             const lngPercent = ((company.longitude - baseLng) / lngRange) * 100;
-            
+
             // 강남은 왼쪽, 판교는 오른쪽에 배치
             const leftOffset = company.area === "강남" ? 20 : 60;
-            
+
             return (
-            <button
-              key={company.id}
-              onClick={() => handleCompanyClick(companyWithFavorite)}
-              className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 z-10 ${
-                !isInSelectedArea ? "opacity-40" : ""
-              }`}
-              style={{
-                left: `${leftOffset + lngPercent * 0.3}%`,
-                top: `${20 + latPercent * 0.6}%`,
-                transform: `translate(-50%, -50%) scale(${mapZoom})`,
-              }}
-            >
-              <div className="relative">
-                <div
-                  className={`w-4 h-4 rounded-full border-2 ${
-                    selectedCompany?.id === company.id
-                      ? "bg-blue-500 border-blue-300 scale-150"
-                      : companyWithFavorite.isFavorite
-                      ? "bg-yellow-500 border-yellow-400"
-                      : "bg-blue-600 border-blue-400"
-                  } transition-all`}
-                />
-                {selectedCompany?.id === company.id && (
-                  <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-zinc-900 border border-zinc-700 rounded-lg p-3 min-w-[200px] shadow-xl z-10">
-                    <p className="font-semibold text-white mb-1">
-                      {companyWithFavorite.name}
-                    </p>
-                    <p className="text-xs text-zinc-400 mb-2">
-                      {companyWithFavorite.industry}
-                    </p>
-                    <button className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-xs font-medium text-white transition-colors">
-                      채용 정보 보기
-                    </button>
-                  </div>
-                )}
-              </div>
-            </button>
+              <button
+                key={company.id}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCompanyClick(companyWithFavorite);
+                }}
+                className="absolute transform -translate-x-1/2 -translate-y-1/2 transition-all hover:scale-110 z-10"
+                style={{
+                  left: `${leftOffset + lngPercent * 0.3}%`,
+                  top: `${20 + latPercent * 0.6}%`,
+                  transform: `translate(-50%, -50%) scale(${mapZoom})`,
+                }}
+                aria-label={`${company.name} 선택`}
+              >
+                <div className="relative">
+                  <div
+                    className={`w-4 h-4 rounded-full border-2 ${
+                      selectedCompany?.id === company.id
+                        ? "bg-blue-500 border-blue-300 scale-150"
+                        : companyWithFavorite.isFavorite
+                          ? "bg-yellow-500 border-yellow-400"
+                          : "bg-blue-600 border-blue-400"
+                    } transition-all`}
+                  />
+
+                  {/* 마커 팝업 1개만 노출: 하단 오버레이 제거 */}
+                  {selectedCompany?.id === company.id && (
+                    <div
+                      className="absolute top-6 left-1/2 -translate-x-1/2 bg-zinc-900 border border-zinc-700 rounded-lg p-3 min-w-[200px] shadow-xl z-10"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <p className="font-semibold text-white mb-1">
+                        {companyWithFavorite.name}
+                      </p>
+                      <p className="text-xs text-zinc-400 mb-2">
+                        {companyWithFavorite.industry}
+                      </p>
+                      <a
+                        href={companyWithFavorite.siteUrl || "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => {
+                          if (!companyWithFavorite.siteUrl) e.preventDefault();
+                        }}
+                        className={[
+                          "w-full px-3 py-1.5 rounded text-xs font-medium transition-colors inline-flex items-center justify-center",
+                          companyWithFavorite.siteUrl
+                            ? "bg-blue-600 hover:bg-blue-500 text-white"
+                            : "bg-zinc-800 text-zinc-400 cursor-not-allowed",
+                        ].join(" ")}
+                      >
+                        채용 정보 보기
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </button>
             );
           })}
         </div>
 
-        {/* 선택된 회사 정보 오버레이 */}
-        {selectedCompany && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-zinc-900 border border-zinc-700 rounded-lg p-4 min-w-[300px] shadow-xl z-20">
-            <div className="flex items-start gap-4">
-              <img
-                src={selectedCompany.logoUrl}
-                alt={selectedCompany.name}
-                className="w-12 h-12 rounded-lg object-contain bg-white p-1"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src =
-                    "https://ui-avatars.com/api/?name=" +
-                    selectedCompany.name +
-                    "&background=3b82f6&color=fff";
-                }}
-              />
-              <div className="flex-1">
-                <h3 className="font-semibold text-white mb-1">
-                  {selectedCompany.name}
-                </h3>
-                <p className="text-sm text-zinc-400 mb-2">
-                  {selectedCompany.industry}
-                </p>
-                <p className="text-xs text-zinc-500 mb-3">
-                  {selectedCompany.address}
-                </p>
-                <button className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium text-white transition-colors">
-                  채용 정보 보기
-                </button>
-              </div>
-              <button
-                onClick={() => setSelectedCompany(null)}
-                className="text-zinc-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
+        {/* 하단 오버레이 제거: "채용 정보 보기" 버튼 중복 방지 */}
       </main>
+
+      {/* 비로그인 시 즐겨찾기 제한 */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+      />
     </div>
   );
 }

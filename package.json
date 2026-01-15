@@ -30,7 +30,6 @@
     "react-force-graph-2d": "^1.29.0",
     "react-force-graph-3d": "^1.29.0",
     "react-hook-form": "^7.50.0",
-    "react-naver-maps": "^0.1.4",
     "react-query": "^3.39.3",
     "recharts": "^2.15.4",
     "tailwind-merge": "^2.2.1",
