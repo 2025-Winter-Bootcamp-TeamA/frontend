@@ -92,6 +92,27 @@ export default function JobSection() {
         scrollRef.current?.classList.remove('cursor-grabbing');
     };
 
+    const getScrollStep = () => {
+        const el = scrollRef.current;
+        if (!el) return 336; // 320(카드) + 16(gap-4) fallback
+
+        const firstChild = el.firstElementChild as HTMLElement | null;
+        const cardWidth = firstChild?.offsetWidth ?? 320;
+
+        // flex gap은 브라우저에서 gap/columnGap로 노출될 수 있음
+        const styles = window.getComputedStyle(el);
+        const gapRaw = styles.columnGap || styles.gap || '16px';
+        const gap = Number.parseFloat(gapRaw) || 16;
+
+        return cardWidth + gap;
+    };
+
+    const scrollByOneCard = (direction: -1 | 1) => {
+        const el = scrollRef.current;
+        if (!el) return;
+        el.scrollBy({ left: direction * getScrollStep(), behavior: 'smooth' });
+    };
+
     useEffect(() => {
         const el = scrollRef.current;
         if (el) {
@@ -111,7 +132,7 @@ export default function JobSection() {
                     
                     {/* 좌측 화살표 */}
                     <button 
-                        onClick={() => scrollRef.current?.scrollBy({ left: -400, behavior: 'smooth' })}
+                        onClick={() => scrollRef.current?.scrollBy({ left: -450, behavior: 'smooth' })}
                         className={`absolute left-0 top-1/2 -translate-y-1/2 z-20 p-2 transition-all hover:scale-110 active:scale-95 ${
                             scrollPosition === 'start' ? 'text-[#9FA0A8] opacity-30 cursor-default' : 'text-white opacity-100 hover:text-blue-400'
                         }`}
@@ -124,7 +145,7 @@ export default function JobSection() {
 
                     {/* 우측 화살표 */}
                     <button 
-                        onClick={() => scrollRef.current?.scrollBy({ left: 400, behavior: 'smooth' })}
+                        onClick={() => scrollRef.current?.scrollBy({ left: 450, behavior: 'smooth' })}
                         className={`absolute right-0 top-1/2 -translate-y-1/2 z-20 p-2 transition-all hover:scale-110 active:scale-95 ${
                             scrollPosition === 'end' ? 'text-[#9FA0A8] opacity-30 cursor-default' : 'text-white opacity-100 hover:text-blue-400'
                         }`}
@@ -142,10 +163,10 @@ export default function JobSection() {
                         onMouseMove={handleMouseMove}
                         onMouseUp={handleMouseUp}
                         onMouseLeave={handleMouseUp}
-                        className="flex gap-4 overflow-x-auto scroll-smooth cursor-grab select-none no-scrollbar py-2"
+                        className="flex gap-4 overflow-x-auto scroll-smooth cursor-grab select-none no-scrollbar py-2 snap-x snap-mandatory scroll-px-[calc(50%-160px)]"
                     >
                         {MOCK_JOBS.map((job) => (
-                            <div key={job.id} className="min-w-[320px] flex-shrink-0">
+                            <div key={job.id} className="w-[320px] flex-shrink-0 snap-center">
                                 <JobCard {...job} />
                             </div>
                         ))}

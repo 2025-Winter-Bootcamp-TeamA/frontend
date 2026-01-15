@@ -20,6 +20,7 @@ interface Props {
     
     // 애니메이션을 위한 상태
     const [displayCount, setDisplayCount] = useState(0);
+    const [hovered, setHovered] = useState<{ id: string; percentage: number } | null>(null);
 
     // 카운팅 애니메이션 로직
     useEffect(() => {
@@ -44,23 +45,36 @@ interface Props {
         percentage: Math.round((node.value / totalValue) * 100)
     }));
 
+    const centerLabel = hovered?.id ?? decodedId;
+    const centerPercent = hovered?.percentage ?? targetPercentage;
+
     return (
-        <div className="w-full bg-[#1e2125] p-8 rounded-3xl border border-gray-800 shadow-2xl h-full flex flex-col">
+        <div className="w-full bg-[#25262B] p-8 rounded-[24px] border border-white/10 shadow-2xl h-full flex flex-col">
         <h3 className="text-white text-lg font-bold mb-6 tracking-tight">시장 점유율</h3>
         
         <div className="relative flex-1 min-h-[300px]">
             {/* 중앙 정보창: 카운팅 애니메이션 적용 */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
-            <span className="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-1">
-                {decodedId}
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center z-10 pointer-events-none">
+            <span className="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2 max-w-[220px] truncate">
+                {centerLabel}
             </span>
-            <span className="text-5xl font-black text-white tabular-nums">
-                {displayCount}%
+            <span className="text-5xl font-black text-white tabular-nums leading-none">
+                {hovered ? centerPercent : displayCount}%
             </span>
             </div>
 
             <ResponsiveContainer width="100%" height="100%">
             <PieChart>
+                <defs>
+                    <linearGradient id="activeSliceGrad" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stopColor={categoryColor} stopOpacity={1} />
+                        <stop offset="100%" stopColor="#ffffff" stopOpacity={0.12} />
+                    </linearGradient>
+                    <linearGradient id="inactiveSliceGrad" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stopColor="#3a3f44" stopOpacity={0.9} />
+                        <stop offset="100%" stopColor="#111315" stopOpacity={1} />
+                    </linearGradient>
+                </defs>
                 <Pie
                 data={chartData}
                 cx="50%"
@@ -71,11 +85,15 @@ interface Props {
                 dataKey="value"
                 stroke="none"
                 animationDuration={1500}
+                onMouseLeave={() => setHovered(null)}
+                onMouseEnter={(payload: any) => {
+                    setHovered({ id: payload?.id ?? '-', percentage: payload?.percentage ?? 0 });
+                }}
                 >
                 {chartData.map((entry, index) => (
                     <Cell 
                     key={`cell-${index}`} 
-                    fill={entry.id.toLowerCase() === decodedId.toLowerCase() ? categoryColor : '#2d3135'} 
+                    fill={entry.id.toLowerCase() === decodedId.toLowerCase() ? 'url(#activeSliceGrad)' : 'url(#inactiveSliceGrad)'} 
                     style={{ outline: 'none' }}
                     />
                 ))}

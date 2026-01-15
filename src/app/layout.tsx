@@ -15,8 +15,8 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko">
-      <body className="bg-[#1A1B1E] text-white">
+    <html lang="ko" suppressHydrationWarning>
+      <body className="transition-colors duration-300">
         <AuthContext> {/* 클라이언트 컴포넌트인 Provider로 감싸기 */}
           <Navbar />
           <Providers>{children}</Providers>

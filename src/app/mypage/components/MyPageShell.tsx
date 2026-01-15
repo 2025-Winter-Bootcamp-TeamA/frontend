@@ -6,6 +6,8 @@ import SideNav from "./SideNav";
 import ResumeSection from "./resume/ResumeSection";
 import AIReportModal from "./resume/AIReportModal";
 import DeleteConfirmModal from "./resume/DeleteConfirmModal";
+import SettingsSection from "./settings/SettingsSection";
+import FavoritesSection from "./favorites/FavoritesSection";
 
 import type { Resume } from "../_models/resume.types";
 import { mockResumes } from "../_models/resume.mock";
@@ -69,14 +71,20 @@ export default function MyPageShell() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        <div className="grid grid-cols-12 gap-6">
-          <aside className="col-span-3">
+    <div className="relative min-h-screen overflow-hidden bg-[#1A1B1E] text-white">
+      {/* 배경 그라데이션(메인 Hero 느낌) */}
+      <div className="pointer-events-none absolute inset-0 z-0">
+        <div className="absolute top-[-10%] left-[-10%] h-[80%] w-[50%] rounded-full bg-blue-600/20 blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] h-[70%] w-[40%] rounded-full bg-purple-600/10 blur-[100px]" />
+      </div>
+
+      <div className="relative z-10 mx-auto max-w-7xl px-6 py-12">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+          <aside className="lg:col-span-3">
             <SideNav active={tab} onChange={setTab} />
           </aside>
 
-          <main className="col-span-9">
+          <main className="lg:col-span-9 min-w-0">
             {tab === "resume" && (
               <ResumeSection
                 resumes={pagedResumes}
@@ -89,19 +97,9 @@ export default function MyPageShell() {
               />
             )}
 
-            {tab === "favorites" && (
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-                <div className="text-lg font-semibold">즐겨찾기 목록</div>
-                <p className="mt-2 text-sm text-zinc-400">여기는 다음 단계에서 붙이면 돼.</p>
-              </div>
-            )}
+            {tab === "favorites" && <FavoritesSection />}
 
-            {tab === "settings" && (
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-                <div className="text-lg font-semibold">설정</div>
-                <p className="mt-2 text-sm text-zinc-400">여기도 다음 단계에서.</p>
-              </div>
-            )}
+            {tab === "settings" && <SettingsSection />}
           </main>
         </div>
       </div>
