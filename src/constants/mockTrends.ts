@@ -138,6 +138,41 @@ export const CATEGORY_INFO: CategoryInfoMap = {
       timeline: createTimeline(120000)
     }
   },
+  'app-mobile': {
+    name: 'App & Mobile', color: '#2E51B3',
+    company: {
+      nodes: [
+        { id: 'App & Mobile', group: 1, value: 120, desc: '모바일 애플리케이션 개발' },
+        { id: 'Swift', group: 2, value: 110, desc: 'iOS 네이티브 개발 언어' },
+        { id: 'Kotlin', group: 2, value: 105, desc: 'Android 네이티브 개발 언어' },
+        { id: 'Flutter', group: 2, value: 95, desc: '구글의 크로스플랫폼 프레임워크' },
+        { id: 'React Native', group: 3, value: 90, desc: '페이스북의 크로스플랫폼 프레임워크' },
+        { id: 'Firebase', group: 3, value: 80, desc: '모바일 백엔드 서비스(BaaS)' },
+      ],
+      links: [
+        { source: 'App & Mobile', target: 'Swift' }, { source: 'App & Mobile', target: 'Kotlin' },
+        { source: 'App & Mobile', target: 'Flutter' }, { source: 'App & Mobile', target: 'React Native' },
+        { source: 'Flutter', target: 'Firebase' }, { source: 'React Native', target: 'Firebase' },
+      ],
+      timeline: createTimeline(42000)
+    },
+    community: {
+      nodes: [
+        { id: 'App & Mobile', group: 1, value: 120, desc: '모바일 애플리케이션 개발' },
+        { id: 'SwiftUI', group: 2, value: 95, desc: '애플의 선언적 UI 프레임워크' },
+        { id: 'Jetpack Compose', group: 2, value: 90, desc: '안드로이드의 현대적 UI 도구' },
+        { id: 'Dart', group: 2, value: 85, desc: 'Flutter 개발 언어' },
+        { id: 'Expo', group: 3, value: 75, desc: 'React Native 개발 워크플로우' },
+        { id: 'Supabase', group: 3, value: 70, desc: '오픈소스 Firebase 대안' },
+      ],
+      links: [
+        { source: 'App & Mobile', target: 'SwiftUI' }, { source: 'App & Mobile', target: 'Jetpack Compose' },
+        { source: 'App & Mobile', target: 'Dart' }, { source: 'App & Mobile', target: 'Expo' },
+        { source: 'App & Mobile', target: 'Supabase' },
+      ],
+      timeline: createTimeline(58000)
+    }
+  },
   devops: {
     name: 'DevOps', color: '#FF9800',
     company: {
