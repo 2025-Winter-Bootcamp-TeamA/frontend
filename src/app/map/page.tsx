@@ -22,7 +22,6 @@ export default function JobMapPage() {
   const favoriteCompanyIdsSet = useCompanyFavoritesStore((state) => state.favoriteCompanyIds);
   const favoriteCompanyIdsArray = Array.from(favoriteCompanyIdsSet); // 의존성 배열용
   const { isFavorite, toggleFavorite } = useCompanyFavoritesStore();
-  const selectedIsFavorite = selectedCompany ? isFavorite(selectedCompany.id) : false;
 
   // 지역별 회사 필터링 (즐겨찾기 상태 포함)
   const areaCompanies = useMemo(() => {
@@ -76,7 +75,7 @@ export default function JobMapPage() {
 
   // 회사 클릭 핸들러
   const handleCompanyClick = (company: Company) => {
-    setSelectedCompany(company);
+    setSelectedCompany((prev) => (prev?.id === company.id ? null : company));
   };
 
   return (
@@ -284,93 +283,54 @@ export default function JobMapPage() {
                 }}
                 aria-label={`${company.name} 선택`}
               >
-                <div
-                  className={`w-4 h-4 rounded-full border-2 ${
-                    selectedCompany?.id === company.id
-                      ? "bg-blue-500 border-blue-300 scale-150"
-                      : companyWithFavorite.isFavorite
-                        ? "bg-yellow-500 border-yellow-400"
-                        : "bg-blue-600 border-blue-400"
-                  } transition-all`}
-                />
+                <div className="relative">
+                  <div
+                    className={`w-4 h-4 rounded-full border-2 ${
+                      selectedCompany?.id === company.id
+                        ? "bg-blue-500 border-blue-300 scale-150"
+                        : companyWithFavorite.isFavorite
+                          ? "bg-yellow-500 border-yellow-400"
+                          : "bg-blue-600 border-blue-400"
+                    } transition-all`}
+                  />
+
+                  {/* 마커 팝업 1개만 노출: 하단 오버레이 제거 */}
+                  {selectedCompany?.id === company.id && (
+                    <div
+                      className="absolute top-6 left-1/2 -translate-x-1/2 bg-zinc-900 border border-zinc-700 rounded-lg p-3 min-w-[200px] shadow-xl z-10"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <p className="font-semibold text-white mb-1">
+                        {companyWithFavorite.name}
+                      </p>
+                      <p className="text-xs text-zinc-400 mb-2">
+                        {companyWithFavorite.industry}
+                      </p>
+                      <a
+                        href={companyWithFavorite.siteUrl || "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => {
+                          if (!companyWithFavorite.siteUrl) e.preventDefault();
+                        }}
+                        className={[
+                          "w-full px-3 py-1.5 rounded text-xs font-medium transition-colors inline-flex items-center justify-center",
+                          companyWithFavorite.siteUrl
+                            ? "bg-blue-600 hover:bg-blue-500 text-white"
+                            : "bg-zinc-800 text-zinc-400 cursor-not-allowed",
+                        ].join(" ")}
+                      >
+                        채용 정보 보기
+                      </a>
+                    </div>
+                  )}
+                </div>
               </button>
             );
           })}
         </div>
 
-        {/* 선택된 회사 정보 오버레이 */}
-        {selectedCompany && (
-          <div
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-zinc-900 border border-zinc-700 rounded-lg p-4 min-w-[300px] shadow-xl z-20"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start gap-4">
-              <img
-                src={selectedCompany.logoUrl}
-                alt={selectedCompany.name}
-                className="w-12 h-12 rounded-lg object-contain bg-white p-1"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src =
-                    "https://ui-avatars.com/api/?name=" +
-                    selectedCompany.name +
-                    "&background=3b82f6&color=fff";
-                }}
-              />
-              <div className="flex-1">
-                <h3 className="font-semibold text-white mb-1">
-                  {selectedCompany.name}
-                </h3>
-                <p className="text-sm text-zinc-400 mb-2">
-                  {selectedCompany.industry}
-                </p>
-                <p className="text-xs text-zinc-500 mb-3">
-                  {selectedCompany.address}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={(e) => handleToggleFavorite(selectedCompany, e)}
-                    className={[
-                      "inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all border",
-                      selectedIsFavorite
-                        ? "bg-yellow-500/10 border-yellow-400/30 text-yellow-300 hover:bg-yellow-500/15"
-                        : "bg-white/5 border-white/10 text-white/80 hover:bg-white/10 hover:text-white",
-                    ].join(" ")}
-                  >
-                    <Star
-                      size={16}
-                      fill={selectedIsFavorite ? "currentColor" : "none"}
-                    />
-                    즐겨찾기
-                  </button>
-                  <a
-                    href={selectedCompany.siteUrl || "#"}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(e) => {
-                      if (!selectedCompany.siteUrl) e.preventDefault();
-                    }}
-                    className={[
-                      "flex-1 inline-flex items-center justify-center px-4 py-2 rounded-xl text-sm font-semibold transition-all",
-                      selectedCompany.siteUrl
-                        ? "bg-blue-600 hover:bg-blue-500 text-white"
-                        : "bg-zinc-800 text-zinc-400 cursor-not-allowed",
-                    ].join(" ")}
-                  >
-                    채용 정보 보기
-                  </a>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedCompany(null)}
-                className="text-zinc-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
+        {/* 하단 오버레이 제거: "채용 정보 보기" 버튼 중복 방지 */}
       </main>
 
       {/* 비로그인 시 즐겨찾기 제한 */}
