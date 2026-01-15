@@ -5,8 +5,12 @@ import { Search, Star } from "lucide-react";
 import { mockCompanies, getCompaniesByArea } from "./_models/companies.mock";
 import type { Company, LocationArea } from "./_models/companies.types";
 import { useCompanyFavoritesStore } from "@/store/companyFavoritesStore";
+import { useSession } from "next-auth/react";
+import LoginModal from "@/components/LoginModal";
 
 export default function JobMapPage() {
+  const { data: session } = useSession();
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [selectedArea, setSelectedArea] = useState<LocationArea>("강남");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -52,6 +56,10 @@ export default function JobMapPage() {
   // 즐겨찾기 토글
   const handleToggleFavorite = (company: Company, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    if (!session) {
+      setIsLoginModalOpen(true);
+      return;
+    }
     toggleFavorite(company.id);
     // store 업데이트로 인해 자동으로 리렌더링됨
   };
@@ -328,6 +336,9 @@ export default function JobMapPage() {
           </div>
         )}
       </main>
+
+      {/* 로그인 모달 */}
+      <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
     </div>
   );
 }

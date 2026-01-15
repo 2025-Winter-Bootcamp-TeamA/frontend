@@ -12,6 +12,7 @@ import { CATEGORY_INFO } from '@/constants/mockTrends';
 import { TimeLineDropdown } from '@/components/trend-analysis/TimeLineDropdown';
 import { useFavoritesStore, createTechStackFromNode } from '@/store/favoritesStore';
 import { useSession } from 'next-auth/react';
+import LoginModal from '@/components/LoginModal';
 
 // --- [인터페이스] ---
 interface GraphNode extends d3.SimulationNodeDatum {
@@ -156,6 +157,7 @@ export default function CategoryDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session } = useSession();
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [activeTab, setActiveTab] = useState<'company' | 'community'>('company');
@@ -411,7 +413,7 @@ export default function CategoryDetailPage() {
                     <button 
                       onClick={() => {
                         if (!session) {
-                          alert('로그인이 필요합니다.');
+                          setIsLoginModalOpen(true);
                           return;
                         }
                         if (currentCategory && selectedNode) {
@@ -446,6 +448,8 @@ export default function CategoryDetailPage() {
           </motion.aside>
         )}
       </AnimatePresence>
+
+      <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
     </div>
   );
 }

@@ -1,16 +1,19 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import { useState } from 'react';
 import { CATEGORY_INFO } from '@/constants/mockTrends';
 import TrendLineChart from '@/components/trend-analysis/report-detail/TrendChart';
 import MarketShareDonutChart from '@/components/trend-analysis/report-detail/MarketShareDonutChart';
 import { useFavoritesStore, createTechStackFromNode } from '@/store/favoritesStore';
 import { useSession } from 'next-auth/react';
+import LoginModal from '@/components/LoginModal';
 
 export default function ReportDetailPage() {
     const { category, id } = useParams();
     const { isTechStackFavorite, toggleTechStack } = useFavoritesStore();
     const { data: session } = useSession();
+    const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
     // 1. URL 인코딩 해결 (%20 -> 공백)
     const decodedId = decodeURIComponent(id as string);
@@ -73,7 +76,7 @@ export default function ReportDetailPage() {
             <button 
                 onClick={() => {
                   if (!session) {
-                    alert('로그인이 필요합니다.');
+                    setIsLoginModalOpen(true);
                     return;
                   }
                   if (categoryData && techInfo) {
@@ -122,7 +125,9 @@ export default function ReportDetailPage() {
                 />
             </div>
             </div>
-        </div>
+            </div>
+
+            <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
         </main>
     );
 }

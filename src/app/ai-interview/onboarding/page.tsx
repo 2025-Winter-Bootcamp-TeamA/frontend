@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, ChevronLeft, Building2, PieChart, Sparkles, ClipboardCheck, Rocket } from 'lucide-react';
+import LoginModal from '@/components/LoginModal';
 
 const ONBOARDING_STEPS = [
     {
@@ -39,6 +41,8 @@ const ONBOARDING_STEPS = [
 export default function AIInterviewOnboarding() {
     const [[currentStep, direction], setStep] = useState([0, 0]);
     const router = useRouter();
+    const { data: session, status } = useSession();
+    const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
     const variants = {
         initial: (direction: number) => ({
@@ -59,6 +63,11 @@ export default function AIInterviewOnboarding() {
         if (currentStep < ONBOARDING_STEPS.length - 1) {
         setStep([currentStep + 1, 1]);
         } else {
+        // 마지막 단계: 로그인된 경우에만 체험 진입, 비로그인이면 로그인 모달 노출
+        if (status !== 'authenticated' || !session) {
+            setIsLoginModalOpen(true);
+            return;
+        }
         localStorage.setItem('seenAIOnboarding', 'true'); // 루프 방지 기록
         router.push('/ai-interview');
         }
@@ -122,6 +131,7 @@ export default function AIInterviewOnboarding() {
             </button>
             </div>
         </div>
+        <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
         </div>
     );
 }
