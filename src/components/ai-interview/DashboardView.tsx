@@ -1,9 +1,118 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-// ✅ [수정됨] ExternalLink, Briefcase 아이콘 추가 임포트
-import { Star, FileText, CheckCircle2, AlertCircle, HelpCircle, ChevronRight, Sparkles, Hash, ExternalLink, Briefcase } from 'lucide-react';
-import Countup from '@/components/ai-interview/Countup';
+import { Star, FileText, CheckCircle2, TrendingUp, AlertCircle, HelpCircle, Briefcase, Hash, ChevronRight, Info } from 'lucide-react';
+
+// --- Mock Data: 이력서 본문 ---
+const MOCK_RESUME_TEXT = `
+안녕하세요, 사용자 경험을 중요시하는 프론트엔드 개발자입니다.
+React와 TypeScript를 주력으로 사용하며, 재사용 가능한 컴포넌트 설계에 깊은 관심을 가지고 있습니다.
+지난 프로젝트에서는 Next.js를 도입하여 초기 로딩 속도를 50% 개선하고 SEO 점수를 90점대로 끌어올린 경험이 있습니다.
+또한 Redux Toolkit을 활용해 복잡한 전역 상태를 효율적으로 관리했습니다.
+다만, 대규모 트래픽 처리를 위한 백엔드와의 최적화 협업 경험은 다소 부족하여, 현재 Node.js와 AWS를 학습하며 인프라에 대한 이해도를 높이고 있습니다.
+사용자의 피드백을 적극적으로 수용하여 서비스를 지속적으로 고도화하는 개발자가 되겠습니다.
+`;
+
+// --- [공통] 이력서 자체 분석 ---
+const COMMON_FEEDBACKS = [
+    {
+        id: 101,
+        type: 'strength',
+        targetText: '초기 로딩 속도를 50% 개선하고 SEO 점수를 90점대로',
+        comment: '단순 경험 나열이 아닌, 구체적 수치(50%, 90점)로 성과를 증명하여 설득력이 높습니다.',
+    },
+    {
+        id: 102,
+        type: 'improvement',
+        targetText: '백엔드와의 최적화 협업 경험은 다소 부족',
+        comment: '단점을 언급하는 데 그치지 않고, 이를 보완하기 위한 구체적인 학습 프로젝트(예: 채팅 서버 구축 등)를 언급하면 더 좋습니다.',
+    },
+    {
+        id: 103,
+        type: 'strength',
+        targetText: '재사용 가능한 컴포넌트 설계',
+        comment: '효율성을 중요시하는 개발자의 자질이 잘 드러납니다. 디자인 시스템 구축 경험이 있다면 추가해 보세요.',
+    }
+];
+
+// --- [기업별] 맞춤 적합도 분석 데이터 ---
+const COMPANY_SPECIFIC_FEEDBACKS: Record<string, any[]> = {
+    'Toss': [
+        {
+            id: 201,
+            type: 'matching',
+            targetText: '사용자의 피드백을 적극적으로 수용하여 서비스를 지속적으로 고도화',
+            comment: "Toss는 'Customer Obsession(고객 집착)'을 핵심 가치로 둡니다. 피드백 기반 개선 경험은 Toss의 인재상과 정확히 일치합니다.",
+        },
+        {
+            id: 202,
+            type: 'matching',
+            targetText: '복잡한 전역 상태를 효율적으로 관리',
+            comment: "송금/결제 등 복잡한 상태 관리가 필수적인 핀테크 도메인에서 매우 중요한 역량입니다.",
+        }
+    ],
+    'Kakao': [
+        {
+            id: 301,
+            type: 'matching',
+            targetText: '사용자 경험을 중요시하는',
+            comment: "Kakao는 '전 국민이 쓰는 쉬운 서비스'를 지향합니다. 기술보다 UX를 앞단에 두는 태도는 카카오의 철학에 부합합니다.",
+        },
+        {
+            id: 302,
+            type: 'improvement',
+            targetText: 'Next.js를 도입하여 초기 로딩 속도를 50% 개선',
+            comment: "카카오톡 내 웹뷰 환경에서의 성능 최적화 경험(Lighthouse 점수 등)을 덧붙인다면 더욱 강력한 어필이 될 것입니다.",
+        }
+    ],
+    'Naver': [
+        {
+            id: 401,
+            type: 'matching',
+            targetText: 'SEO 점수를 90점대로 끌어올린 경험',
+            comment: "검색 엔진(Naver)의 특성상 SEO와 웹 표준 준수 경험은 매우 높게 평가받는 항목입니다.",
+        },
+        {
+            id: 402,
+            type: 'matching',
+            targetText: '대규모 트래픽 처리를 위한 백엔드와의 최적화 협업',
+            comment: "네이버는 국내 최대 트래픽을 다룹니다. 비록 부족하다고 적으셨지만, 이 부분에 대한 관심과 학습 의지는 긍정적인 평가 요소입니다.",
+        }
+    ],
+    'Line': [
+        {
+            id: 501,
+            type: 'matching',
+            targetText: 'React와 TypeScript를 주력으로 사용',
+            comment: "LINE의 글로벌 프론트엔드 표준 스택과 일치합니다. 글로벌 서비스 고려 사항(i18n 등)을 경험해 본 적이 있다면 추가해 보세요.",
+        }
+    ],
+    'Coupang': [
+        {
+            id: 601,
+            type: 'matching',
+            targetText: '서비스를 지속적으로 고도화',
+            comment: "Coupang의 'Wow the Customer' 리더십 원칙과 맞닿아 있습니다. 데이터(A/B 테스트 등)에 기반한 의사결정 경험을 추가하면 완벽합니다.",
+        }
+    ],
+    'Baemin': [
+        {
+            id: 701,
+            type: 'matching',
+            targetText: '재사용 가능한 컴포넌트 설계',
+            comment: "우아한형제들은 디자인 시스템(Woowahan Design System)을 적극적으로 운영합니다. 컴포넌트 추상화 능력이 큰 강점입니다.",
+        }
+    ],
+    'Karrot': [
+        {
+            id: 801,
+            type: 'matching',
+            targetText: 'Node.js와 AWS를 학습하며 인프라에 대한 이해도',
+            comment: "당근마켓은 개발자가 주도적으로 서비스를 만드는 문화를 가집니다. 풀스택 역량과 인프라 이해도는 큰 가산점입니다.",
+        }
+    ]
+};
 
 interface DashboardViewProps {
     resumeTitle: string;
@@ -19,203 +128,260 @@ interface DashboardViewProps {
 export default function DashboardView({
     resumeTitle, resumeKeywords, sortedCompanies, selectedCompany, setSelectedCompany, toggleFavorite, matchScore, onOpenReport
 }: DashboardViewProps) {
+    const [activeFeedbackId, setActiveFeedbackId] = useState<number | null>(null);
 
-    // 기업 선택 전 빈 화면
-    if (!selectedCompany) {
+    // 기업 선택 여부에 따라 피드백 합치기
+    const currentFeedbacks = useMemo(() => {
+        const companyFeedbacks = selectedCompany ? (COMPANY_SPECIFIC_FEEDBACKS[selectedCompany.name] || []) : [];
+        return [...COMMON_FEEDBACKS, ...companyFeedbacks];
+    }, [selectedCompany]);
+
+    const getHighlightStyle = (type: string, isActive: boolean) => {
+        switch (type) {
+            case 'strength':
+                return isActive 
+                    ? 'bg-blue-500/30 text-blue-200 underline decoration-blue-500 decoration-2' 
+                    : 'text-blue-400 underline decoration-blue-500/50 decoration-2 hover:bg-blue-500/20';
+            case 'matching':
+                return isActive 
+                    ? 'bg-green-500/30 text-green-200 underline decoration-green-500 decoration-2' 
+                    : 'text-green-400 underline decoration-green-500/50 decoration-2 hover:bg-green-500/20';
+            case 'improvement':
+                return isActive 
+                    ? 'bg-orange-500/30 text-orange-200 underline decoration-orange-500 decoration-2' 
+                    : 'text-orange-400 underline decoration-orange-500/50 decoration-2 hover:bg-orange-500/20';
+            default: return '';
+        }
+    };
+
+    const renderHighlightedText = (text: string) => {
+        let parts = [{ text, type: 'normal', id: 0 }];
+
+        currentFeedbacks.forEach((fb) => {
+            const newParts: any[] = [];
+            parts.forEach((part) => {
+                if (part.type !== 'normal') {
+                    newParts.push(part);
+                    return;
+                }
+                const split = part.text.split(fb.targetText);
+                if (split.length > 1) {
+                    newParts.push({ text: split[0], type: 'normal', id: 0 });
+                    newParts.push({ text: fb.targetText, type: fb.type, id: fb.id });
+                    newParts.push({ text: split[1], type: 'normal', id: 0 });
+                } else {
+                    newParts.push(part);
+                }
+            });
+            parts = newParts;
+        });
+
         return (
-            <div className="grid grid-cols-1 lg:grid-cols-[3.5fr_4.5fr_4fr] gap-8 h-full items-start">
-                <section className="h-[750px] bg-[#212226] border border-white/5 rounded-[32px] p-6 opacity-50 flex flex-col items-center justify-center text-center">
-                    <p className="text-sm text-[#9FA0A8]">기업을 먼저 선택해주세요.</p>
-                </section>
-                <section className="bg-[#212226] border border-white/5 rounded-[32px] p-6 h-[750px] flex flex-col">
-                    <h3 className="text-lg font-bold mb-6 flex items-center gap-2 text-white">
-                        <Star className="text-yellow-400 fill-yellow-400" size={20} /> 기업 선택
+            <p className="text-gray-300 leading-relaxed whitespace-pre-wrap text-base">
+                {parts.map((part, idx) => (
+                    part.type === 'normal' ? (
+                        <span key={idx}>{part.text}</span>
+                    ) : (
+                        <span 
+                            key={idx}
+                            className={`relative font-bold cursor-pointer transition-all px-0.5 rounded ${getHighlightStyle(part.type, activeFeedbackId === part.id)}`}
+                            onMouseEnter={() => setActiveFeedbackId(part.id)}
+                            onMouseLeave={() => setActiveFeedbackId(null)}
+                        >
+                            {part.text}
+                        </span>
+                    )
+                ))}
+            </p>
+        );
+    };
+
+    return (
+        <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} 
+            className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full items-start"
+        >
+            {/* ================= LEFT COLUMN (3/12) ================= */}
+            <div className="lg:col-span-3 flex flex-col gap-6 h-[800px]">
+                
+                {/* 1. 기업 목록 */}
+                <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
+                    <h3 className="text-sm font-bold text-gray-400 mb-4 flex items-center gap-2 uppercase tracking-wider">
+                        <Briefcase size={14} /> Companies
                     </h3>
-                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
                         {sortedCompanies.map((c) => (
-                            <div key={c.id} onClick={() => setSelectedCompany(c)} className="p-5 rounded-2xl border border-white/5 bg-white/5 hover:bg-white/10 transition-all cursor-pointer flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-white p-1.5 flex items-center justify-center"><img src={c.logo} alt="" className="w-full h-full object-contain" /></div>
-                                    <div><h4 className="font-bold text-gray-200">{c.name}</h4></div>
+                            <div 
+                                key={c.id} 
+                                // ✅ [수정완료] null 전달 로직 제거 -> 단순히 객체 전달 (훅 내부에서 토글 처리)
+                                onClick={() => setSelectedCompany(c)}
+                                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center gap-3 select-none ${
+                                    selectedCompany?.id === c.id ? 'bg-green-600/20 border-green-500/50' : 'bg-white/5 border-transparent hover:bg-white/10'
+                                }`}
+                            >
+                                <div className="w-8 h-8 rounded-lg bg-white p-1 flex items-center justify-center shrink-0">
+                                    <img src={c.logo} alt="" className="w-full h-full object-contain" />
+                                </div>
+                                <div className="min-w-0">
+                                    <h4 className={`text-sm font-bold truncate ${selectedCompany?.id === c.id ? 'text-green-100' : 'text-gray-300'}`}>{c.name}</h4>
+                                    <p className="text-xs text-gray-500 truncate">{c.category}</p>
                                 </div>
                             </div>
                         ))}
                     </div>
                 </section>
-                <section className="h-[750px] bg-[#212226] border border-white/5 rounded-[32px] flex flex-col items-center justify-center text-center p-10">
-                    <Sparkles size={64} className="text-white/10 mb-6" />
-                    <h3 className="text-2xl font-bold text-white mb-2">분석 대기 중</h3>
-                    <p className="text-[#9FA0A8]">중앙 리스트에서 기업을 선택하면<br/>'{resumeTitle}' 이력서와의 적합도를 분석합니다.</p>
+
+                {/* 2. 내 키워드 */}
+                <section className="h-[250px] bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col">
+                    <h3 className="text-sm font-bold text-gray-400 mb-4 flex items-center gap-2 uppercase tracking-wider">
+                        <Hash size={14} /> My Tech Stack
+                    </h3>
+                    <div className="flex flex-wrap gap-2 content-start overflow-y-auto custom-scrollbar">
+                        {resumeKeywords.map((k, i) => (
+                            <span key={i} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs font-medium text-gray-300">
+                                {k}
+                            </span>
+                        ))}
+                    </div>
                 </section>
             </div>
-        );
-    }
 
-    return (
-        <motion.div 
-            key="dashboard"
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-            className="grid grid-cols-1 lg:grid-cols-[3.5fr_4.5fr_4fr] gap-6 h-full items-start"
-        >
-            {/* [좌측] 적합도 파이차트 + 이력서 키워드 */}
-            <section className="flex flex-col gap-6 h-[750px]">
-                <div className="flex-1 bg-[#212226] border border-white/5 rounded-[32px] p-6 flex flex-col items-center justify-center relative overflow-hidden">
-                    <div className="absolute inset-0 bg-blue-600/5 blur-3xl" />
-                    <div className="relative z-10 text-center">
-                        <h4 className="text-blue-400 font-bold text-xs tracking-widest uppercase mb-6">Match Score</h4>
-                        <div className="relative w-36 h-36 mx-auto mb-6">
-                            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 144 144">
-                                <circle cx="72" cy="72" r="60" stroke="#333" strokeWidth="12" fill="none" />
-                                <motion.circle 
-                                    cx="72" cy="72" r="60" stroke="#3B82F6" strokeWidth="12" fill="none" 
-                                    strokeDasharray="377" 
-                                    strokeDashoffset={377 - (377 * matchScore) / 100}
-                                    initial={{ strokeDashoffset: 377 }}
-                                    animate={{ strokeDashoffset: 377 - (377 * matchScore) / 100 }}
-                                    transition={{ duration: 1.5, ease: "easeOut" }}
-                                    strokeLinecap="round"
-                                />
-                            </svg>
-                            <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-5xl font-black text-white leading-none">
-                                    <Countup value={matchScore} />
-                                </span>
-                                <span className="text-sm font-bold text-gray-500 mt-1">%</span>
-                            </div>
-                        </div>
-                        <div className="bg-white/5 rounded-full px-4 py-1.5 text-xs text-gray-300 inline-block">
-                            {selectedCompany.name} 기업과 내 이력서의 적합도
+            {/* ================= CENTER COLUMN (6/12) ================= */}
+            <div className="lg:col-span-6 flex flex-col gap-6 h-[800px]">
+                
+                {/* 3. 이력서 뷰어 */}
+                <section className="flex-[2] bg-[#212226] border border-white/5 rounded-[24px] p-8 flex flex-col relative overflow-hidden group">
+                    <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${selectedCompany ? 'from-blue-500 via-green-500 to-orange-500' : 'from-blue-500 to-orange-500'} opacity-50`} />
+                    
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                            <FileText size={18} className="text-blue-400" /> 
+                            {resumeTitle}
+                        </h3>
+                        <div className="flex gap-3 text-xs font-bold">
+                             <span className="flex items-center gap-1.5 text-blue-400"><span className="w-2 h-2 rounded-full bg-blue-500"></span> 강점</span>
+                             <span className="flex items-center gap-1.5 text-orange-400"><span className="w-2 h-2 rounded-full bg-orange-500"></span> 보완점</span>
+                             {selectedCompany && (
+                                 <motion.span 
+                                    initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}
+                                    className="flex items-center gap-1.5 text-green-400"
+                                 >
+                                    <span className="w-2 h-2 rounded-full bg-green-500"></span> 기업 적합
+                                 </motion.span>
+                             )}
                         </div>
                     </div>
-                </div>
 
-                <div className="flex-[1.2] bg-[#212226] border border-white/5 rounded-[32px] p-6 flex flex-col">
-                    <h4 className="text-white font-bold text-sm mb-4 flex items-center gap-2">
-                        <Hash size={16} className="text-purple-400" /> 내 기술 키워드
-                    </h4>
-                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                        <div className="flex flex-wrap gap-2">
-                            {resumeKeywords.map((k, i) => (
-                                <span key={i} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl text-xs text-gray-300">
-                                    {k}
-                                </span>
-                            ))}
-                            {resumeKeywords.length === 0 && <span className="text-gray-500 text-xs">추출된 키워드가 없습니다.</span>}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#1A1B1E] rounded-xl p-6 border border-white/5 shadow-inner">
+                        {renderHighlightedText(MOCK_RESUME_TEXT)}
+                    </div>
+                </section>
+
+                {/* 4. AI 면접 질문 */}
+                <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-6 flex flex-col">
+                    <h3 className="text-sm font-bold text-purple-400 mb-4 flex items-center gap-2 uppercase tracking-wider">
+                        <HelpCircle size={16} /> AI Interview Questions
+                    </h3>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
+                        <div className="bg-purple-500/5 border border-purple-500/10 p-4 rounded-xl flex gap-3 hover:bg-purple-500/10 transition-colors">
+                            <span className="flex items-center justify-center w-5 h-5 rounded bg-purple-500/20 text-purple-400 text-xs font-bold shrink-0">Q1</span>
+                            <p className="text-gray-200 text-sm font-medium">
+                                {selectedCompany 
+                                    ? `${selectedCompany.name}의 채용 공고에 언급된 핵심 역량과 관련하여, 본인의 ${resumeKeywords[0] || '프로젝트'} 경험을 어떻게 기여할 수 있을지 설명해주세요.` 
+                                    : "이력서에 언급된 '초기 로딩 속도 50% 개선' 과정에서 가장 큰 기술적 병목은 무엇이었나요?"}
+                            </p>
                         </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* [중앙] 기업 선택 리스트 */}
-            <section className="bg-[#212226] border border-white/5 rounded-[32px] p-6 h-[750px] flex flex-col">
-                <h3 className="text-lg font-bold mb-6 flex items-center gap-2 text-white">
-                    <Star className="text-yellow-400 fill-yellow-400" size={20} /> 기업 목록
-                </h3>
-                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
-                    {sortedCompanies.map((c) => (
-                        <motion.div 
-                            layout
-                            key={c.id} 
-                            onClick={() => setSelectedCompany(c)} 
-                            className={`p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${selectedCompany?.id === c.id ? 'bg-blue-600 border-blue-500 shadow-xl shadow-blue-900/20' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-white p-1.5 flex items-center justify-center shadow-sm">
-                                    <img src={c.logo} alt="" className="w-full h-full object-contain" />
-                                </div>
-                                <div>
-                                    <h4 className={`font-bold ${selectedCompany?.id === c.id ? 'text-white' : 'text-gray-200'}`}>{c.name}</h4>
-                                    <p className={`text-xs ${selectedCompany?.id === c.id ? 'text-blue-200' : 'text-gray-500'}`}>{c.category}</p>
-                                </div>
-                            </div>
-                            <button onClick={(e) => toggleFavorite(e, c.id)} className="p-2 hover:bg-white/10 rounded-full transition-colors z-10">
-                                <Star size={20} fill={c.favorite ? "#EAB308" : "none"} className={c.favorite ? 'text-yellow-500' : selectedCompany?.id === c.id ? 'text-white/50' : 'text-gray-600'} />
-                            </button>
-                        </motion.div>
-                    ))}
-                </div>
-            </section>
-
-            {/* [우측] 분석 결과 + 통합 리포트 버튼 */}
-            <section className="h-[750px] flex flex-col gap-6">
-                <motion.div 
-                    initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} 
-                    className="flex-1 bg-[#212226] border border-white/5 rounded-[32px] p-8 flex flex-col gap-6 overflow-y-auto custom-scrollbar"
-                >
-                    {/* 강점 */}
-                    <div>
-                        <h4 className="flex items-center gap-2 text-green-400 font-bold mb-3 text-sm uppercase tracking-wider">
-                            <CheckCircle2 size={16} /> Resume Strengths
-                        </h4>
-                        <p className="text-gray-300 text-sm leading-relaxed bg-green-500/5 border border-green-500/10 p-4 rounded-xl">
-                            <span className="text-white font-bold">{resumeKeywords[0] || '보유 기술'}</span> 프로젝트 경험이 풍부하며, 
-                            {selectedCompany.name}의 실무 역량과 일치합니다.
-                        </p>
-                    </div>
-
-                    {/* 단점 */}
-                    <div>
-                        <h4 className="flex items-center gap-2 text-red-400 font-bold mb-3 text-sm uppercase tracking-wider">
-                            <AlertCircle size={16} /> Weaknesses
-                        </h4>
-                        <p className="text-gray-300 text-sm leading-relaxed bg-red-500/5 border border-red-500/10 p-4 rounded-xl">
-                            대규모 트래픽 처리 경험이 부족하여 시스템 설계 심화 질문 대비가 필요합니다.
-                        </p>
-                    </div>
-
-                    {/* AI 질문 */}
-                    <div>
-                        <h4 className="flex items-center gap-2 text-purple-400 font-bold mb-3 text-sm uppercase tracking-wider">
-                            <HelpCircle size={16} /> AI Interview Question
-                        </h4>
-                        <div className="bg-purple-500/10 border border-purple-500/20 p-4 rounded-xl">
-                            <p className="text-white font-bold text-sm leading-snug">
-                                "이력서에 기재하신 {resumeKeywords[0] || '프로젝트'} 경험에서 발생했던 가장 큰 기술적 이슈는 무엇이었나요?"
+                         <div className="bg-purple-500/5 border border-purple-500/10 p-4 rounded-xl flex gap-3 hover:bg-purple-500/10 transition-colors">
+                            <span className="flex items-center justify-center w-5 h-5 rounded bg-purple-500/20 text-purple-400 text-xs font-bold shrink-0">Q2</span>
+                            <p className="text-gray-200 text-sm font-medium">
+                                Redux Toolkit을 도입하면서 느꼈던 장점과, 만약 다른 상태 관리 라이브러리(Zustand 등)를 쓴다면 어떤 점이 달랐을지 비교해 보세요.
                             </p>
                         </div>
                     </div>
+                </section>
+            </div>
 
-                    {/* ✅ [추가됨] 채용공고 보러가기 버튼 (Wanted 링크) */}
-                    <div className="mt-auto pt-2">
-                        <a 
-                            href={`https://www.wanted.co.kr/search?query=${encodeURIComponent(selectedCompany.name)}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="w-full bg-[#1A1B1E] hover:bg-[#25262B] border border-white/10 rounded-2xl p-4 flex items-center justify-between group transition-all"
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                                    <Briefcase size={18} className="text-blue-400" />
-                                </div>
-                                <div className="text-left">
-                                    <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">
-                                        {selectedCompany.name} 채용공고 보러가기
-                                    </p>
-                                    <p className="text-xs text-[#9FA0A8]">Wanted에서 현직자 연봉과 공고 확인</p>
-                                </div>
-                            </div>
-                            <ExternalLink size={16} className="text-[#9FA0A8] group-hover:text-white transition-colors" />
-                        </a>
+            {/* ================= RIGHT COLUMN (3/12) ================= */}
+            <div className="lg:col-span-3 flex flex-col gap-6 h-[800px]">
+                
+                {/* 5. 상세 피드백 리스트 */}
+                <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-sm font-bold text-gray-400 flex items-center gap-2 uppercase tracking-wider">
+                            <CheckCircle2 size={14} /> Analysis Details
+                        </h3>
+                        {selectedCompany && (
+                            <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full border border-green-500/30">
+                                {selectedCompany.name} Fit
+                            </span>
+                        )}
                     </div>
-                </motion.div>
+                    
+                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
+                        {currentFeedbacks.length === 0 && (
+                            <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2">
+                                <Info size={24} />
+                                <span className="text-xs">분석 데이터가 없습니다.</span>
+                            </div>
+                        )}
+                        
+                        {currentFeedbacks.map((fb) => (
+                            <div 
+                                key={fb.id}
+                                onMouseEnter={() => setActiveFeedbackId(fb.id)}
+                                onMouseLeave={() => setActiveFeedbackId(null)}
+                                className={`p-4 rounded-xl border transition-all cursor-pointer relative select-none ${
+                                    fb.type === 'strength' 
+                                        ? (activeFeedbackId === fb.id ? 'bg-blue-500/10 border-blue-500/50' : 'bg-blue-500/5 border-blue-500/10')
+                                    : fb.type === 'matching'
+                                        ? (activeFeedbackId === fb.id ? 'bg-green-500/10 border-green-500/50 ring-1 ring-green-500/30' : 'bg-green-500/5 border-green-500/10')
+                                    : (activeFeedbackId === fb.id ? 'bg-orange-500/10 border-orange-500/50' : 'bg-orange-500/5 border-orange-500/10')
+                                }`}
+                            >
+                                <div className="flex items-center gap-2 mb-2">
+                                    {fb.type === 'strength' && <TrendingUp size={14} className="text-blue-400" />}
+                                    {fb.type === 'matching' && <CheckCircle2 size={14} className="text-green-400" />}
+                                    {fb.type === 'improvement' && <AlertCircle size={14} className="text-orange-400" />}
+                                    
+                                    <span className={`text-xs font-bold uppercase ${
+                                        fb.type === 'strength' ? 'text-blue-400' : 
+                                        fb.type === 'matching' ? 'text-green-400' : 'text-orange-400'
+                                    }`}>
+                                        {fb.type === 'strength' ? 'Strength' : 
+                                         fb.type === 'matching' ? 'Company Fit' : 'Suggestion'}
+                                    </span>
+                                </div>
+                                
+                                {fb.type === 'matching' && (
+                                    <div className="mb-2 text-[10px] text-green-300 bg-green-900/30 px-2 py-1 rounded inline-block">
+                                        🎯 기업 가치관 / 프로젝트 매칭
+                                    </div>
+                                )}
 
-                {/* 통합 리포트 버튼 */}
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-[28px] p-[1px] shrink-0"
+                                <p className="text-xs text-gray-500 mb-2 line-clamp-1 italic">"{fb.targetText}"</p>
+                                <p className="text-sm text-gray-200 leading-snug font-medium">
+                                    {fb.comment}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                {/* 6. 통합 리포트 버튼 */}
+                <button 
+                    onClick={onOpenReport}
+                    className="h-20 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-[24px] flex items-center justify-center gap-4 shadow-xl shadow-blue-900/20 transition-all transform hover:scale-[1.02] active:scale-[0.98] group"
                 >
-                    <button 
-                        onClick={onOpenReport}
-                        className="w-full bg-[#212226] hover:bg-[#2C2D33] rounded-[27px] py-5 flex flex-col items-center justify-center gap-1 transition-all group"
-                    >
-                        <div className="flex items-center gap-2">
-                            <FileText className="text-blue-400 group-hover:scale-110 transition-transform" size={20} />
-                            <span className="text-lg font-black text-white group-hover:text-blue-400 transition-colors">통합 리포트 확인하기</span>
-                        </div>
-                        <p className="text-white/40 text-xs">상세 분석 결과 및 면접 가이드 모달 열기</p>
-                    </button>
-                </motion.div>
-            </section>
+                    <div className="bg-white/10 p-2.5 rounded-xl group-hover:bg-white/20 transition-colors">
+                        <FileText size={24} className="text-white" />
+                    </div>
+                    <div className="text-left">
+                        <p className="font-bold text-lg leading-none">통합 리포트 확인</p>
+                        <p className="text-xs text-blue-200 mt-1 opacity-80">상세 분석 및 PDF 저장</p>
+                    </div>
+                    <ChevronRight size={20} className="text-white/50 group-hover:translate-x-1 transition-transform" />
+                </button>
+            </div>
         </motion.div>
     );
 }

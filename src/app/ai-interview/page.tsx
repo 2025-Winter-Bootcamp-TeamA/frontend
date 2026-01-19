@@ -11,17 +11,13 @@ import UploadSection from '@/components/ai-interview/UploadSection';
 import ResumePickerModal from '@/components/ai-interview/ResumePickerModal';
 import ViewSwitcher from '@/components/ai-interview/ViewSwitcher';
 import ReportModal from '@/components/ai-interview/ReportModal';
-
-// 뷰 컴포넌트
 import DashboardView from '@/components/ai-interview/DashboardView'; 
 import SimulationView from '@/components/ai-interview/SimulationView';
 
-// Hook & Data
 import { useSimulation } from '@/hooks/useSimulation';
 import type { Resume } from '@/app/mypage/_models/resume.types';
 import { mockResumes } from '@/app/mypage/_models/resume.mock';
 
-// 하위 컴포넌트
 function DropdownButton({ onClick, icon, text, hasBorder = false }: any) {
     return (
         <button onClick={onClick} className={`w-full flex items-center gap-4 px-6 py-5 text-sm hover:bg-white/5 text-left font-medium transition-colors ${hasBorder ? 'border-b border-white/5' : ''}`}>
@@ -46,25 +42,19 @@ export default function AIInterviewPage() {
     const searchParams = useSearchParams();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // --- State ---
     const [step, setStep] = useState<'empty' | 'analyzing' | 'result'>('empty');
     const [viewMode, setViewMode] = useState<'dashboard' | 'simulation'>('dashboard');
-    
     const [showDropdown, setShowDropdown] = useState(false);
     const [isResumePickerOpen, setIsResumePickerOpen] = useState(false);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false); 
-    
     const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
 
-    // 공통 데이터 훅
     const simulationData = useSimulation();
 
-    // 이력서용 키워드
     const resumeKeywords = selectedResume 
-        ? ['React', 'TypeScript', 'Next.js', 'Tailwind'] 
+        ? ['React', 'TypeScript', 'Next.js', 'Tailwind', 'Node.js', 'AWS'] 
         : [];
 
-    // 이력서용 매칭 점수
     const resumeMatchScore = useMemo(() => {
         if (!simulationData.selectedCompany) return 0;
         return Math.min(simulationData.selectedCompany.baseScore + (resumeKeywords.length * 8), 98);
@@ -76,7 +66,6 @@ export default function AIInterviewPage() {
         }
     }, [searchParams]);
 
-    // 핸들러
     const handleStartAnalysis = () => {
         setShowDropdown(false);
         setStep('analyzing');
@@ -107,17 +96,14 @@ export default function AIInterviewPage() {
     const triggerFileUpload = () => fileInputRef.current?.click();
 
     return (
-        // ✅ [수정됨] justify-center -> justify-start, pt-4 추가 (위쪽 정렬 및 상단 여백 최소화)
-        <div className="h-screen bg-[#1A1B1E] overflow-hidden flex flex-col items-center justify-start pt-4 text-white">
+        <div className="h-screen bg-[#1A1B1E] overflow-hidden flex flex-col items-center justify-start pt-6 text-white">
             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".pdf,.doc,.docx" />
-
-            {/* ✅ [수정됨] origin-center -> origin-top (축소 시 위쪽 기준으로 축소되어 상단 공백 제거) */}
-            <div className="max-w-[1600px] w-full h-full flex flex-col p-6 lg:p-10 scale-[0.95] origin-top">
-                
-                {/* --- HEADER --- */}
-                <header className="flex justify-between items-center mb-2">
+            
+            {/* ✅ max-w-[1800px] */}
+            <div className="max-w-[1800px] w-full h-full flex flex-col p-6 lg:p-10 scale-[0.95] origin-top">
+                <header className="flex justify-between items-center mb-4">
                     <div className="space-y-1">
-                        <h1 className="text-4xl font-black tracking-tighter uppercase">AI 역량 분석 리포트</h1>
+                        <h1 className="text-3xl font-black tracking-tighter uppercase">AI 역량 분석 리포트</h1>
                         <p className="text-sm text-[#9FA0A8]">
                             {selectedResume ? `분석 중인 이력서: ${selectedResume.title}` : '이력서를 등록하여 맞춤형 분석을 받아보세요.'}
                         </p>
@@ -132,9 +118,9 @@ export default function AIInterviewPage() {
                             <div className="relative">
                                 <button 
                                     onClick={() => setShowDropdown(!showDropdown)} 
-                                    className="w-12 h-12 rounded-full bg-[#25262B] border border-white/10 flex items-center justify-center hover:bg-[#2C2D33] transition-colors group"
+                                    className="w-10 h-10 rounded-full bg-[#25262B] border border-white/10 flex items-center justify-center hover:bg-[#2C2D33] transition-colors group"
                                 >
-                                    <ArrowRightLeft size={20} className="text-white group-hover:text-blue-400 transition-colors" />
+                                    <ArrowRightLeft size={18} className="text-white group-hover:text-blue-400 transition-colors" />
                                 </button>
                                 <AnimatePresence>
                                     {showDropdown && (
@@ -151,7 +137,6 @@ export default function AIInterviewPage() {
 
                 <ResumePickerModal open={isResumePickerOpen} resumes={mockResumes} onClose={() => setIsResumePickerOpen(false)} onSelect={handleSelectResume} />
 
-                {/* --- MAIN CONTENT --- */}
                 <main className="flex-1">
                     <AnimatePresence mode="wait">
                         {step === 'empty' && (
@@ -186,10 +171,11 @@ export default function AIInterviewPage() {
             
             <ScrollbarStyles />
 
+            {/* ✅ [수정] any 타입 캐스팅으로 에러 회피 */}
             <ReportModal
                 isOpen={isReportModalOpen}
                 onClose={() => setIsReportModalOpen(false)}
-                selectedCompany={simulationData.selectedCompany}
+                selectedCompany={simulationData.selectedCompany as any} 
                 selectedKeywords={viewMode === 'simulation' ? simulationData.selectedKeywords : resumeKeywords}
                 totalScore={viewMode === 'simulation' ? simulationData.matchScore : resumeMatchScore}
             />
