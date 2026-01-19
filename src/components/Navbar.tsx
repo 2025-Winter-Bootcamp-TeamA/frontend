@@ -18,7 +18,7 @@ export default function Navbar() {
     const navItems = [
         { name: '대시보드', href: '/' },
         { name: '채용 지도', href: '/map' },
-        { name: 'AI 면접', href: '/ai-interview/onboarding' },
+        { name: 'AI 면접', href: '/ai-interview' },
     ];
 
     // 로그아웃 확인 후 실행될 함수
