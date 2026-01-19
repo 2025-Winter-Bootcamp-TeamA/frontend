@@ -17,7 +17,7 @@ export const getTrendDataByCategory = async (category: string): Promise<Category
     });
   }
 
-  // 실제 백엔드 연동 시 (팀장님이 만든 axios 인스턴스 사용)
+  // 
   const response = await api.get<CategoryDetail>(`/trends/${category}/`);
   return response.data;
 };

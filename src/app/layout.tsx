@@ -3,6 +3,7 @@ import AuthContext from "@/components/AuthContext"; // 방금 만든 컴포넌�
 import Navbar from "@/components/Navbar";
 import "./globals.css";
 import { Providers } from "./providers";
+import Script from "next/script";
 
 // 서버 컴포넌트이므로 메타데이터 설정도 가능해집니다
 export const metadata = {

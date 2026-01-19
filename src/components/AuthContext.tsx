@@ -1,4 +1,4 @@
-'use client'; // [중요] 최상단에 이 코드가 반드시 있어야 함
+'use client';
 
 import { SessionProvider } from "next-auth/react";
 

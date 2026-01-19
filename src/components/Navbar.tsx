@@ -16,8 +16,7 @@ export default function Navbar() {
     const pathname = usePathname();
 
     const navItems = [
-        { name: '홈 피드', href: '/' },
-        { name: '트렌드 분석', href: '/trend-analysis' },
+        { name: '대시보드', href: '/' },
         { name: '채용 지도', href: '/map' },
         { name: 'AI 면접', href: '/ai-interview/onboarding' },
     ];

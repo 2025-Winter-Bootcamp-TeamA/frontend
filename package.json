@@ -30,15 +30,17 @@
     "react-force-graph-2d": "^1.29.0",
     "react-force-graph-3d": "^1.29.0",
     "react-hook-form": "^7.50.0",
+    "react-naver-maps": "^0.1.4",
     "react-query": "^3.39.3",
     "recharts": "^2.15.4",
+    "styled-components": "^6.3.8",
     "tailwind-merge": "^2.2.1",
-    "three": "^0.182.0",
     "zod": "^3.22.4",
     "zustand": "^4.5.0"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
+    "@types/navermaps": "^3.9.1",
     "@types/node": "^20.11.16",
     "@types/react": "^18.2.52",
     "@types/react-dom": "^18.2.18",
