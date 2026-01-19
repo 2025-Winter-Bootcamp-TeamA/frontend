@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Resume } from '@/app/mypage/_models/resume.types';
+import type { Resume } from '@/types';
 
 interface ResumePickerModalProps {
     open: boolean;
@@ -43,7 +43,7 @@ export default function ResumePickerModal({ open, resumes, onClose, onSelect }: 
                                         <div className="min-w-0">
                                             <div className="truncate text-sm font-semibold text-white">{r.title}</div>
                                             <div className="mt-1 text-xs text-[#9FA0A8]">
-                                                {r.company ? `${r.company} · ` : ''}등록일: {r.createdAt}
+                                                등록일: {r.createdAt}
                                             </div>
                                         </div>
                                         <span className="shrink-0 rounded-full bg-blue-600 px-3 py-1 text-[11px] font-bold text-white">선택</span>

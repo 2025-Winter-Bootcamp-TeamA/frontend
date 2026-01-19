@@ -15,8 +15,8 @@ import DashboardView from '@/components/ai-interview/DashboardView';
 import SimulationView from '@/components/ai-interview/SimulationView';
 
 import { useSimulation } from '@/hooks/useSimulation';
-import type { Resume } from '@/app/mypage/_models/resume.types';
-import { mockResumes } from '@/app/mypage/_models/resume.mock';
+import type { Resume } from '@/types';
+import { MOCK_RESUMES } from '@/data/mockData';
 
 function DropdownButton({ onClick, icon, text, hasBorder = false }: any) {
     return (
@@ -51,9 +51,14 @@ export default function AIInterviewPage() {
 
     const simulationData = useSimulation();
 
-    const resumeKeywords = selectedResume 
-        ? ['React', 'TypeScript', 'Next.js', 'Tailwind', 'Node.js', 'AWS'] 
-        : [];
+   const resumeKeywords = useMemo(() => {
+        if (!selectedResume) return [];
+        // techStacks가 있다면 이름만 추출, 없으면 기본값
+        if (selectedResume.techStacks && selectedResume.techStacks.length > 0) {
+            return selectedResume.techStacks.map(item => item.techStack.name);
+        }
+        return ['React', 'TypeScript', 'Next.js', 'Tailwind', 'Node.js', 'AWS'];
+    }, [selectedResume]);
 
     const resumeMatchScore = useMemo(() => {
         if (!simulationData.selectedCompany) return 0;
@@ -82,11 +87,12 @@ export default function AIInterviewPage() {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files?.[0]) {
              setSelectedResume({ 
-                id: '999', 
+                id: 9999, // 임시 숫자 ID
                 title: e.target.files[0].name, 
-                createdAt: '2026.01.20', 
-                company: '',
-                tags: [] 
+                createdAt: '2026.01.20',
+                updatedAt: '2026.01.20',
+                url: null,
+                techStacks: [] // 파일 업로드 시엔 비어있음 (분석 전)
             });
             setViewMode('dashboard');
             handleStartAnalysis();
@@ -135,7 +141,7 @@ export default function AIInterviewPage() {
                     </div>
                 </header>
 
-                <ResumePickerModal open={isResumePickerOpen} resumes={mockResumes} onClose={() => setIsResumePickerOpen(false)} onSelect={handleSelectResume} />
+                <ResumePickerModal open={isResumePickerOpen} resumes={MOCK_RESUMES} onClose={() => setIsResumePickerOpen(false)} onSelect={handleSelectResume} />
 
                 <main className="flex-1">
                     <AnimatePresence mode="wait">
