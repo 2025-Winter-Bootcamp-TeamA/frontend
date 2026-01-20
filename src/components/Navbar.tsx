@@ -1,19 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoginModal from './LoginModal';
-import { useSession, signOut } from "next-auth/react";
+import { getAuthTokens, clearAuthTokens } from '@/lib/auth';
 
 export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false); // 모바일 메뉴 상태
-    const { data: session } = useSession();
+    const [isLoggedIn, setIsLoggedIn] = useState(false); // 로그인 상태
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false); 
     const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false); // 로그아웃 모달 상태
     const pathname = usePathname();
+    const router = useRouter();
+
+    // 로그인 상태 확인
+    useEffect(() => {
+        const { accessToken } = getAuthTokens();
+        setIsLoggedIn(!!accessToken);
+    }, []);
 
     const navItems = [
         { name: '대시보드', href: '/' },
@@ -23,7 +30,10 @@ export default function Navbar() {
 
     // 로그아웃 확인 후 실행될 함수
     const handleLogout = () => {
-        signOut({ callbackUrl: '/' });
+        clearAuthTokens();
+        setIsLoggedIn(false);
+        setIsLogoutModalOpen(false);
+        router.push('/');
     };
 
     return (
@@ -59,7 +69,7 @@ export default function Navbar() {
 
                 {/* 우측 액션 버튼 (로그인/로그아웃/프로필) */}
                 <div className="flex items-center gap-4">
-                    {session ? (
+                    {isLoggedIn ? (
                         <div className="flex items-center gap-6">
                             {/* 데스크톱 로그아웃 버튼 */}
                             <button 
@@ -72,7 +82,7 @@ export default function Navbar() {
                                 <div className="w-[40px] h-[40px] overflow-hidden hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-lg"
                                      style={{ borderRadius: '10px' }}>
                                     <img
-                                        src={session.user?.image || 'https://via.placeholder.com/40'}
+                                        src="https://via.placeholder.com/40"
                                         alt="프로필"
                                         className="w-full h-full object-cover"
                                     />
@@ -126,7 +136,7 @@ export default function Navbar() {
                                 </Link>
                             ))}
                             <hr className="border-white/5 my-2" />
-                            {!session ? (
+                            {!isLoggedIn ? (
                                 <button 
                                     onClick={() => { setIsLoginModalOpen(true); setIsOpen(false); }} 
                                     className="text-[#9FA0A8] hover:text-white"

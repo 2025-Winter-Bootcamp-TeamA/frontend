@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { getSession, signOut } from 'next-auth/react';
+import { getAuthTokens, refreshAccessToken, clearAuthTokens } from './auth';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export const api = axios.create({
   // 백엔드 URL 구조에 맞춰 /api/v1을 유지합니다.
@@ -11,41 +11,62 @@ export const api = axios.create({
   },
 });
 
-// 요청 인터셉터: localStorage 대신 NextAuth 세션에서 토큰을 가져옵니다.
+// 요청 인터셉터: JWT 토큰을 헤더에 추가
 api.interceptors.request.use(
   async (config) => {
-    // 클라이언트 측에서 현재 세션 정보를 가져옵니다.
-    const session = await getSession();
+    const { accessToken } = getAuthTokens();
     
-    // 지난번 [...nextauth]/route.ts에서 설정한 대로 
-    // session.user 안에 백엔드에서 받은 access 토큰이 들어있습니다.
-    const token = (session?.user as any)?.access;
-
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
     }
+    
+    // FormData인 경우 Content-Type을 제거하여 axios가 자동으로 boundary를 설정하도록 함
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
+    
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// 응답 인터셉터: 401 에러(토큰 만료 등) 시 처리
+// 응답 인터셉터: 401 에러 시 토큰 갱신 시도
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // 토큰이 만료되어 401 에러가 발생한 경우
+    // 토큰 만료로 401 에러 발생 시
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      // [중요] NextAuth를 사용하면 리프레시 토큰 로직은 
-      // 보통 [...nextauth]/route.ts의 jwt 콜백에서 처리하는 것이 가장 깔끔합니다.
-      // 여기서는 토큰이 완전히 만료된 경우 로그아웃 처리를 하거나 에러를 던집니다.
-      
-      console.error("인증이 만료되었습니다. 다시 로그인해주세요.");
-      // 필요 시 자동 로그아웃 실행
-      // signOut({ callbackUrl: '/' }); 
+      try {
+        // 토큰 갱신 시도
+        const newAccessToken = await refreshAccessToken();
+        
+        if (newAccessToken) {
+          // 새 토큰으로 원래 요청 재시도
+          // Authorization 헤더를 명시적으로 설정
+          originalRequest.headers = originalRequest.headers || {};
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+          return api(originalRequest);
+        } else {
+          // 토큰 갱신 실패 시 로그아웃
+          clearAuthTokens();
+          if (typeof window !== 'undefined') {
+            window.location.href = '/';
+          }
+          return Promise.reject(error);
+        }
+      } catch (refreshError) {
+        // 토큰 갱신 실패 시 로그아웃
+        console.error("토큰 갱신 실패. 다시 로그인해주세요.", refreshError);
+        clearAuthTokens();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
+        return Promise.reject(error);
+      }
     }
 
     return Promise.reject(error);

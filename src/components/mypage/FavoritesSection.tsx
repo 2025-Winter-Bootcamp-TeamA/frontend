@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useFavoritesStore } from "@/store/favoritesStore";
 import { MOCK_CORPS, MOCK_TECH_STACKS } from "@/data/mockData";
-import { useSession } from "next-auth/react";
+import { getAuthTokens } from "@/lib/auth";
 import LoginModal from "@/components/LoginModal";
 import { TechCategory } from "@/types";
 
@@ -26,9 +26,14 @@ export default function FavoritesSection() {
   const [tab, setTab] = useState<FavoritesTab>("tech");
   const [techFilter, setTechFilter] = useState<TechFilter>("all");
   const [page, setPage] = useState(1);
-  
-  const { data: session } = useSession();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
+  // 로그인 상태 확인
+  useEffect(() => {
+    const { accessToken } = getAuthTokens();
+    setIsLoggedIn(!!accessToken);
+  }, []);
 
   // Store Hooks
   const { isTechFavorite, toggleTechFavorite, isCorpFavorite, toggleCorpFavorite } = useFavoritesStore();
@@ -60,7 +65,7 @@ export default function FavoritesSection() {
 
   // 핸들러
   const handleToggle = (id: number) => {
-    if (!session) {
+    if (!isLoggedIn) {
       setIsLoginModalOpen(true);
       return;
     }
