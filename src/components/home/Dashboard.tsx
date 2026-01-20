@@ -9,6 +9,7 @@ import StackRelationAnalysis from "./RelationAnalysis";
 
 // API 서비스 및 타입
 import { searchTechStacks } from "@/services/trendService";
+import { TechStackData } from "@/types/trend";
 
 // --- 헬퍼 함수: 디바운스 ---
 function useDebounce<T>(value: T, delay: number): T {
@@ -20,33 +21,29 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-// 초기 화면용 기본 데이터
-const DEFAULT_STACKS: (StackData & { officialSite: string })[] = [
+// ✅ [핵심] StackData(기존) + 추가 필드(공식사이트, 생성일 등)를 합친 타입 정의
+// 이를 통해 'created_at이 없다'는 오류를 해결합니다.
+interface DashboardStackData extends StackData {
+  officialSite: string;
+  created_at?: string; // 선택적 속성으로 정의
+}
+
+// ✅ [핵심] 타입을 DashboardStackData[]로 명시
+const DEFAULT_STACKS: DashboardStackData[] = [
   {
     id: 1,
     name: "React",
     count: 12540,
     growth: 12.5,
     color: "from-blue-500 to-cyan-400",
-    logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/React-icon.svg/1200px-React-icon.svg.png",
+    logo: "https://cdn.simpleicons.org/react",
     themeColor: "#3B82F6",
     description: "Meta가 개발한 컴포넌트 기반 UI 라이브러리",
-    officialSite: "https://react.dev"
+    officialSite: "https://react.dev",
+    created_at: new Date().toISOString()
   },
-  {
-    id: 2,
-    name: "Next.js",
-    count: 8230,
-    growth: 24.8,
-    color: "from-gray-600 to-gray-900",
-    logo: "https://assets.vercel.com/image/upload/v1662130559/nextjs/Icon_light_background.png",
-    themeColor: "#000000",
-    description: "React 기반의 풀스택 웹 프레임워크",
-    officialSite: "https://nextjs.org"
-  }
 ];
 
-// 차트 데이터 (수정됨: Props 호환)
 const MOCK_CHART_DATA = [
   { year: "2024.01", company: 45, community: 30 },
   { year: "2024.02", company: 52, community: 35 },
@@ -57,48 +54,72 @@ const MOCK_CHART_DATA = [
 ];
 
 export default function Dashboard() {
-    const [activeStack, setActiveStack] = useState(DEFAULT_STACKS[0]);
+    // 상태 타입 명시
+    const [activeStack, setActiveStack] = useState<DashboardStackData>(DEFAULT_STACKS[0]);
     const [viewMode, setViewMode] = useState<"chart" | "compare" | "graph">("chart");
     
-    // 검색 상태
     const [searchQuery, setSearchQuery] = useState("");
     const debouncedSearchQuery = useDebounce(searchQuery, 300);
-    const [filteredStacks, setFilteredStacks] = useState(DEFAULT_STACKS);
+    
+    // 상태 타입 명시
+    const [filteredStacks, setFilteredStacks] = useState<DashboardStackData[]>([]); 
     const [isSearching, setIsSearching] = useState(false);
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
 
-    // 연관 노드 (수정됨: Props 호환)
     const relatedNodes: string[] = ["Next.js", "TypeScript", "Tailwind CSS", "Redux", "Vite"];
 
-    // ✅ 검색 로직
-    useEffect(() => {
-        const fetchStacks = async () => {
-            if (!debouncedSearchQuery.trim()) {
-                setFilteredStacks(DEFAULT_STACKS); 
-                return;
-            }
+    // ✅ 데이터 포맷팅: API 데이터(TechStackData) -> 대시보드 데이터(DashboardStackData) 변환
+    const formatApiData = (apiResults: TechStackData[]): DashboardStackData[] => {
+        return apiResults.map((stack, index) => ({
+            id: stack.id,
+            name: stack.name,
+            // 없는 데이터는 랜덤/기본값 처리
+            count: Math.floor(Math.random() * 5000) + 1000, 
+            growth: parseFloat((Math.random() * 20).toFixed(1)),
+            color: index % 2 === 0 ? "from-blue-500 to-indigo-500" : "from-green-500 to-emerald-500",
+            // trendService에서 처리된 logo 사용
+            logo: stack.logo || "", 
+            themeColor: "#3B82F6", 
+            description: stack.description || stack.docs_url || "상세 설명이 없습니다.",
+            officialSite: stack.docs_url || "#",
+            created_at: stack.created_at
+        }));
+    };
 
+    // 초기 데이터 로딩 (전체 데이터)
+    useEffect(() => {
+        const loadAllData = async () => {
+            setIsInitialLoading(true);
+            try {
+                // 빈 문자열 검색 = 전체 데이터 반환 (trendService에서 처리)
+                const allData = await searchTechStacks("");
+                
+                if (allData.length > 0) {
+                    const formatted = formatApiData(allData);
+                    setFilteredStacks(formatted);
+                    setActiveStack(formatted[0]); // 첫 번째 아이템 선택
+                } else {
+                    setFilteredStacks(DEFAULT_STACKS);
+                }
+            } catch (e) {
+                console.error("Initial load error:", e);
+                setFilteredStacks(DEFAULT_STACKS);
+            } finally {
+                setIsInitialLoading(false);
+            }
+        };
+        loadAllData();
+    }, []);
+
+    // 검색 로직
+    useEffect(() => {
+        if (isInitialLoading) return;
+
+        const fetchStacks = async () => {
             setIsSearching(true);
             try {
                 const apiResults = await searchTechStacks(debouncedSearchQuery);
-
-                const formattedResults = apiResults.map((stack, index) => {
-                    // 로고가 없으면 UI Avatar 서비스 사용
-                    const fallbackLogo = `https://ui-avatars.com/api/?name=${encodeURIComponent(stack.name)}&background=random&color=fff&size=128`;
-                    
-                    return {
-                        id: stack.id,
-                        name: stack.name,
-                        count: Math.floor(Math.random() * 5000) + 1000, 
-                        growth: parseFloat((Math.random() * 20).toFixed(1)),
-                        color: index % 2 === 0 ? "from-blue-500 to-indigo-500" : "from-green-500 to-emerald-500",
-                        // 로고가 있으면 쓰고, 없으면 fallback 사용
-                        logo: stack.logo || fallbackLogo,
-                        themeColor: "#3B82F6", 
-                        description: stack.docs_url || "상세 설명이 없습니다.",
-                        officialSite: stack.docs_url || "#"
-                    };
-                });
-
+                const formattedResults = formatApiData(apiResults);
                 setFilteredStacks(formattedResults);
             } catch (error) {
                 console.error("Stack search failed:", error);
@@ -109,13 +130,13 @@ export default function Dashboard() {
         };
 
         fetchStacks();
-    }, [debouncedSearchQuery]);
+    }, [debouncedSearchQuery, isInitialLoading]);
 
-    // 이미지 에러 핸들러 (개별 함수로 분리)
+    // 이미지 에러 핸들러 (CDN에도 이미지가 없을 때)
     const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, name: string) => {
         const target = e.target as HTMLImageElement;
-        // 이미 fallback 로직이 있어도, 이미지 로드 자체가 실패하면 다시 fallback으로 교체
-        target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&size=128`;
+        // 텍스트 아이콘으로 대체
+        target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&size=128&bold=true`;
     };
 
     return (
@@ -128,7 +149,7 @@ export default function Dashboard() {
                 <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${activeStack.color} p-[2px] shadow-lg`}>
                     <div className="w-full h-full bg-[#2A2B30] rounded-2xl flex items-center justify-center p-3 overflow-hidden">
                         <img 
-                            src={activeStack.logo} 
+                            src={activeStack.logo || ""} 
                             alt={activeStack.name} 
                             className="w-full h-full object-contain"
                             onError={(e) => handleImageError(e, activeStack.name)}
@@ -144,7 +165,7 @@ export default function Dashboard() {
                         </span>
                     </div>
                     <div className="flex items-center gap-3 text-[#9FA0A8] text-sm">
-                        <span>언급량 {activeStack.count.toLocaleString()}회</span>
+                        <span>언급량 {activeStack.count?.toLocaleString()}회</span>
                         {activeStack.officialSite && activeStack.officialSite !== '#' && (
                             <>
                                 <span className="w-1 h-1 rounded-full bg-white/20" />
@@ -162,7 +183,7 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* 오른쪽: 검색창 */}
+            {/* 오른쪽: 검색창 및 뷰 모드 설정 */}
             <div className="flex items-center gap-3 w-full xl:w-auto">
                 <div className="relative flex-1 xl:w-64 group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-blue-400 transition-colors" size={18} />
@@ -197,7 +218,7 @@ export default function Dashboard() {
                                         >
                                             <div className="w-8 h-8 rounded-lg bg-white/10 p-1 flex items-center justify-center overflow-hidden shrink-0">
                                                 <img 
-                                                    src={stack.logo} 
+                                                    src={stack.logo || ""} 
                                                     alt={stack.name} 
                                                     className="w-full h-full object-contain" 
                                                     onError={(e) => handleImageError(e, stack.name)}
@@ -217,7 +238,6 @@ export default function Dashboard() {
                     </AnimatePresence>
                 </div>
 
-                {/* 뷰 모드 버튼들 */}
                 <div className="flex p-1 bg-white/5 rounded-xl border border-white/10">
                     <button onClick={() => setViewMode("chart")} className={`p-2 rounded-lg transition-all ${viewMode === "chart" ? "bg-white/10 text-white shadow-sm" : "text-white/40 hover:text-white"}`}>
                         <TrendingUp size={18} />
@@ -232,7 +252,7 @@ export default function Dashboard() {
             </div>
         </div>
 
-        {/* 메인 컨텐츠 */}
+        {/* 메인 컨텐츠 영역 */}
         <div className="flex-1 relative min-h-0">
             <AnimatePresence mode="wait">
                 <div className="w-full h-full">
@@ -243,7 +263,7 @@ export default function Dashboard() {
                     )}
                     {viewMode === "graph" && (
                         <motion.div key="node-graph" className="absolute inset-0 overflow-hidden">
-                            <StackRelationAnalysis mainStackName={activeStack.name} mainLogo={activeStack.logo} relatedNodes={relatedNodes} onClose={() => setViewMode("chart")} />
+                            <StackRelationAnalysis mainStackName={activeStack.name} mainLogo={activeStack.logo || ""} relatedNodes={relatedNodes} onClose={() => setViewMode("chart")} />
                         </motion.div>
                     )}
                     {viewMode === "chart" && (

@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Star, FileText, CheckCircle2, TrendingUp, AlertCircle, HelpCircle, Briefcase, Hash, ChevronRight, Info } from 'lucide-react';
+// ✅ [추가] 기술 스택 데이터를 가져오기 위해 서비스 임포트
+import { fetchAllTechStacks } from '@/services/trendService';
 
 // --- Mock Data: 이력서 본문 ---
 const MOCK_RESUME_TEXT = `
@@ -129,6 +131,34 @@ export default function DashboardView({
     resumeTitle, resumeKeywords, sortedCompanies, selectedCompany, setSelectedCompany, toggleFavorite, matchScore, onOpenReport
 }: DashboardViewProps) {
     const [activeFeedbackId, setActiveFeedbackId] = useState<number | null>(null);
+    
+    // ✅ [추가] 기술 스택 로고 매핑 상태
+    const [techLogos, setTechLogos] = useState<Record<string, string>>({});
+
+    // ✅ [추가] 컴포넌트 마운트 시 기술 스택 정보 가져오기
+    useEffect(() => {
+        const loadTechLogos = async () => {
+            try {
+                // trendService의 fetchAllTechStacks 사용 (백엔드 API 호출)
+                const stacks = await fetchAllTechStacks();
+                
+                // 검색 효율을 위해 { "react": "logo_url", "typescript": "logo_url" } 형태의 맵 생성
+                const logoMap: Record<string, string> = {};
+                stacks.forEach(stack => {
+                    if (stack.logo) {
+                        // 대소문자 무시 매칭을 위해 소문자로 키 저장
+                        logoMap[stack.name.toLowerCase()] = stack.logo;
+                    }
+                });
+                
+                setTechLogos(logoMap);
+            } catch (error) {
+                console.error("기술 스택 로고 로딩 실패:", error);
+            }
+        };
+
+        loadTechLogos();
+    }, []);
 
     // 기업 선택 여부에 따라 피드백 합치기
     const currentFeedbacks = useMemo(() => {
@@ -231,17 +261,30 @@ export default function DashboardView({
                     </div>
                 </section>
 
-                {/* 2. 내 키워드 */}
+                {/* 2. 내 키워드 (My Tech Stack) - ✅ 로고 이미지 추가됨 */}
                 <section className="h-[250px] bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col">
                     <h3 className="text-sm font-bold text-gray-400 mb-4 flex items-center gap-2 uppercase tracking-wider">
                         <Hash size={14} /> My Tech Stack
                     </h3>
                     <div className="flex flex-wrap gap-2 content-start overflow-y-auto custom-scrollbar">
-                        {resumeKeywords.map((k, i) => (
-                            <span key={i} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs font-medium text-gray-300">
-                                {k}
-                            </span>
-                        ))}
+                        {resumeKeywords.map((k, i) => {
+                            // 소문자로 변환하여 매핑된 로고 찾기
+                            const logoUrl = techLogos[k.toLowerCase()];
+                            return (
+                                <span key={i} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs font-medium text-gray-300 flex items-center gap-2 transition-colors hover:bg-white/10">
+                                    {/* 로고가 있으면 이미지 표시, 없으면 텍스트만 */}
+                                    {logoUrl && (
+                                        <img 
+                                            src={logoUrl} 
+                                            alt={k} 
+                                            className="w-4 h-4 object-contain"
+                                            onError={(e) => { e.currentTarget.style.display = 'none'; }} // 이미지 로드 실패 시 숨김
+                                        />
+                                    )}
+                                    {k}
+                                </span>
+                            );
+                        })}
                     </div>
                 </section>
             </div>

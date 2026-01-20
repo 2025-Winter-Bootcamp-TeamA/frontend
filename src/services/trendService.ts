@@ -1,142 +1,116 @@
 import api from '@/lib/api';
-import { CATEGORY_INFO } from '@/constants/mockTrends';
+import { AxiosResponse } from 'axios';
 import { CategoryDetail, TechStackData } from '@/types/trend';
 
-// 목데이터 사용 여부 (검색 로직에서는 무시됨)
-const USE_MOCK = true; 
-
-// 캐싱 변수
-let cachedAllStacks: TechStackData[] | null = null;
-
 // 페이지네이션 응답 타입
-interface PaginatedResponse {
+interface PaginatedResponse<T> {
   count: number;
   next: string | null;
   previous: string | null;
-  results: TechStackData[];
+  results: T[];
 }
 
-export const getTrendDataByCategory = async (category: string): Promise<CategoryDetail> => {
-  if (USE_MOCK) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(CATEGORY_INFO[category] || CATEGORY_INFO.frontend); 
-      }, 500);
-    });
-  }
-  const response = await api.get<CategoryDetail>(`/trends/${category}/`);
-  return response.data;
+/**
+ * ✅ [핵심] 기술 스택 이름을 기반으로 외부 CDN(Simple Icons) 주소 생성
+ */
+const getExternalLogoUrl = (name: string): string => {
+    // Simple Icons 슬러그 규칙 (소문자, 공백/특수문자 제거 및 변환)
+    const slug = name.toLowerCase()
+        .replace(/\./g, 'dot')      // . -> dot
+        .replace(/\s+/g, '')        // 공백 제거
+        .replace(/\+/g, 'plus')     // + -> plus
+        .replace(/#/g, 'sharp');    // # -> sharp
+
+    return `https://cdn.simpleicons.org/${slug}`;
 };
 
 /**
- * 전체 기술 스택 가져오기 (페이지네이션 자동 처리)
+ * 이미지 URL 정규화 (백엔드 로고 우선, 없으면 외부 CDN)
  */
-const fetchAllTechStacks = async (): Promise<TechStackData[]> => {
-  if (cachedAllStacks && cachedAllStacks.length > 0) return cachedAllStacks;
-
-  let allStacks: TechStackData[] = [];
-  let page = 1;
-  let hasNextPage = true;
-
-  try {
-    while (hasNextPage) {
-      const response = await api.get<TechStackData[] | PaginatedResponse>('/trends/tech-stacks/', {
-        params: { page: page }
-      });
-      const data = response.data;
-
-      if (Array.isArray(data)) {
-        allStacks = data;
-        hasNextPage = false;
-        break;
-      }
-
-      if ('results' in data) {
-        allStacks = [...allStacks, ...data.results];
-        if (data.next) {
-          page++;
-        } else {
-          hasNextPage = false;
-        }
-      } else {
-        hasNextPage = false;
-      }
+const normalizeLogoUrl = (url: string | null, name: string): string => {
+    // 1. 백엔드 DB에 로고 URL이 있는 경우
+    if (url) {
+        if (url.startsWith('http')) return url;
+        const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        return `${baseURL}${url.startsWith('/') ? '' : '/'}${url}`;
     }
-
-    cachedAllStacks = allStacks;
-    console.log(`Loaded ${allStacks.length} stacks.`);
-    return allStacks;
-
-  } catch (error) {
-    console.error('Failed to fetch all stacks:', error);
-    return allStacks.length > 0 ? allStacks : [];
-  }
+    // 2. 없으면 외부 CDN 주소 생성
+    return getExternalLogoUrl(name);
 };
 
 /**
- * ✅ [수정됨] 기술 스택 검색 API
- * - api.defaults가 undefined일 경우 오류가 나지 않도록 안전하게 접근(Optional Chaining)
+ * ✅ [핵심] 모든 페이지의 데이터를 순회하여 가져오는 함수
  */
-export const searchTechStacks = async (query: string): Promise<TechStackData[]> => {
-  try {
-    const allStacks = await fetchAllTechStacks();
-    if (!query.trim()) return [];
-
-    const lowerQuery = query.toLowerCase();
-    
-    // 1. 필터링
-    const filtered = allStacks.filter((stack) => 
-      stack.name.toLowerCase().includes(lowerQuery)
-    );
-
-    // 2. 정렬 (정확도 순)
-    const sorted = filtered.sort((a, b) => {
-      const nameA = a.name.toLowerCase();
-      const nameB = b.name.toLowerCase();
-
-      if (nameA === lowerQuery) return -1;
-      if (nameB === lowerQuery) return 1;
-
-      const startsA = nameA.startsWith(lowerQuery);
-      const startsB = nameB.startsWith(lowerQuery);
-      if (startsA && !startsB) return -1;
-      if (!startsA && startsB) return 1;
-
-      return nameA.localeCompare(nameB);
-    });
-
-    // 3. 로고 URL 정규화
-    // ⚠️ [수정] api.defaults?.baseURL로 안전하게 접근하고, 타입이 문자열인지 확인
-    // (api.defaults가 없거나 baseURL이 설정되지 않았을 경우 빈 문자열 처리)
-    const baseURL = (api.defaults?.baseURL as string) || '';
-    let serverOrigin = '';
+const fetchAllPages = async (initialUrl: string): Promise<TechStackData[]> => {
+    let allResults: TechStackData[] = [];
+    let nextUrl: string | null = initialUrl;
 
     try {
-      // baseURL이 존재하고 유효한 URL(http로 시작)일 때만 Origin 추출
-      if (baseURL && baseURL.startsWith('http')) {
-        const urlObj = new URL(baseURL);
-        serverOrigin = urlObj.origin; 
-      }
-    } catch (e) {
-      console.warn("Base URL parsing failed", e);
-    }
-    
-    return sorted.map(stack => {
-      let logoUrl = stack.logo;
-      
-      if (logoUrl && !logoUrl.startsWith('http')) {
-        const cleanPath = logoUrl.startsWith('/') ? logoUrl : `/${logoUrl}`;
-        
-        // Origin이 파악되었을 때만 도메인을 붙임
-        if (serverOrigin) {
-          logoUrl = `${serverOrigin}${cleanPath}`;
-        }
-      }
-      return { ...stack, logo: logoUrl };
-    });
+        while (nextUrl) {
+            // nextUrl이 http로 시작하면 baseURL 무시됨 (정상 동작)
+            const response: AxiosResponse<PaginatedResponse<TechStackData>> = await api.get(nextUrl);
+            const data = response.data;
 
-  } catch (error) {
-    console.error('Tech stack search error:', error);
-    return [];
-  }
+            if (data.results && Array.isArray(data.results)) {
+                allResults = [...allResults, ...data.results];
+            }
+
+            nextUrl = data.next; // 다음 페이지 URL (없으면 null)
+        }
+    } catch (error) {
+        console.error("Pagination fetch failed:", error);
+    }
+
+    return allResults;
+};
+
+// 카테고리별 트렌드 조회
+export const getTrendDataByCategory = async (category: string): Promise<CategoryDetail> => {
+    try {
+        const response = await api.get<CategoryDetail>(`/trends/${category}/`);
+        return response.data;
+    } catch (error) {
+        console.error("Failed to fetch category trend:", error);
+        throw error;
+    }
+};
+
+/**
+ * ✅ 기술 스택 검색 (전체 데이터 캐싱 + 필터링)
+ */
+let cachedAllStacks: TechStackData[] | null = null;
+
+export const searchTechStacks = async (query: string): Promise<TechStackData[]> => {
+    try {
+        // 1. 캐시 없으면 전체 데이터 로딩 (페이지네이션 순회)
+        if (!cachedAllStacks || cachedAllStacks.length === 0) {
+            cachedAllStacks = await fetchAllPages('/trends/tech-stacks/');
+        }
+
+        // 2. 데이터 가공 (로고 URL 생성)
+        const formattedStacks = cachedAllStacks.map(stack => ({
+            ...stack,
+            logo: normalizeLogoUrl(stack.logo, stack.name)
+        }));
+
+        // 3. 검색어 필터링
+        if (!query.trim()) {
+            return formattedStacks; 
+        }
+
+        const lowerQuery = query.toLowerCase();
+        
+        return formattedStacks.filter(stack => 
+            stack.name.toLowerCase().includes(lowerQuery) ||
+            (stack.description && stack.description.toLowerCase().includes(lowerQuery))
+        );
+
+    } catch (error) {
+        console.error("Failed to search tech stacks:", error);
+        return [];
+    }
+};
+
+export const fetchAllTechStacks = async (): Promise<TechStackData[]> => {
+    return searchTechStacks('');
 };

@@ -46,7 +46,6 @@ api.interceptors.response.use(
         
         if (newAccessToken) {
           // 새 토큰으로 원래 요청 재시도
-          // Authorization 헤더를 명시적으로 설정
           originalRequest.headers = originalRequest.headers || {};
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
           return api(originalRequest);
@@ -59,7 +58,7 @@ api.interceptors.response.use(
           return Promise.reject(error);
         }
       } catch (refreshError) {
-        // 토큰 갱신 실패 시 로그아웃
+        // 토큰 갱신 에러 발생 시 로그아웃
         console.error("토큰 갱신 실패. 다시 로그인해주세요.", refreshError);
         clearAuthTokens();
         if (typeof window !== 'undefined') {
