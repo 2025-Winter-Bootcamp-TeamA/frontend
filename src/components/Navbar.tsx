@@ -7,19 +7,45 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoginModal from './LoginModal';
 import { getAuthTokens, clearAuthTokens } from '@/lib/auth';
+import api from '@/lib/api'; // ✅ API 호출을 위해 추가
 
 export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false); // 모바일 메뉴 상태
     const [isLoggedIn, setIsLoggedIn] = useState(false); // 로그인 상태
+    const [profileImage, setProfileImage] = useState<string | null>(null); // ✅ 프로필 이미지 상태 추가
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false); 
     const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false); // 로그아웃 모달 상태
     const pathname = usePathname();
     const router = useRouter();
 
-    // 로그인 상태 확인
+    // ✅ 로그인 상태 및 프로필 이미지 확인 로직 수정
     useEffect(() => {
-        const { accessToken } = getAuthTokens();
-        setIsLoggedIn(!!accessToken);
+        const checkAuth = async () => {
+            const { accessToken } = getAuthTokens();
+            
+            if (accessToken) {
+                setIsLoggedIn(true);
+                try {
+                    // 1. 내 정보 조회 API 호출
+                    const response = await api.get('/users/me/');
+                    const userData = response.data;
+
+                    // 2. 백엔드에서 주는 이미지 URL 가져오기 (profile_image 또는 avatar)
+                    const imageUrl = userData.profile_image || userData.avatar;
+                    
+                    if (imageUrl) {
+                        setProfileImage(imageUrl);
+                    }
+                } catch (error) {
+                    console.error("사용자 정보 로딩 실패:", error);
+                }
+            } else {
+                setIsLoggedIn(false);
+                setProfileImage(null);
+            }
+        };
+
+        checkAuth();
     }, []);
 
     const navItems = [
@@ -32,6 +58,7 @@ export default function Navbar() {
     const handleLogout = () => {
         clearAuthTokens();
         setIsLoggedIn(false);
+        setProfileImage(null); // 이미지 초기화
         setIsLogoutModalOpen(false);
         router.push('/');
     };
@@ -71,7 +98,7 @@ export default function Navbar() {
                 <div className="flex items-center gap-4">
                     {isLoggedIn ? (
                         <div className="flex items-center gap-6">
-                            {/* 데스크톱 로그아웃 버튼 */}
+                            {/* 데스크톱 로그아웃 버튼 (기존 디자인 유지) */}
                             <button 
                                 className="hidden md:block text-[#9FA0A8] hover:text-red-400 transition-colors duration-300 text-[16px] font-medium"
                                 onClick={() => setIsLogoutModalOpen(true)}
@@ -81,10 +108,12 @@ export default function Navbar() {
                             <Link href="/mypage">
                                 <div className="w-[40px] h-[40px] overflow-hidden hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-lg"
                                      style={{ borderRadius: '10px' }}>
+                                    {/* ✅ 이미지 태그 수정: 동적 이미지 URL 사용 및 referrerPolicy 추가 */}
                                     <img
-                                        src="https://via.placeholder.com/40"
+                                        src={profileImage || "https://via.placeholder.com/40"}
                                         alt="프로필"
                                         className="w-full h-full object-cover"
+                                        referrerPolicy="no-referrer"
                                     />
                                 </div>
                             </Link>
