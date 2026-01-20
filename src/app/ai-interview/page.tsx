@@ -17,6 +17,7 @@ import SimulationView from '@/components/ai-interview/SimulationView';
 import { useSimulation } from '@/hooks/useSimulation';
 import type { Resume } from '@/types';
 import { MOCK_RESUMES } from '@/data/mockData';
+import { api } from '@/lib/api';
 
 function DropdownButton({ onClick, icon, text, hasBorder = false }: any) {
     return (
@@ -65,8 +66,45 @@ export default function AIInterviewPage() {
         return Math.min(simulationData.selectedCompany.baseScore + (resumeKeywords.length * 8), 98);
     }, [simulationData.selectedCompany, resumeKeywords]);
 
+    // 쿼리 파라미터에서 resumeId를 받아서 이력서 자동 로드
     useEffect(() => {
-        if (searchParams?.get('pickResume') === '1') {
+        const resumeId = searchParams?.get('resumeId');
+        if (resumeId) {
+            // API에서 이력서 정보 불러오기
+            const fetchResume = async () => {
+                try {
+                    const response = await api.get(`/resumes/${resumeId}/`);
+                    const resumeData = response.data;
+                    
+                    // API 응답을 Resume 타입으로 변환
+                    const resume: Resume = {
+                        id: resumeData.id,
+                        title: resumeData.title,
+                        url: resumeData.url,
+                        techStacks: resumeData.tech_stacks?.map((ts: any) => ({
+                            techStack: {
+                                id: ts.tech_stack?.id || ts.id,
+                                name: ts.tech_stack?.name || ts.name,
+                                logo: ts.tech_stack?.image || ts.image || null,
+                                docsUrl: ts.tech_stack?.link || ts.link || null,
+                                createdAt: '',
+                            }
+                        })) || [],
+                        createdAt: resumeData.created_at,
+                        updatedAt: resumeData.updated_at,
+                    };
+                    
+                    setSelectedResume(resume);
+                    setViewMode('dashboard');
+                    handleStartAnalysis();
+                } catch (error) {
+                    console.error('이력서 불러오기 실패:', error);
+                    alert('이력서를 불러올 수 없습니다.');
+                }
+            };
+            
+            fetchResume();
+        } else if (searchParams?.get('pickResume') === '1') {
             setIsResumePickerOpen(true);
         }
     }, [searchParams]);

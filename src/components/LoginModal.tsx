@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { signIn } from 'next-auth/react';
+import { startGoogleLogin } from '@/lib/auth';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -43,7 +43,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             </p>
 
             <button
-              onClick={() => signIn('google')}
+              onClick={startGoogleLogin}
               className="flex items-center justify-center gap-3 w-full bg-white text-gray-900 font-bold py-4 rounded-full hover:bg-gray-100 transition-all active:scale-95 shadow-lg"
             >
               <img src={GOOGLE_LOGO_URL} alt="Google" className="w-6 h-6" />

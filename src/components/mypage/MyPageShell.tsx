@@ -3,6 +3,7 @@
 import { useState } from "react";
 import SideNav from "./SideNav";
 import FavoritesSection from "./FavoritesSection";
+import ResumesSection from "./ResumesSection";
 
 type TabKey = "resume" | "favorites" | "settings";
 
@@ -26,11 +27,7 @@ export default function MyPageShell() {
 
           {/* 메인 컨텐츠 영역 */}
           <main className="lg:col-span-9 min-w-0">
-            {tab === "resume" && (
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-10 text-center text-zinc-400">
-                <p>이력서 관리 기능은 준비 중입니다.</p>
-              </div>
-            )}
+            {tab === "resume" && <ResumesSection />}
 
             {tab === "favorites" && <FavoritesSection />}
 
