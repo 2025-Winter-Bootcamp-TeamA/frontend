@@ -17,6 +17,9 @@ function CallbackContent() {
       // JWT 토큰 저장
       localStorage.setItem("access_token", access);
       localStorage.setItem("refresh_token", refresh);
+      
+      // ✅ 인증 성공 이벤트 발생 (Navbar가 인증 상태를 즉시 업데이트하도록)
+      window.dispatchEvent(new Event('authSuccess'));
 
       // 메인 페이지로 이동
       router.push("/");

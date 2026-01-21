@@ -5,7 +5,7 @@ export async function startGoogleLogin() {
   try {
     const API_URL = process.env.NEXT_PUBLIC_API_URL;
     const response = await fetch(
-      `${API_URL}/api/v1/auth/google/start/`
+      `${API_URL}/api/v1/users/auth/google/start/`
     );
     
     if (!response.ok) {
