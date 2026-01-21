@@ -19,6 +19,17 @@ const nextConfig = {
   // typescript: {
   //   ignoreBuildErrors: true,
   // },
+  /*
+  // API 프록시 설정 (vercel.json의 rewrites로 대체)
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/:path*`,
+      },
+    ];
+  },
+  */
 };
 
 module.exports = nextConfig;
