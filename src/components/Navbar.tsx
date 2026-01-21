@@ -34,7 +34,7 @@ export default function Navbar() {
 
                 // 2. 최신 정보를 위해 API 호출 (이름 기반 생성 로직은 삭제하고 순수 구글 이미지만 사용)
                 try {
-                    const response = await api.get('/auth/me/');
+                    const response = await api.get('/users/auth/me/');
                     const userData = response.data;
                     
                     // 백엔드(구글 로그인)에서 받은 이미지가 있다면 덮어쓰기
@@ -53,7 +53,27 @@ export default function Navbar() {
         };
 
         checkAuth();
-    }, []);
+        
+        // ✅ 로그인 후 토큰 저장 이벤트 리스너 추가
+        const handleStorageChange = (e: StorageEvent) => {
+            if (e.key === 'access_token') {
+                checkAuth();
+            }
+        };
+        
+        // ✅ 커스텀 이벤트 리스너 (같은 탭에서 발생하는 localStorage 변경 감지)
+        const handleAuthSuccess = () => {
+            checkAuth();
+        };
+        
+        window.addEventListener('storage', handleStorageChange);
+        window.addEventListener('authSuccess', handleAuthSuccess);
+        
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('authSuccess', handleAuthSuccess);
+        };
+    }, [pathname]); // ✅ pathname 변경 시에도 인증 상태 재확인
 
     const navItems = [
         { name: '대시보드', href: '/' },
