@@ -3,21 +3,45 @@
  */
 export async function startGoogleLogin() {
   try {
+    // vercel.json의 rewrites를 사용하여 프록시 경로로 요청
+    // /api/:path* -> https://api.devroad.cloud/api/:path*
+    // 따라서 /api/v1/auth/google/start/로 요청하면
+    // https://api.devroad.cloud/api/v1/auth/google/start/로 프록시됨
+    
+    // 개발 환경과 프로덕션 환경 모두 /api를 통해 프록시 사용
     const API_URL = process.env.NEXT_PUBLIC_API_URL;
-    const response = await fetch(
-      `${API_URL}/api/v1/auth/google/start/`
-    );
+    const apiPath = API_URL 
+      ? `${API_URL}/api/v1/auth/google/start/`
+      : '/api/v1/auth/google/start/';
+    
+    console.log('Google 로그인 요청:', apiPath);
+    
+    const response = await fetch(apiPath, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
     
     if (!response.ok) {
-      throw new Error("OAuth URL을 가져올 수 없습니다.");
+      const errorText = await response.text();
+      console.error("OAuth URL 요청 실패:", response.status, errorText);
+      throw new Error(`OAuth URL을 가져올 수 없습니다. (${response.status})`);
     }
     
     const data = await response.json();
+    console.log('Google 로그인 응답:', data);
+    
+    if (!data.redirectUrl) {
+      console.error("응답 데이터:", data);
+      throw new Error("리다이렉트 URL을 받지 못했습니다.");
+    }
     
     // Google 로그인 페이지로 리다이렉트
     window.location.href = data.redirectUrl;
   } catch (error) {
     console.error("Google 로그인 시작 실패:", error);
+    alert("로그인에 실패했습니다. 잠시 후 다시 시도해주세요.");
     throw error;
   }
 }
