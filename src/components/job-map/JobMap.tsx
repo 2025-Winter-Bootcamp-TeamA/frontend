@@ -147,7 +147,7 @@ export default function JobMap() {
   const [center, setCenter] = useState({ lat: 37.501, lng: 127.028 });
   const [level, setLevel] = useState(8); 
   const [favorites, setFavorites] = useState<number[]>([101, 401]);
-  const [showRegions, setShowRegions] = useState(true);
+  const [showRegions, setShowRegions] = useState(false);
 
   // --- 연관 검색어 ---
   const suggestions = useMemo(() => {
@@ -270,7 +270,7 @@ export default function JobMap() {
       <div className="w-full lg:w-[400px] bg-[#25262B] border-r border-white/5 flex flex-col z-20 shadow-xl">
         <div className="p-6 pb-4 border-b border-white/5 relative">
           <h2 className="text-2xl font-black text-white mb-4 flex items-center gap-2">
-            채용 지도 <span className="text-xs font-normal text-gray-500 bg-white/10 px-2 py-1 rounded-full">Beta</span>
+            채용 지도
           </h2>
           
           <div className="relative z-50">
