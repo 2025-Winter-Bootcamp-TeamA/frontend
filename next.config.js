@@ -9,18 +9,8 @@ const nextConfig = {
         hostname: '**',
       },
     ],
+    domains: ['lh3.googleusercontent.com', 'k.kakaocdn.net'],
   },
-  /*
-  // API 프록시 설정
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/:path*`,
-      },
-    ];
-  },
-  */
 };
 
 module.exports = nextConfig;

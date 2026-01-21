@@ -1,30 +1,75 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoginModal from './LoginModal';
-import { useSession, signOut } from "next-auth/react";
+import { getAuthTokens, clearAuthTokens } from '@/lib/auth';
+import api from '@/lib/api'; 
 
 export default function Navbar() {
-    const [isOpen, setIsOpen] = useState(false); // 모바일 메뉴 상태
-    const { data: session } = useSession();
+    const [isOpen, setIsOpen] = useState(false);
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [profileImage, setProfileImage] = useState<string | null>(null);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false); 
-    const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false); // 로그아웃 모달 상태
+    const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
     const pathname = usePathname();
+    const router = useRouter();
+
+    // ✅ 로그인 체크 및 이미지 로드 (프론트엔드 전용 로직)
+    useEffect(() => {
+        const checkAuth = async () => {
+            const { accessToken } = getAuthTokens();
+            
+            if (accessToken) {
+                setIsLoggedIn(true);
+                
+                // 1. LocalStorage에서 저장된 구글 이미지 먼저 확인
+                const savedImage = localStorage.getItem('user_profile_image');
+                if (savedImage) {
+                    setProfileImage(savedImage);
+                } 
+
+                // 2. 최신 정보를 위해 API 호출 (이름 기반 생성 로직은 삭제하고 순수 구글 이미지만 사용)
+                try {
+                    const response = await api.get('/auth/me/');
+                    const userData = response.data;
+                    
+                    // 백엔드(구글 로그인)에서 받은 이미지가 있다면 덮어쓰기
+                    if (userData.profile_image) {
+                        setProfileImage(userData.profile_image);
+                        localStorage.setItem('user_profile_image', userData.profile_image);
+                    }
+                    // 임의 아바타 생성 로직(ui-avatars) 삭제함: 구글 이미지가 없으면 기본값 유지
+                } catch (error) {
+                    console.error("정보 로딩 실패", error);
+                }
+            } else {
+                setIsLoggedIn(false);
+                setProfileImage(null);
+            }
+        };
+
+        checkAuth();
+    }, []);
 
     const navItems = [
-        { name: '홈 피드', href: '/' },
-        { name: '트렌드 분석', href: '/trend-analysis' },
+        { name: '대시보드', href: '/' },
         { name: '채용 지도', href: '/map' },
-        { name: 'AI 면접', href: '/ai-interview/onboarding' },
+        { name: 'AI 면접', href: '/ai-interview' },
     ];
 
-    // 로그아웃 확인 후 실행될 함수
     const handleLogout = () => {
-        signOut({ callbackUrl: '/' });
+        clearAuthTokens();
+        // ✅ 로그아웃 시 저장된 이미지도 삭제
+        localStorage.removeItem('user_profile_image');
+        
+        setIsLoggedIn(false);
+        setProfileImage(null);
+        setIsLogoutModalOpen(false);
+        router.push('/');
     };
 
     return (
@@ -58,11 +103,10 @@ export default function Navbar() {
                     </div>
                 </div>
 
-                {/* 우측 액션 버튼 (로그인/로그아웃/프로필) */}
+                {/* 우측 액션 버튼 */}
                 <div className="flex items-center gap-4">
-                    {session ? (
+                    {isLoggedIn ? (
                         <div className="flex items-center gap-6">
-                            {/* 데스크톱 로그아웃 버튼 */}
                             <button 
                                 className="hidden md:block text-[#9FA0A8] hover:text-red-400 transition-colors duration-300 text-[16px] font-medium"
                                 onClick={() => setIsLogoutModalOpen(true)}
@@ -72,10 +116,12 @@ export default function Navbar() {
                             <Link href="/mypage">
                                 <div className="w-[40px] h-[40px] overflow-hidden hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-lg"
                                      style={{ borderRadius: '10px' }}>
+                                    {/* ✅ 이미지 태그 */}
                                     <img
-                                        src={session.user?.image || 'https://via.placeholder.com/40'}
+                                        src={profileImage || "https://via.placeholder.com/40"}
                                         alt="프로필"
                                         className="w-full h-full object-cover"
+                                        referrerPolicy="no-referrer"
                                     />
                                 </div>
                             </Link>
@@ -104,7 +150,7 @@ export default function Navbar() {
                 </div>
             </div>
 
-            {/* 모바일 슬라이드 메뉴 */}
+            {/* 모바일 메뉴 (생략 없이 포함) */}
             <AnimatePresence>
                 {isOpen && (
                     <motion.div 
@@ -127,7 +173,7 @@ export default function Navbar() {
                                 </Link>
                             ))}
                             <hr className="border-white/5 my-2" />
-                            {!session ? (
+                            {!isLoggedIn ? (
                                 <button 
                                     onClick={() => { setIsLoginModalOpen(true); setIsOpen(false); }} 
                                     className="text-[#9FA0A8] hover:text-white"
@@ -147,14 +193,11 @@ export default function Navbar() {
                 )}
             </AnimatePresence>
 
-            {/* 로그인 모달 */}
             <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
 
-            {/* 로그아웃 확인 커스텀 모달 */}
             <AnimatePresence>
                 {isLogoutModalOpen && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                        {/* 배경 오버레이 */}
                         <motion.div 
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -162,8 +205,6 @@ export default function Navbar() {
                             onClick={() => setIsLogoutModalOpen(false)}
                             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
                         />
-                        
-                        {/* 모달 콘텐츠 */}
                         <motion.div 
                             initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}

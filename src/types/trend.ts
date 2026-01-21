@@ -36,4 +36,21 @@ export interface CategoryDetail {
   community: TabData;
 }
 
-export type CategoryInfoMap = Record<string, CategoryDetail>;
+// ✅ [수정] 백엔드 데이터 구조 반영 (description, created_at 추가)
+export interface TechStackData {
+  id: number;
+  name: string;
+  logo: string | null;
+  docs_url: string | null;
+  description?: string; // 설명 (검색용)
+  created_at?: string;  // 생성일
+}
+
+export interface TechStackUI extends TechStackData {
+  catName?: string;
+  count?: number;
+  growth?: number;
+  color?: string;
+  themeColor?: string;
+  officialSite?: string;
+}

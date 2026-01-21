@@ -1,3 +1,14 @@
+// src/types/index.ts
+
+// --- UI 헬퍼 타입 (새로 추가) ---
+export type TechCategory = 
+  | "frontend" 
+  | "backend" 
+  | "ai-data" 
+  | "mobile" 
+  | "devops" 
+  | "etc";
+
 // 사용자 타입
 export interface User {
   id: number;
@@ -7,13 +18,14 @@ export interface User {
   updatedAt: string;
 }
 
-// 기술 스택 타입
+// 기술 스택 타입 (category 추가)
 export interface TechStack {
   id: number;
   name: string;
   logo: string | null;
   docsUrl: string | null;
   createdAt: string;
+  category?: TechCategory; // UI 필터링용
 }
 
 // 기술 트렌드 타입
@@ -32,7 +44,7 @@ export interface Category {
   name: string;
 }
 
-// 기업 타입
+// 기업 타입 (industry, siteUrl 추가)
 export interface Corp {
   id: number;
   name: string;
@@ -40,6 +52,8 @@ export interface Corp {
   address: string | null;
   latitude?: number;
   longitude?: number;
+  industry?: string; // UI 표시용
+  siteUrl?: string;  // UI 표시용
 }
 
 // 채용 공고 타입
@@ -110,6 +124,4 @@ export interface AuthResponse {
   user: User;
 }
 
-
-// src/types/trend.ts
 export * from './trend';

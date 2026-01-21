@@ -1,7 +1,7 @@
-'use client'; // [중요] 최상단에 이 코드가 반드시 있어야 함
+'use client';
 
-import { SessionProvider } from "next-auth/react";
-
+// NextAuth 제거됨 - JWT 기반 인증 사용
+// auth.ts의 유틸리티 함수 사용
 export default function AuthContext({ children }: { children: React.ReactNode }) {
-  return <SessionProvider>{children}</SessionProvider>;
+  return <>{children}</>;
 }

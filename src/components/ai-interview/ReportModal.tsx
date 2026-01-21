@@ -1,120 +1,170 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Download, Star, CheckCircle2, Lightbulb, MessageCircle } from 'lucide-react';
+import { X, Download, FileText, CheckCircle2, AlertCircle, TrendingUp, Target } from 'lucide-react';
 
-export default function ReportModal({ isOpen, onClose, selectedCompany, selectedKeywords, totalScore }: any) {
-  if (!isOpen) return null;
-
-  return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:p-10">
-        {/* 배경 블러 처리 */}
-        <motion.div 
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="absolute inset-0 bg-black/80 backdrop-blur-md"
-        />
-
-        {/* 리포트 본문 */}
-        <motion.div 
-          initial={{ opacity: 0, y: 50, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 50, scale: 0.95 }}
-          className="relative w-full max-w-4xl bg-[#1E1F22] border border-white/10 rounded-[40px] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
-        >
-          {/* 상단 헤더: PDF 다운로드 및 닫기 */}
-          <div className="p-8 border-b border-white/5 flex justify-between items-center bg-[#25262B]">
-            <div>
-              <h2 className="text-2xl font-black tracking-tighter text-blue-500">AI 분석 리포트</h2>
-              <p className="text-white/40 text-xs mt-1 uppercase font-bold tracking-widest">사용자에게 맞춤 제공되었습니다.</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 bg-white/5 hover:bg-white/10 px-4 py-2 rounded-xl text-sm font-bold transition-all border border-white/10">
-                <Download size={18} /> PDF 저장
-              </button>
-              <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors text-white/40 hover:text-white">
-                <X size={24} />
-              </button>
-            </div>
-          </div>
-
-          {/* 리포트 내용 스크롤 영역 */}
-          <div className="flex-1 overflow-y-auto p-8 lg:p-12 custom-scrollbar space-y-12">
-            
-            {/* 1. 하이라이트: 최고 매칭 기업 */}
-            <section className="bg-blue-600/5 border border-blue-500/20 rounded-[32px] p-8 flex flex-col lg:flex-row items-center gap-8">
-              <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center p-4 shadow-2xl">
-                <Star className="text-blue-600 fill-blue-600" size={48} />
-              </div>
-              <div className="flex-1 text-center lg:text-left">
-                <h3 className="text-3xl font-black mb-2">현재 선택하신 기업은 <span className="text-blue-500">{selectedCompany.name}</span> 입니다.</h3>
-                <p className="text-white/60 leading-relaxed max-w-xl">
-                  선택하신 <span className="text-purple-400 font-bold">{selectedKeywords.join(', ')}</span> 스택과 기업의 핵심 요구 사항이 **{totalScore}%** 일치합니다.
-                </p>
-              </div>
-            </section>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* 2. 상세 역량 분석 */}
-              <div className="space-y-6">
-                <h4 className="flex items-center gap-2 font-bold text-lg"><Lightbulb className="text-yellow-400" /> 상세 역량 분석</h4>
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-6 space-y-4">
-                  <div className="space-y-2">
-                    <p className="text-blue-400 font-bold text-sm">강점 (Strengths)</p>
-                    <p className="text-sm text-white/60 leading-relaxed">SW 우수상 수상 이력을 통해 검증된 **실무 기반의 문제 해결 능력**이 돋보입니다. 특히 DevRoad 프로젝트에서의 복잡한 데이터 시스템 설계 경험은 {selectedCompany.name}의 시니어 엔지니어들에게도 매력적인 요소입니다.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-purple-400 font-bold text-sm">보완점 (Opportunities)</p>
-                    <p className="text-sm text-white/60 leading-relaxed">최신 기술 스택에 대한 이해도는 높으나, 실제 프로덕션 환경에서의 **대규모 트래픽 분산 처리**에 대한 기술적 근거를 면접 시 더 구체적으로 준비해야 합니다.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. 구체적 예상 질문 */}
-              <div className="space-y-6">
-                <h4 className="flex items-center gap-2 font-bold text-lg"><MessageCircle className="text-green-400" /> 커스텀 예상 질문</h4>
-                <div className="space-y-3">
-                  {[
-                    "DevRoad 프로젝트에서 Next.js를 도입하며 가장 중점을 두었던 성능 최적화 포인트는 무엇인가요?",
-                    "SW에서 우수상을 수상할 당시, 본인이 맡았던 핵심 기술적 기여와 팀 내 갈등 해결 방식에 대해 설명해주세요.",
-                    "MSA 구조로 시스템을 확장한다면, 현재 설계된 데이터 아키텍처에서 어떤 병목 현상이 발생할 것으로 예상하시나요?"
-                  ].map((q, i) => (
-                    <div key={i} className="bg-white/5 border border-white/5 p-4 rounded-xl text-sm text-white/80 leading-snug">
-                      <span className="text-green-400 font-bold mr-2">Q{i+1}.</span> {q}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* 4. 지원 및 면접 준비 전략 요약 */}
-            <section className="space-y-6">
-              <h4 className="flex items-center gap-2 font-bold text-lg"><CheckCircle2 className="text-blue-400" /> 실전 지원 가이드</h4>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <StrategyCard title="지원서 포인트" content="sw 활동을 단순 참여가 아닌 '성과 지표' 중심으로 기술하세요." color="blue" />
-                <StrategyCard title="기술 면접 팁" content="선택하신 TypeScript의 제네릭 활용 사례를 실제 코드 예시와 함께 준비하세요." color="purple" />
-                <StrategyCard title="마지막 한마디" content="DevRoad 서비스를 통해 얻은 취준생에 대한 통찰력을 기업 서비스와 연결해 보세요." color="green" />
-              </div>
-            </section>
-          </div>
-
-          {/* 하단 푸터 */}
-          <div className="p-8 border-t border-white/5 bg-[#1A1B1E] flex justify-center">
-            <button onClick={onClose} className="text-white/30 hover:text-white font-bold transition-colors">리포트 닫기</button>
-          </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>
-  );
+interface ReportModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    // ✅ [수정] 타입을 'any'로 변경하여 호환성 문제 해결
+    selectedCompany: any; 
+    selectedKeywords: string[];
+    totalScore: number;
 }
 
-function StrategyCard({ title, content, color }: any) {
-  const colors: any = { blue: 'text-blue-400', purple: 'text-purple-400', green: 'text-green-400' };
-  return (
-    <div className="bg-white/5 border border-white/5 p-5 rounded-2xl">
-      <p className={`font-bold text-xs uppercase mb-2 ${colors[color]}`}>{title}</p>
-      <p className="text-sm text-white/60 leading-relaxed">{content}</p>
-    </div>
-  );
+const MOCK_RESUME_TEXT = `
+안녕하세요, 사용자 경험을 중요시하는 프론트엔드 개발자입니다.
+React와 TypeScript를 주력으로 사용하며, 재사용 가능한 컴포넌트 설계에 깊은 관심을 가지고 있습니다.
+지난 프로젝트에서는 Next.js를 도입하여 초기 로딩 속도를 50% 개선하고 SEO 점수를 90점대로 끌어올린 경험이 있습니다.
+또한 Redux Toolkit을 활용해 복잡한 전역 상태를 효율적으로 관리했습니다.
+다만, 대규모 트래픽 처리를 위한 백엔드와의 최적화 협업 경험은 다소 부족하여, 현재 Node.js와 AWS를 학습하며 인프라에 대한 이해도를 높이고 있습니다.
+사용자의 피드백을 적극적으로 수용하여 서비스를 지속적으로 고도화하는 개발자가 되겠습니다.
+`;
+
+// 기업 적합도를 포함한 Mock Data
+const ANALYSIS_FEEDBACKS = [
+    { type: 'strength', text: '초기 로딩 속도를 50% 개선', comment: '구체적 수치로 성과 증명' },
+    { type: 'matching', text: '사용자 피드백 수용 및 서비스 고도화', comment: '기업 핵심 가치(Customer Obsession)와 일치' },
+    { type: 'improvement', text: '백엔드와의 최적화 협업 경험 부족', comment: '구체적 학습 계획 및 토이 프로젝트 추가 추천' },
+];
+
+const AI_QUESTIONS = [
+    "핵심 가치인 '고객 집착' 관점에서, 본인이 수행했던 가장 기억에 남는 UX 개선 사례를 설명해주세요.",
+    "Redux Toolkit을 도입하면서 느꼈던 장점과, 만약 다른 상태 관리 라이브러리를 쓴다면 어떤 점이 달랐을지 비교해 보세요.",
+    "대규모 트래픽 처리를 위해 현재 학습 중인 내용을 실제 프로젝트에 어떻게 적용할 계획인가요?"
+];
+
+export default function ReportModal({ isOpen, onClose, selectedCompany, selectedKeywords, totalScore }: ReportModalProps) {
+    if (!isOpen) return null;
+
+    const handlePrint = () => {
+        window.print();
+    };
+
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:p-6">
+                    <motion.div 
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-sm" 
+                    />
+
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+                        animate={{ opacity: 1, scale: 1, y: 0 }} 
+                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                        className="relative w-full max-w-4xl h-[90vh] bg-[#1A1B1E] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-white/10"
+                    >
+                        {/* Header */}
+                        <div className="flex justify-between items-center p-6 border-b border-white/10 bg-[#212226]">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-500/10 rounded-lg">
+                                    <FileText className="text-blue-400" size={24} />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-white">AI 역량 분석 통합 리포트</h2>
+                                    {/* ✅ selectedCompany가 null/undefined일 경우 안전하게 처리 */}
+                                    <p className="text-sm text-gray-400">Analysis Result for {selectedCompany?.name || 'General Report'}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button 
+                                    onClick={handlePrint}
+                                    className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-gray-300 transition-colors"
+                                >
+                                    <Download size={16} /> PDF 저장
+                                </button>
+                                <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors">
+                                    <X size={24} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-[#151619]">
+                            <div className="max-w-[800px] mx-auto bg-white text-black rounded-sm shadow-xl min-h-[1000px] p-12 flex flex-col gap-10">
+                                
+                                <div className="border-b-2 border-black/10 pb-6 flex justify-between items-end">
+                                    <div>
+                                        <h1 className="text-3xl font-black text-gray-900 mb-2">COMPETENCY REPORT</h1>
+                                        <p className="text-gray-500 font-medium">AI-Powered Resume Analysis</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-5xl font-black text-blue-600">{totalScore}</div>
+                                        <div className="text-sm font-bold text-gray-400 uppercase tracking-widest">Match Score</div>
+                                    </div>
+                                </div>
+
+                                {/* 상세 분석 */}
+                                <div>
+                                    <h3 className="text-lg font-bold uppercase tracking-wider text-gray-400 mb-4 border-l-4 border-blue-600 pl-3">
+                                        Resume Analysis
+                                    </h3>
+                                    <div className="bg-gray-50 p-6 rounded-xl text-gray-700 leading-relaxed text-sm whitespace-pre-wrap font-medium mb-6">
+                                        {MOCK_RESUME_TEXT.split('\n').map((line, i) => (
+                                            <p key={i} className="mb-1">{line}</p>
+                                        ))}
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {ANALYSIS_FEEDBACKS.map((fb, i) => (
+                                            <div key={i} className={`p-4 rounded-lg border flex flex-col gap-2
+                                                ${fb.type === 'strength' ? 'bg-blue-50 border-blue-100' : 
+                                                  fb.type === 'matching' ? 'bg-green-50 border-green-100' : 'bg-orange-50 border-orange-100'}`}>
+                                                
+                                                <div className="flex items-center gap-2 font-bold">
+                                                    {fb.type === 'strength' && <TrendingUp size={16} className="text-blue-600" />}
+                                                    {fb.type === 'matching' && <Target size={16} className="text-green-600" />}
+                                                    {fb.type === 'improvement' && <AlertCircle size={16} className="text-orange-600" />}
+                                                    <span className={
+                                                        fb.type === 'strength' ? 'text-blue-800' :
+                                                        fb.type === 'matching' ? 'text-green-800' : 'text-orange-800'
+                                                    }>
+                                                        {fb.type === 'strength' ? '강점 (Strength)' : 
+                                                         fb.type === 'matching' ? '기업 적합 (Company Fit)' : '보완 제안 (Suggestion)'}
+                                                    </span>
+                                                </div>
+                                                <p className="font-semibold text-gray-800">"{fb.text}"</p>
+                                                <p className="text-gray-600 text-sm">{fb.comment}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* AI 질문 */}
+                                <div>
+                                    <h3 className="text-lg font-bold uppercase tracking-wider text-gray-400 mb-4 border-l-4 border-gray-800 pl-3">
+                                        Expected Questions
+                                    </h3>
+                                    <ul className="space-y-4">
+                                        {AI_QUESTIONS.map((q, i) => (
+                                            <li key={i} className="flex gap-4 items-start bg-gray-50 p-4 rounded-lg border border-gray-100">
+                                                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-black text-white text-xs font-bold shrink-0">Q{i+1}</span>
+                                                <p className="text-gray-800 font-medium">{q}</p>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+
+                                {/* Target Keywords */}
+                                <div>
+                                    <h3 className="text-lg font-bold uppercase tracking-wider text-gray-400 mb-4 border-l-4 border-purple-600 pl-3">
+                                        Keywords
+                                    </h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedKeywords.map((k, i) => (
+                                            <span key={i} className="px-3 py-1 bg-gray-100 border border-gray-200 rounded-full text-sm font-bold text-gray-600">
+                                                #{k}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+        </AnimatePresence>
+    );
 }

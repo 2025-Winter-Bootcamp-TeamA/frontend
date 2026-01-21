@@ -1,283 +1,29 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, FileUp, User, Monitor, FileSearch, UploadCloud } from 'lucide-react'; // UploadCloud 아이콘 추가
+import { User, Monitor, ArrowRightLeft } from 'lucide-react';
 
-// 외부 컴포넌트 임포트 (기존과 동일)
-import SuitabilityChart from '@/components/ai-interview/SuitabilityChart';
-import CompanyList from '@/components/ai-interview/CompanyList';
-import AnalysisSummary from '@/components/ai-interview/AnalysisSummary';
+// 컴포넌트 임포트
 import { AnalyzingState } from '@/components/ai-interview/States';
+import UploadSection from '@/components/ai-interview/UploadSection';
+import ResumePickerModal from '@/components/ai-interview/ResumePickerModal';
+import ViewSwitcher from '@/components/ai-interview/ViewSwitcher';
 import ReportModal from '@/components/ai-interview/ReportModal';
+import DashboardView from '@/components/ai-interview/DashboardView'; 
+import SimulationView from '@/components/ai-interview/SimulationView';
 
-import type { Resume } from '@/app/mypage/_models/resume.types';
-import { mockResumes } from '@/app/mypage/_models/resume.mock';
+import { useSimulation } from '@/hooks/useSimulation';
+import type { Resume } from '@/types';
+import { MOCK_RESUMES } from '@/data/mockData';
+import { api } from '@/lib/api';
 
-const INITIAL_COMPANIES = [
-    { id: 1, name: 'Toss', category: '금융/핀테크', logo: '/logos/toss.svg', baseScore: 70, favorite: false },
-    { id: 2, name: 'Woowahan', category: '배달/커머스', logo: '/logos/baemin.svg', baseScore: 65, favorite: false },
-    { id: 3, name: 'Line', category: '메신저/플랫폼', logo: '/logos/line.svg', baseScore: 60, favorite: false },
-    { id: 4, name: 'Karrot', category: '지역/커뮤니티', logo: '/logos/daangn.svg', baseScore: 55, favorite: false },
-    { id: 5, name: 'ZigZag', category: '패션/커머스', logo: '/logos/zigzag.svg', baseScore: 50, favorite: false },
-    { id: 6, name: 'Bucketplace', category: '인테리어', logo: '/logos/ohou.svg', baseScore: 45, favorite: false },
-    { id: 7, name: 'Musinsa', category: '패션/커머스', logo: '/logos/musinsa.svg', baseScore: 58, favorite: false },
-    { id: 8, name: 'Coupang', category: '이커머스', logo: '/logos/coupang.svg', baseScore: 62, favorite: false },
-];
-
-const KEYWORDS = [
-    'React', 'Next.js', 'TypeScript', 'Node.js', 'Tailwind CSS', 'Redux', 'AWS', 'SSR', 
-    'Zustand', 'Recoil', 'React Query', 'Framer Motion', 'Git', 'Java', 'Python', 'Django'
-];
-
-function useAnalysisResult() {
-    const [companies, setCompanies] = useState(INITIAL_COMPANIES);
-    const [selectedCompany, setSelectedCompany] = useState<any>(null);
-    const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
-    const [totalScore, setTotalScore] = useState(0);
-
-    const sortedCompanies = useMemo(() => {
-        return [...companies].sort((a, b) => (a.favorite === b.favorite ? 0 : a.favorite ? -1 : 1));
-    }, [companies]);
-
-    const toggleCompany = useCallback((company: any) => {
-        setSelectedCompany((prev: any) => (prev?.id === company.id ? null : company));
-    }, []);
-
-    const toggleKeyword = useCallback((tag: string) => {
-        setSelectedKeywords(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
-    }, []);
-
-    const toggleFavorite = useCallback((e: React.MouseEvent, id: number) => {
-        e.stopPropagation();
-        setCompanies(prev => prev.map(c => c.id === id ? { ...c, favorite: !c.favorite } : c));
-    }, []);
-
-    useEffect(() => {
-        if (selectedCompany && selectedKeywords.length > 0) {
-            const score = Math.min(selectedCompany.baseScore + (selectedKeywords.length * 5), 100);
-            setTotalScore(score);
-        } else {
-            setTotalScore(0);
-        }
-    }, [selectedCompany, selectedKeywords]);
-
-    return {
-        sortedCompanies, selectedCompany, selectedKeywords, totalScore,
-        toggleCompany, toggleKeyword, toggleFavorite
-    };
-}
-
-export default function AIInterviewPage() {
-    const searchParams = useSearchParams();
-    const fileInputRef = useRef<HTMLInputElement>(null); // ✅ 내 컴퓨터 파일 업로드용 Ref
-
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [step, setStep] = useState<'empty' | 'analyzing' | 'result'>('empty');
-    const [showDropdown, setShowDropdown] = useState(false);
-    const [isResumePickerOpen, setIsResumePickerOpen] = useState(false);
-    const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
-    
-    const {
-        sortedCompanies, selectedCompany, selectedKeywords, totalScore,
-        toggleCompany, toggleKeyword, toggleFavorite
-    } = useAnalysisResult();
-
-    useEffect(() => {
-        if (searchParams?.get('pickResume') === '1') {
-            setIsResumePickerOpen(true);
-        }
-    }, [searchParams]);
-
-    const handleStartAnalysis = () => {
-        setShowDropdown(false);
-        setStep('analyzing');
-        setTimeout(() => setStep('result'), 3000);
-    };
-
-    const handlePickFromMyPage = () => {
-        setShowDropdown(false);
-        setIsResumePickerOpen(true);
-    };
-
-    const handleSelectResume = (resume: Resume) => {
-        setSelectedResume(resume);
-        setIsResumePickerOpen(false);
-        handleStartAnalysis();
-    };
-
-    // ✅ 파일 선택 핸들러
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            // 실제 파일 업로드 로직 대신 바로 분석 시작
-            handleStartAnalysis();
-        }
-    };
-
-    return (
-        <div className="min-h-[calc(100vh-70px)] bg-[#1A1B1E] overflow-hidden flex flex-col text-white">
-            {/* ✅ 숨겨진 파일 입력창 */}
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".pdf,.doc,.docx" />
-
-            <div className="max-w-[1400px] mx-auto w-full h-full flex flex-col p-6 lg:p-10">
-                
-                {/* --- [HEADER SECTION] --- */}
-                <header className="flex justify-between items-center mb-5">
-                    <div className="space-y-1">
-                        <h1 className="text-4xl font-black tracking-tighter uppercase">내 이력서 분석</h1>
-                        <p className="text-sm text-[#9FA0A8]">
-                            {selectedResume ? `선택된 이력서: ${selectedResume.title}` : '이력서를 선택해 분석을 시작하세요.'}
-                        </p>
-                    </div>
-
-                    <div className="relative">
-                        
-                        <AnimatePresence>
-                            {showDropdown && (
-                                <motion.div 
-                                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-                                    className="absolute right-0 mt-3 w-60 bg-[#212226] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50"
-                                >
-                                    <DropdownButton onClick={handlePickFromMyPage} icon={<User size={18} className="text-blue-400" />} text="마이페이지에서 선택" hasBorder />
-                                    <DropdownButton onClick={() => fileInputRef.current?.click()} icon={<Monitor size={18} className="text-purple-400" />} text="내 컴퓨터에서 선택" />
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-                </header>
-
-                <ResumePickerModal
-                    open={isResumePickerOpen}
-                    resumes={mockResumes}
-                    onClose={() => setIsResumePickerOpen(false)}
-                    onSelect={handleSelectResume}
-                />
-
-                {/* --- [MAIN CONTENT SECTION] --- */}
-                <main>
-                    <AnimatePresence mode="wait">
-                        {/* ✅ [EMPTY STATE: 새롭게 디자인된 업로드 화면] */}
-                        {step === 'empty' && (
-                            <motion.div 
-                                key="empty"
-                                initial={{ opacity: 0, scale: 0.98 }} 
-                                animate={{ opacity: 1, scale: 1 }} 
-                                exit={{ opacity: 0, scale: 0.98 }}
-                                className="h-[600px] flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-[40px] bg-white/[0.01] hover:bg-white/[0.02] transition-all cursor-pointer group p-10"
-                                onClick={() => fileInputRef.current?.click()} // 영역 전체 클릭 시 파일 선택창 열림
-                            >
-                                <div className="w-32 h-32 rounded-full bg-blue-600/5 flex items-center justify-center mb-8 border border-blue-600/10 group-hover:scale-110 transition-transform duration-500">
-                                    <UploadCloud size={56} className="text-blue-500 opacity-60" />
-                                </div>
-                                <h2 className="text-4xl font-black mb-4 tracking-tighter text-white">분석할 이력서를 업로드하세요</h2>
-                                <p className="text-[#9FA0A8] max-w-md leading-relaxed mb-10 text-lg text-center">
-                                    도영님의 이력서를 바탕으로 <span className="text-blue-400 font-bold">최적의 기술 스택</span>과<br />
-                                    <span className="text-blue-400 font-bold">가장 적합한 기업</span>을 분석해 드립니다.
-                                </p>
-                                
-                                <div className="flex gap-4">
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
-                                        className="px-8 py-4 bg-white text-black font-black rounded-2xl shadow-xl hover:bg-gray-100 transition-all active:scale-95 flex items-center gap-2"
-                                    >
-                                        <Monitor size={20} /> 내 컴퓨터에서 찾기
-                                    </button>
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); setIsResumePickerOpen(true); }} 
-                                        className="px-8 py-4 bg-white/5 border border-white/10 text-white font-bold rounded-2xl hover:bg-white/10 transition-all flex items-center gap-2"
-                                    >
-                                        <User size={20} /> 마이페이지 불러오기
-                                    </button>
-                                </div>
-                                <p className="mt-6 text-xs text-white/20">지원 형식: PDF, DOC, DOCX (최대 10MB)</p>
-                            </motion.div>
-                        )}
-
-                        {step === 'analyzing' && <AnalyzingState key="analyzing" />}
-
-                        {/* ✅ [RESULT STATE: 기존 로직 그대로 유지] */}
-                        {step === 'result' && (
-                            <motion.div 
-                                key="result"
-                                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                                className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start"
-                            >
-                                <section className="lg:col-span-4">
-                                    <SuitabilityChart 
-                                        selectedCompany={selectedCompany} 
-                                        selectedKeywords={selectedKeywords} 
-                                        totalScore={totalScore} 
-                                        keywords={KEYWORDS} 
-                                        onToggleKeyword={toggleKeyword} 
-                                    />
-                                </section>
-
-                                <section className="lg:col-span-4">
-                                    <CompanyList 
-                                        companies={sortedCompanies} 
-                                        selectedCompany={selectedCompany} 
-                                        onSelect={toggleCompany} 
-                                        onFavorite={toggleFavorite} 
-                                    />
-                                </section>
-
-                                <section className="lg:col-span-4">
-                                    <AnalysisSummary onOpenModal={() => setIsModalOpen(true)} />
-                                    <ReportModal
-                                        isOpen={isModalOpen}
-                                        onClose={() => setIsModalOpen(false)}
-                                        selectedCompany={selectedCompany || sortedCompanies[0]}
-                                        selectedKeywords={selectedKeywords}
-                                        totalScore={totalScore}
-                                    />
-                                </section>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </main>
-            </div>
-
-            <ScrollbarStyles />
-        </div>
-    );
-}
-
-// ... (하단 DropdownButton, ResumePickerModal, ScrollbarStyles는 기존 코드 유지)
 function DropdownButton({ onClick, icon, text, hasBorder = false }: any) {
     return (
         <button onClick={onClick} className={`w-full flex items-center gap-4 px-6 py-5 text-sm hover:bg-white/5 text-left font-medium transition-colors ${hasBorder ? 'border-b border-white/5' : ''}`}>
             {icon} {text}
         </button>
-    );
-}
-
-function ResumePickerModal({ open, resumes, onClose, onSelect }: { open: boolean; resumes: Resume[]; onClose: () => void; onSelect: (r: Resume) => void; }) {
-    return (
-        <AnimatePresence>
-            {open && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-                    <motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-[min(500px,92vw)] rounded-[24px] border border-white/10 bg-[#1A1B1E] p-6 shadow-2xl">
-                        <div className="text-lg font-bold text-white mb-4">마이페이지 이력서 선택</div>
-                        <div className="space-y-3">
-                            {resumes.map((r) => (
-                                <button key={r.id} onClick={() => onSelect(r)} className="w-full rounded-2xl border border-white/10 bg-[#25262B] p-4 text-left transition-all hover:border-white/30 hover:bg-[#2C2D33] active:scale-[0.99]">
-                                    <div className="flex items-center justify-between gap-4">
-                                        <div className="min-w-0">
-                                            <div className="truncate text-sm font-semibold text-white">{r.title}</div>
-                                            <div className="mt-1 text-xs text-[#9FA0A8]">{r.company ? `${r.company} · ` : ''}등록일: {r.createdAt}</div>
-                                        </div>
-                                        <span className="shrink-0 rounded-full bg-blue-600 px-3 py-1 text-[11px] font-bold text-white">선택</span>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    </motion.div>
-                </div>
-            )}
-        </AnimatePresence>
     );
 }
 
@@ -290,5 +36,193 @@ function ScrollbarStyles() {
             .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); }
             .custom-scrollbar::-webkit-scrollbar-thumb:active { background: rgba(255, 255, 255, 0.3); }
         `}</style>
+    );
+}
+
+export default function AIInterviewPage() {
+    const searchParams = useSearchParams();
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const [step, setStep] = useState<'empty' | 'analyzing' | 'result'>('empty');
+    const [viewMode, setViewMode] = useState<'dashboard' | 'simulation'>('dashboard');
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [isResumePickerOpen, setIsResumePickerOpen] = useState(false);
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false); 
+    const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
+
+    const simulationData = useSimulation();
+
+   const resumeKeywords = useMemo(() => {
+        if (!selectedResume) return [];
+        // techStacks가 있다면 이름만 추출, 없으면 기본값
+        if (selectedResume.techStacks && selectedResume.techStacks.length > 0) {
+            return selectedResume.techStacks.map(item => item.techStack.name);
+        }
+        return ['React', 'TypeScript', 'Next.js', 'Tailwind', 'Node.js', 'AWS'];
+    }, [selectedResume]);
+
+    const resumeMatchScore = useMemo(() => {
+        if (!simulationData.selectedCompany) return 0;
+        return Math.min(simulationData.selectedCompany.baseScore + (resumeKeywords.length * 8), 98);
+    }, [simulationData.selectedCompany, resumeKeywords]);
+
+    // 쿼리 파라미터에서 resumeId를 받아서 이력서 자동 로드
+    useEffect(() => {
+        const resumeId = searchParams?.get('resumeId');
+        if (resumeId) {
+            // API에서 이력서 정보 불러오기
+            const fetchResume = async () => {
+                try {
+                    const response = await api.get(`/resumes/${resumeId}/`);
+                    const resumeData = response.data;
+                    
+                    // API 응답을 Resume 타입으로 변환
+                    const resume: Resume = {
+                        id: resumeData.id,
+                        title: resumeData.title,
+                        url: resumeData.url,
+                        techStacks: resumeData.tech_stacks?.map((ts: any) => ({
+                            techStack: {
+                                id: ts.tech_stack?.id || ts.id,
+                                name: ts.tech_stack?.name || ts.name,
+                                logo: ts.tech_stack?.image || ts.image || null,
+                                docsUrl: ts.tech_stack?.link || ts.link || null,
+                                createdAt: '',
+                            }
+                        })) || [],
+                        createdAt: resumeData.created_at,
+                        updatedAt: resumeData.updated_at,
+                    };
+                    
+                    setSelectedResume(resume);
+                    setViewMode('dashboard');
+                    handleStartAnalysis();
+                } catch (error) {
+                    console.error('이력서 불러오기 실패:', error);
+                    alert('이력서를 불러올 수 없습니다.');
+                }
+            };
+            
+            fetchResume();
+        } else if (searchParams?.get('pickResume') === '1') {
+            setIsResumePickerOpen(true);
+        }
+    }, [searchParams]);
+
+    const handleStartAnalysis = () => {
+        setShowDropdown(false);
+        setStep('analyzing');
+        setTimeout(() => setStep('result'), 3000);
+    };
+    
+    const handleSelectResume = (resume: Resume) => {
+        setSelectedResume(resume);
+        setIsResumePickerOpen(false);
+        setViewMode('dashboard'); 
+        handleStartAnalysis();
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files?.[0]) {
+             setSelectedResume({ 
+                id: 9999, // 임시 숫자 ID
+                title: e.target.files[0].name, 
+                createdAt: '2026.01.20',
+                updatedAt: '2026.01.20',
+                url: null,
+                techStacks: [] // 파일 업로드 시엔 비어있음 (분석 전)
+            });
+            setViewMode('dashboard');
+            handleStartAnalysis();
+        }
+    };
+    
+    const triggerFileUpload = () => fileInputRef.current?.click();
+
+    return (
+        <div className="h-screen bg-[#1A1B1E] overflow-hidden flex flex-col items-center justify-start pt-6 text-white">
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".pdf,.doc,.docx" />
+            
+            {/* ✅ max-w-[1800px] */}
+            <div className="max-w-[1800px] w-full h-full flex flex-col p-6 lg:p-10 scale-[0.95] origin-top">
+                <header className="flex justify-between items-center mb-4">
+                    <div className="space-y-1">
+                        <h1 className="text-3xl font-black tracking-tighter uppercase">AI 역량 분석 리포트</h1>
+                        <p className="text-sm text-[#9FA0A8]">
+                            {selectedResume ? `분석 중인 이력서: ${selectedResume.title}` : '이력서를 등록하여 맞춤형 분석을 받아보세요.'}
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        {step === 'result' && (
+                            <ViewSwitcher currentView={viewMode} onChange={setViewMode} />
+                        )}
+
+                        {step !== 'empty' && (
+                            <div className="relative">
+                                <button 
+                                    onClick={() => setShowDropdown(!showDropdown)} 
+                                    className="w-10 h-10 rounded-full bg-[#25262B] border border-white/10 flex items-center justify-center hover:bg-[#2C2D33] transition-colors group"
+                                >
+                                    <ArrowRightLeft size={18} className="text-white group-hover:text-blue-400 transition-colors" />
+                                </button>
+                                <AnimatePresence>
+                                    {showDropdown && (
+                                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute right-0 mt-3 w-60 bg-[#212226] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
+                                            <DropdownButton onClick={() => { setShowDropdown(false); setIsResumePickerOpen(true); }} icon={<User size={18} className="text-blue-400" />} text="마이페이지에서 선택" hasBorder />
+                                            <DropdownButton onClick={triggerFileUpload} icon={<Monitor size={18} className="text-purple-400" />} text="내 컴퓨터에서 선택" />
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        )}
+                    </div>
+                </header>
+
+                <ResumePickerModal open={isResumePickerOpen} resumes={MOCK_RESUMES} onClose={() => setIsResumePickerOpen(false)} onSelect={handleSelectResume} />
+
+                <main className="flex-1">
+                    <AnimatePresence mode="wait">
+                        {step === 'empty' && (
+                            <UploadSection onUploadClick={triggerFileUpload} onMyPageClick={() => setIsResumePickerOpen(true)} />
+                        )}
+
+                        {step === 'analyzing' && <AnalyzingState key="analyzing" />}
+
+                        {step === 'result' && (
+                            viewMode === 'dashboard' ? (
+                                <DashboardView 
+                                    key="dashboard"
+                                    resumeTitle={selectedResume?.title || '나의 이력서'}
+                                    resumeKeywords={resumeKeywords}
+                                    sortedCompanies={simulationData.sortedCompanies}
+                                    selectedCompany={simulationData.selectedCompany}
+                                    setSelectedCompany={simulationData.toggleCompany} 
+                                    toggleFavorite={simulationData.toggleFavorite}
+                                    matchScore={resumeMatchScore}
+                                    onOpenReport={() => setIsReportModalOpen(true)}
+                                />
+                            ) : (
+                                <SimulationView 
+                                    key="simulation"
+                                    simulationData={simulationData}
+                                />
+                            )
+                        )}
+                    </AnimatePresence>
+                </main>
+            </div>
+            
+            <ScrollbarStyles />
+
+            {/* ✅ [수정] any 타입 캐스팅으로 에러 회피 */}
+            <ReportModal
+                isOpen={isReportModalOpen}
+                onClose={() => setIsReportModalOpen(false)}
+                selectedCompany={simulationData.selectedCompany as any} 
+                selectedKeywords={viewMode === 'simulation' ? simulationData.selectedKeywords : resumeKeywords}
+                totalScore={viewMode === 'simulation' ? simulationData.matchScore : resumeMatchScore}
+            />
+        </div>
     );
 }
