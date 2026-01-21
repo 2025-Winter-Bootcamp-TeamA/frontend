@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, TrendingUp, Scale, ExternalLink, Star, Trophy, AlertCircle, ArrowLeft } from "lucide-react";
+import { Search, TrendingUp, Scale, ExternalLink, Star, Trophy, AlertCircle } from "lucide-react"; // ArrowLeft 제거
 import TrendChart from "./TrendChart";
 import StackComparison, { StackData } from "./Comparison";
 import StackRelationAnalysis from "./RelationAnalysis";
@@ -70,7 +70,6 @@ interface TechTrendResponse {
     reference_date: string;
 }
 
-// 빈 객체 초기값
 const EMPTY_STACK: DashboardStackData = {
     id: 0,
     name: "",
@@ -178,6 +177,22 @@ export default function Dashboard() {
         loadInitialData();
     }, []);
 
+    // ✅ [추가] Navbar에서 'resetDashboard' 이벤트 발생 시 Top 5 화면으로 복귀
+    useEffect(() => {
+        const handleReset = () => {
+            setIsLanding(true);
+            setSearchQuery("");
+            setFilteredStacks([]);
+            // Top 5 중 1위를 배경으로 설정 (선택 사항)
+            if (topStacks.length > 0) {
+                setActiveStack(topStacks[0]);
+            }
+        };
+
+        window.addEventListener('resetDashboard', handleReset);
+        return () => window.removeEventListener('resetDashboard', handleReset);
+    }, [topStacks]);
+
     // 검색 로직
     useEffect(() => {
         if (isInitialLoading) return;
@@ -274,15 +289,6 @@ export default function Dashboard() {
         setFilteredStacks([]);
     };
 
-    const handleBackToLanding = () => {
-        setIsLanding(true);
-        setSearchQuery("");
-        setFilteredStacks([]);
-        if (topStacks.length > 0) {
-            setActiveStack(topStacks[0]);
-        }
-    };
-
     return (
       <div className="w-full h-full">
         <LoginCheckModal 
@@ -297,10 +303,8 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 gap-6 h-full lg:grid-cols-12 min-h-0">
             
-            {/* ✅ [수정 1] 높이를 600px -> 800px로 증가 */}
             <div className="h-[800px] lg:col-span-9 lg:h-full lg:min-h-0 flex flex-col gap-6 p-6 bg-[#212226] rounded-[32px] border border-white/5 relative overflow-hidden shadow-2xl">
                 
-                {/* 헤더 영역 */}
                 <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 relative z-10">
                     
                     {isLanding ? (
@@ -316,14 +320,8 @@ export default function Dashboard() {
                     ) : (
                         activeStack.id !== 0 ? (
                             <div className="flex items-start gap-4 max-w-2xl">
-                                <button 
-                                    onClick={handleBackToLanding}
-                                    className="mt-1 p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors border border-white/5 flex-shrink-0"
-                                    title="초기 화면으로 돌아가기"
-                                >
-                                    <ArrowLeft size={24} />
-                                </button>
-
+                                {/* ✅ 뒤로가기 버튼 삭제됨 */}
+                                
                                 <div className={`w-20 h-20 shrink-0 rounded-2xl bg-gradient-to-br ${activeStack.color} p-[2px] shadow-lg`}>
                                     <div className="w-full h-full bg-[#2A2B30] rounded-2xl flex items-center justify-center p-3 overflow-hidden">
                                         <img 
@@ -372,9 +370,6 @@ export default function Dashboard() {
                             </div>
                         ) : (
                             <div className="flex items-center gap-3 opacity-50">
-                                <button onClick={handleBackToLanding} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                                    <ArrowLeft className="text-gray-400" size={24} />
-                                </button>
                                 <AlertCircle className="text-gray-400" size={24} />
                                 <div>
                                     <h2 className="text-xl font-bold text-white">기술 스택 정보 없음</h2>
@@ -384,7 +379,7 @@ export default function Dashboard() {
                         )
                     )}
 
-                    {/* 검색창 및 토글 */}
+                    {/* 오른쪽: 검색창 및 토글 */}
                     <div className="flex items-center gap-4 w-full xl:w-auto">
                         <div className="relative flex-1 group transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] w-full xl:w-72 focus-within:xl:w-[480px]">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-blue-400 transition-colors" size={20} />
@@ -516,7 +511,6 @@ export default function Dashboard() {
                             ) : (
                                 <>
                                     {viewMode === "compare" && (
-                                        // ✅ [수정 2] pb-20 -> pb-4 로 하단 여백 대폭 감소
                                         <motion.div key="compare" className="absolute inset-0 pb-4 pr-2">
                                             <StackComparison initialBaseStack={activeStack} allStacks={topStacks} onBack={() => setViewMode("chart")} />
                                         </motion.div>

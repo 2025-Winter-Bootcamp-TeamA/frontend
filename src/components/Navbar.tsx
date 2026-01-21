@@ -18,31 +18,25 @@ export default function Navbar() {
     const pathname = usePathname();
     const router = useRouter();
 
-    // ✅ 로그인 체크 및 이미지 로드 (프론트엔드 전용 로직)
     useEffect(() => {
         const checkAuth = async () => {
             const { accessToken } = getAuthTokens();
             
             if (accessToken) {
                 setIsLoggedIn(true);
-                
-                // 1. LocalStorage에서 저장된 구글 이미지 먼저 확인
                 const savedImage = localStorage.getItem('user_profile_image');
                 if (savedImage) {
                     setProfileImage(savedImage);
                 } 
 
-                // 2. 최신 정보를 위해 API 호출 (이름 기반 생성 로직은 삭제하고 순수 구글 이미지만 사용)
                 try {
                     const response = await api.get('/users/auth/me/');
                     const userData = response.data;
                     
-                    // 백엔드(구글 로그인)에서 받은 이미지가 있다면 덮어쓰기
                     if (userData.profile_image) {
                         setProfileImage(userData.profile_image);
                         localStorage.setItem('user_profile_image', userData.profile_image);
                     }
-                    // 임의 아바타 생성 로직(ui-avatars) 삭제함: 구글 이미지가 없으면 기본값 유지
                 } catch (error) {
                     console.error("정보 로딩 실패", error);
                 }
@@ -54,14 +48,12 @@ export default function Navbar() {
 
         checkAuth();
         
-        // ✅ 로그인 후 토큰 저장 이벤트 리스너 추가
         const handleStorageChange = (e: StorageEvent) => {
             if (e.key === 'access_token') {
                 checkAuth();
             }
         };
         
-        // ✅ 커스텀 이벤트 리스너 (같은 탭에서 발생하는 localStorage 변경 감지)
         const handleAuthSuccess = () => {
             checkAuth();
         };
@@ -73,7 +65,7 @@ export default function Navbar() {
             window.removeEventListener('storage', handleStorageChange);
             window.removeEventListener('authSuccess', handleAuthSuccess);
         };
-    }, [pathname]); // ✅ pathname 변경 시에도 인증 상태 재확인
+    }, [pathname]); 
 
     const navItems = [
         { name: '대시보드', href: '/' },
@@ -83,7 +75,6 @@ export default function Navbar() {
 
     const handleLogout = () => {
         clearAuthTokens();
-        // ✅ 로그아웃 시 저장된 이미지도 삭제
         localStorage.removeItem('user_profile_image');
         
         setIsLoggedIn(false);
@@ -96,9 +87,13 @@ export default function Navbar() {
         <nav className="bg-[#1A1B1E] sticky top-0 z-50 border-b border-white/5 w-full">
             <div className="flex justify-between items-center h-[70px] px-6"> 
                 
-                {/* 로고 및 메인 메뉴 */}
+                {/* ✅ 로고 클릭 시 초기화 이벤트 발생 */}
                 <div className="flex items-center gap-10"> 
-                    <Link href="/" className="flex items-center">
+                    <Link 
+                        href="/" 
+                        className="flex items-center" 
+                        onClick={() => window.dispatchEvent(new Event('resetDashboard'))}
+                    >
                         <Image src="/logo.png" alt="DevRoad 로고" width={34} height={34} className="object-contain" />
                     </Link>
 
@@ -107,6 +102,12 @@ export default function Navbar() {
                             <div key={item.name} className="flex items-center">
                                 <Link
                                     href={item.href}
+                                    onClick={() => {
+                                        // ✅ 대시보드 메뉴 클릭 시 초기화 이벤트 발생
+                                        if (item.href === '/') {
+                                            window.dispatchEvent(new Event('resetDashboard'));
+                                        }
+                                    }}
                                     className={`text-[18px] transition-all duration-300 hover:text-white py-1 ${
                                         pathname === item.href 
                                             ? 'text-white font-bold' 
@@ -136,7 +137,6 @@ export default function Navbar() {
                             <Link href="/mypage">
                                 <div className="w-[40px] h-[40px] overflow-hidden hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-lg bg-gray-700 flex items-center justify-center"
                                      style={{ borderRadius: '10px' }}>
-                                    {/* ✅ 이미지 태그 */}
                                     {profileImage ? (
                                         <img
                                             src={profileImage}
@@ -144,7 +144,6 @@ export default function Navbar() {
                                             className="w-full h-full object-cover"
                                             referrerPolicy="no-referrer"
                                             onError={(e) => {
-                                                // 이미지 로드 실패 시 기본 아바타로 대체
                                                 const target = e.target as HTMLImageElement;
                                                 target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent('User')}&background=3b82f6&color=fff&size=40&bold=true`;
                                             }}
@@ -181,7 +180,7 @@ export default function Navbar() {
                 </div>
             </div>
 
-            {/* 모바일 메뉴 (생략 없이 포함) */}
+            {/* 모바일 메뉴 */}
             <AnimatePresence>
                 {isOpen && (
                     <motion.div 
@@ -195,7 +194,12 @@ export default function Navbar() {
                                 <Link
                                     key={item.name}
                                     href={item.href}
-                                    onClick={() => setIsOpen(false)}
+                                    onClick={() => {
+                                        if (item.href === '/') {
+                                            window.dispatchEvent(new Event('resetDashboard'));
+                                        }
+                                        setIsOpen(false);
+                                    }}
                                     className={`block text-[18px] transition-colors duration-300 hover:text-white ${
                                         pathname === item.href ? 'text-white font-bold' : 'text-[#9FA0A8]'
                                     }`}

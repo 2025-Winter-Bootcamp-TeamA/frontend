@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, ArrowLeft, TrendingUp, Map, FileSearch } from "lucide-react";
+import { ArrowRight, ArrowLeft, TrendingUp, Map as MapIcon, FileText, CheckCircle2, Search, Building2 } from "lucide-react";
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -13,29 +13,25 @@ const STEPS = [
     id: 1,
     title: "IT 트렌드, 데이터로 한눈에",
     desc: "최신 기술 스택의 성장세와 기업 선호도를\n직관적인 그래프로 비교 분석하세요.",
-    image: "", 
-    icon: <TrendingUp className="w-24 h-24 text-white drop-shadow-2xl" />,
     color: "from-blue-600 to-cyan-400",
-    shadow: "shadow-blue-500/40",
+    glow: "shadow-blue-500/20",
+    accent: "text-blue-400",
   },
   {
     id: 2,
     title: "내 주변 채용 공고 지도",
     desc: "관심 있는 기술 스택을 사용하는 기업의\n위치와 채용 정보를 지도 위에서 탐색하세요.",
-    image: "", 
-    icon: <Map className="w-24 h-24 text-white drop-shadow-2xl" />,
     color: "from-purple-600 to-pink-400",
-    shadow: "shadow-purple-500/40",
+    glow: "shadow-purple-500/20",
+    accent: "text-purple-400",
   },
   {
     id: 3,
     title: "AI 맞춤형 이력서 진단",
     desc: "내 이력서와 기업 요구사항의 매칭률을 분석하고,\n합격 가능성을 높이는 피드백을 받아보세요.",
-    // ✅ 이미지가 public 폴더에 있는지 확인해주세요.
-    image: "/onboarding3.png", 
-    icon: <FileSearch className="w-24 h-24 text-white drop-shadow-2xl" />,
     color: "from-orange-500 to-yellow-400",
-    shadow: "shadow-orange-500/40",
+    glow: "shadow-orange-500/20",
+    accent: "text-orange-400",
   },
 ];
 
@@ -56,98 +52,243 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
   };
 
+  // 🎨 단계별 커스텀 일러스트 렌더링
+  const renderVisual = (stepIndex: number) => {
+    switch (stepIndex) {
+      case 0: // Trend Analysis Visualization
+        return (
+          <div className="relative w-full h-full flex items-center justify-center">
+            {/* 차트 컨테이너 */}
+            <div className="w-64 h-48 bg-[#1A1B1E] border border-white/10 rounded-xl shadow-2xl p-4 flex flex-col justify-end relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-blue-500/5 to-transparent pointer-events-none" />
+                
+                {/* 라인 차트 */}
+                <svg className="absolute top-4 left-0 w-full h-32 overflow-visible">
+                    <motion.path 
+                        d="M 10 100 Q 60 100 90 60 T 170 40 T 250 10"
+                        fill="none"
+                        stroke="#60A5FA"
+                        strokeWidth="3"
+                        initial={{ pathLength: 0, opacity: 0 }}
+                        animate={{ pathLength: 1, opacity: 1 }}
+                        transition={{ duration: 1.5, ease: "easeInOut" }}
+                    />
+                    {[10, 90, 170, 250].map((cx, i) => (
+                        <motion.circle 
+                            key={i} cx={cx} cy={[100, 60, 40, 10][i]} r="4" fill="#3B82F6" stroke="white" strokeWidth="2"
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ delay: 1 + i * 0.2 }}
+                        />
+                    ))}
+                </svg>
+
+                {/* 바 차트 */}
+                <div className="flex justify-between items-end h-24 gap-3 z-10">
+                    {[40, 70, 50, 85, 60].map((h, i) => (
+                        <motion.div
+                            key={i}
+                            className="w-full bg-gradient-to-t from-blue-900/50 to-blue-500/50 rounded-t-md backdrop-blur-sm border-t border-x border-white/10"
+                            initial={{ height: 0 }}
+                            animate={{ height: `${h}%` }}
+                            transition={{ duration: 0.8, delay: i * 0.1, ease: "backOut" }}
+                        />
+                    ))}
+                </div>
+            </div>
+            
+            {/* 플로팅 배지 */}
+            <motion.div 
+                className="absolute top-1/4 right-10 bg-[#25262B] border border-white/10 p-3 rounded-lg shadow-xl flex items-center gap-2"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 1.2 }}
+            >
+                <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
+                    <TrendingUp size={16} />
+                </div>
+                <div>
+                    <div className="text-[10px] text-gray-400">Growth</div>
+                    <div className="text-sm font-bold text-white">+124%</div>
+                </div>
+            </motion.div>
+          </div>
+        );
+
+      case 1: // Map Visualization
+        return (
+          <div className="relative w-full h-full flex items-center justify-center">
+            {/* 지도 배경 */}
+            <div className="w-72 h-56 bg-[#1A1B1E] border border-white/10 rounded-2xl shadow-2xl relative overflow-hidden perspective-[1000px] rotate-x-12 transform-style-3d">
+                <div className="absolute inset-0 grid grid-cols-6 grid-rows-6 gap-[1px] opacity-20 pointer-events-none">
+                    {Array.from({ length: 36 }).map((_, i) => (
+                        <div key={i} className="bg-gray-700/30" />
+                    ))}
+                </div>
+                
+                <motion.div 
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/10 to-transparent w-[200%]"
+                    animate={{ x: ["-100%", "100%"] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                />
+
+                <motion.div 
+                    className="absolute top-1/3 left-1/4"
+                    initial={{ scale: 0, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    transition={{ delay: 0.3, type: "spring" }}
+                >
+                    <MapIcon className="text-purple-500 drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]" size={32} fill="rgba(168,85,247,0.2)" />
+                </motion.div>
+
+                <motion.div 
+                    className="absolute bottom-1/3 right-1/3"
+                    initial={{ scale: 0, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    transition={{ delay: 0.6, type: "spring" }}
+                >
+                    <div className="relative">
+                        <MapIcon className="text-pink-500 drop-shadow-[0_0_15px_rgba(236,72,153,0.6)]" size={40} fill="rgba(236,72,153,0.3)" />
+                        <motion.div 
+                            className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full animate-ping" 
+                        />
+                    </div>
+                </motion.div>
+            </div>
+
+            <motion.div 
+                className="absolute bottom-16 left-12 bg-[#25262B]/90 backdrop-blur-md border border-white/10 p-4 rounded-xl shadow-2xl w-48"
+                initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: 1 }}
+            >
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center">
+                        <Building2 size={16} className="text-black" />
+                    </div>
+                    <div className="w-full">
+                        <div className="h-2 w-2/3 bg-gray-600 rounded-full mb-1.5" />
+                        <div className="h-1.5 w-1/2 bg-gray-700 rounded-full" />
+                    </div>
+                </div>
+                <div className="flex gap-1 mt-2">
+                    <div className="h-4 w-12 bg-purple-500/20 rounded border border-purple-500/30" />
+                    <div className="h-4 w-10 bg-gray-700/50 rounded border border-gray-600/30" />
+                </div>
+            </motion.div>
+          </div>
+        );
+
+      case 2: // AI Resume Visualization
+        return (
+          <div className="relative w-full h-full flex items-center justify-center">
+            {/* 문서 아이콘 */}
+            <motion.div 
+                className="w-56 h-72 bg-[#1A1B1E] border border-white/10 rounded-2xl shadow-2xl relative overflow-hidden flex flex-col items-center p-6"
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.5 }}
+            >
+                <div className="w-16 h-16 bg-gray-800 rounded-full mb-6 flex items-center justify-center">
+                    <FileText className="text-gray-500" size={32} />
+                </div>
+                <div className="w-full space-y-3">
+                    <div className="h-3 w-3/4 bg-gray-700 rounded-full" />
+                    <div className="h-3 w-full bg-gray-800 rounded-full" />
+                    <div className="h-3 w-5/6 bg-gray-800 rounded-full" />
+                    <div className="h-3 w-full bg-gray-800 rounded-full" />
+                </div>
+
+                {/* 스캔 라인 */}
+                <motion.div 
+                    className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-orange-400 to-transparent shadow-[0_0_15px_#FB923C]"
+                    animate={{ top: ["0%", "100%", "0%"] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                />
+            </motion.div>
+
+            {/* ✅ [수정] 분석 결과 뱃지 위치 조정 (오른쪽 하단) */}
+            <motion.div 
+                className="absolute bottom-20 right-12 bg-[#25262B] border border-orange-500/30 p-3 rounded-xl shadow-2xl flex items-center gap-3 backdrop-blur-md"
+                initial={{ scale: 0, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                transition={{ delay: 1.5, type: "spring" }}
+            >
+                <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 border border-green-500/30">
+                    <CheckCircle2 size={20} />
+                </div>
+                <div>
+                    <div className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Match Rate</div>
+                    <div className="text-xl font-black text-white">98%</div>
+                </div>
+            </motion.div>
+
+            {/* ✅ [수정] 돋보기 아이콘 위치 및 디자인 조정 (왼쪽 상단에서 스캔하는 느낌) */}
+            <motion.div
+                className="absolute top-24 left-12 text-orange-400 opacity-90"
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1, x: [0, 10, 0], y: [0, 10, 0] }}
+                transition={{ 
+                    scale: { delay: 1, duration: 0.3 },
+                    opacity: { delay: 1, duration: 0.3 },
+                    x: { repeat: Infinity, duration: 3, ease: "easeInOut" },
+                    y: { repeat: Infinity, duration: 4, ease: "easeInOut" }
+                }}
+            >
+                <div className="relative">
+                    {/* 돋보기 배경 글로우 추가 */}
+                    <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full" />
+                    <Search size={56} strokeWidth={2.5} className="drop-shadow-[0_0_15px_rgba(251,146,60,0.6)] relative z-10" />
+                </div>
+            </motion.div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="min-h-screen w-full bg-[#0F1012] text-white overflow-hidden relative flex flex-col items-center justify-center perspective-[2000px]">
+    <div className="min-h-screen w-full bg-[#0F1012] text-white overflow-hidden relative flex flex-col items-center justify-center">
       
-      {/* 배경 그라데이션 */}
       <motion.div
         animate={{
-          background: `radial-gradient(circle at 30% 50%, ${
+          background: `radial-gradient(circle at ${
+            currentStep === 0 ? "30% 40%" : currentStep === 1 ? "70% 60%" : "50% 50%"
+          }, ${
             currentStep === 0 ? "#1d4ed8" : currentStep === 1 ? "#7e22ce" : "#c2410c"
-          } 0%, transparent 60%)`,
+          } 0%, transparent 50%)`,
         }}
-        className="absolute inset-0 opacity-20 blur-[120px] transition-colors duration-1000 pointer-events-none"
+        className="absolute inset-0 opacity-15 blur-[120px] transition-all duration-1000 pointer-events-none"
       />
 
-      <div className="w-full max-w-[1600px] relative z-10 flex flex-col lg:flex-row items-center justify-center p-6 lg:p-12 gap-10">
+      <div className="w-full max-w-[1400px] relative z-10 flex flex-col lg:flex-row items-center justify-center p-6 lg:p-12 gap-12 lg:gap-24 h-full">
         
-        {/* [왼쪽: 그래픽 영역] */}
-        <div className="relative w-full lg:w-1/2 h-[400px] lg:h-[600px] flex items-center justify-center perspective-[2000px]">
+        <div className="relative w-full lg:w-1/2 max-w-[500px] aspect-square flex items-center justify-center">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentStep}
-              initial={{ opacity: 0, rotateY: 20, rotateX: 10, y: 50, scale: 0.9 }}
-              animate={{ 
-                opacity: 1, 
-                rotateY: 15, 
-                rotateX: 5,
-                y: [0, -15, 0], 
-                scale: 1 
-              }}
-              exit={{ opacity: 0, rotateY: -20, rotateX: -10, y: 50, scale: 0.9 }}
-              transition={{ 
-                opacity: { duration: 0.5 },
-                scale: { duration: 0.5 },
-                rotateY: { duration: 0.8, ease: "easeOut" },
-                y: { repeat: Infinity, duration: 6, ease: "easeInOut" } 
-              }}
-              // ✅ 이미지가 깨져도 영역이 보이도록 배경색을 조금 밝게 설정 (bg-[#1A1B1E] -> bg-gray-800)
-              className={`w-full max-w-[600px] aspect-square rounded-[48px] overflow-hidden shadow-2xl ${STEPS[currentStep].shadow} bg-gray-800 border border-white/10 relative group`}
+              initial={{ opacity: 0, scale: 0.8, rotate: -5 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              exit={{ opacity: 0, scale: 1.1, filter: "blur(10px)" }}
+              transition={{ duration: 0.5, ease: "backOut" }}
+              className={`w-full h-full rounded-[40px] bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-xl shadow-2xl relative overflow-hidden group ${STEPS[currentStep].glow}`}
             >
-                {STEPS[currentStep].image ? (
-                    // ✅ 이미지 모드 (Step 3)
-                    <div className="relative w-full h-full flex items-center justify-center bg-black">
-                        <img 
-                            src={STEPS[currentStep].image} 
-                            alt={STEPS[currentStep].title} 
-                            // ✅ object-contain으로 변경하여 이미지가 잘리지 않고 전체가 보이도록 함
-                            className="w-full h-full object-contain" 
-                        />
-                        {/* 이미지 로딩 실패 시 텍스트 표시 (디버깅용) */}
-                        <div className="absolute inset-0 flex items-center justify-center -z-10 text-gray-500 text-sm">
-                            이미지를 불러오는 중...<br/>
-                            (public 폴더를 확인하세요)
-                        </div>
-                    </div>
-                ) : (
-                    // ✅ 아이콘 모드 (Step 1, 2)
-                    <div className="relative w-full h-full flex items-center justify-center overflow-hidden bg-[#1A1B1E]">
-                        <div className={`absolute inset-0 bg-gradient-to-br ${STEPS[currentStep].color} opacity-20 blur-[80px] group-hover:opacity-30 transition-opacity duration-700`} />
-                        
-                        <div className="relative z-10 flex flex-col items-center gap-8">
-                            <div className={`
-                                w-48 h-48 rounded-[40px] 
-                                bg-gradient-to-br ${STEPS[currentStep].color} 
-                                flex items-center justify-center 
-                                shadow-[0_20px_50px_rgba(0,0,0,0.5)] 
-                                border border-white/20 
-                                backdrop-blur-md
-                                transform group-hover:scale-110 transition-transform duration-500
-                            `}>
-                                {STEPS[currentStep].icon}
-                            </div>
-                            <div className="text-center space-y-2">
-                                <div className="inline-block px-4 py-1.5 rounded-full bg-white/10 border border-white/10 backdrop-blur-md shadow-lg">
-                                    <span className="text-sm font-semibold text-white/90">Preview Feature</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {renderVisual(currentStep)}
             </motion.div>
           </AnimatePresence>
         </div>
 
-        {/* [오른쪽: 텍스트 영역] */}
-        <div className="relative w-full lg:w-1/2 flex flex-col items-center lg:items-start text-center lg:text-left z-20">
-          <div className="bg-[#1A1B1E]/80 backdrop-blur-xl border border-white/10 p-8 lg:p-12 rounded-[32px] shadow-2xl w-full max-w-lg">
+        <div className="relative w-full lg:w-1/2 flex flex-col items-center lg:items-start text-center lg:text-left z-20 max-w-lg">
             
-            <div className="flex justify-center lg:justify-start mb-6">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/5">
-                <span className="text-xs font-bold text-white">Step {currentStep + 1}</span>
-                <span className="text-xs text-gray-500">/</span>
-                <span className="text-xs text-gray-500">{STEPS.length}</span>
-                </div>
+            <div className="flex justify-center lg:justify-start mb-8 gap-2">
+                {STEPS.map((_, idx) => (
+                    <motion.div 
+                        key={idx}
+                        className={`h-1.5 rounded-full transition-colors duration-300 ${idx === currentStep ? `w-8 bg-white` : "w-2 bg-gray-700"}`}
+                        layoutId="step-indicator"
+                    />
+                ))}
             </div>
 
             <AnimatePresence mode="wait">
@@ -157,33 +298,24 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.3 }}
-                className="mb-8 min-h-[120px]"
+                className="mb-10 min-h-[140px]"
               >
-                <h1 className="text-3xl lg:text-4xl font-black mb-4 leading-tight whitespace-pre-wrap text-white">
+                <h1 className={`text-3xl lg:text-5xl font-black mb-6 leading-tight whitespace-pre-wrap bg-clip-text text-transparent bg-gradient-to-r ${STEPS[currentStep].color}`}>
                   {STEPS[currentStep].title}
                 </h1>
-                <p className="text-base lg:text-lg text-gray-400 leading-relaxed whitespace-pre-wrap">
+                <p className="text-base lg:text-lg text-gray-400 leading-relaxed whitespace-pre-wrap font-medium">
                   {STEPS[currentStep].desc}
                 </p>
               </motion.div>
             </AnimatePresence>
 
-            <div className="w-full h-1.5 bg-gray-700/30 rounded-full mb-8 overflow-hidden">
-              <motion.div 
-                className={`h-full bg-gradient-to-r ${STEPS[currentStep].color}`}
-                initial={{ width: "0%" }}
-                animate={{ width: `${((currentStep + 1) / STEPS.length) * 100}%` }}
-                transition={{ duration: 0.4 }}
-              />
-            </div>
-
-            <div className="flex w-full gap-3">
+            <div className="flex w-full gap-4 mt-auto">
               {currentStep > 0 && (
                 <button
                   onClick={handlePrev}
-                  className="w-14 h-14 flex items-center justify-center rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-colors text-white"
+                  className="w-14 h-14 flex-shrink-0 flex items-center justify-center rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-colors text-white group"
                 >
-                  <ArrowLeft className="w-6 h-6" />
+                  <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
                 </button>
               )}
               
@@ -191,11 +323,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 onClick={handleNext}
                 className={`flex-1 h-14 rounded-full font-bold text-lg transition-all flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] active:scale-[0.98]
                   ${currentStep === STEPS.length - 1 
-                    ? `bg-gradient-to-r ${STEPS[currentStep].color} text-white` 
-                    : "bg-white text-black hover:bg-gray-200"
+                    ? `bg-gradient-to-r ${STEPS[currentStep].color} text-white shadow-${STEPS[currentStep].color}/50` 
+                    : "bg-white text-black hover:bg-gray-100"
                   }`}
               >
-                {currentStep === STEPS.length - 1 ? "시작하기" : "다음"}
+                <span>{currentStep === STEPS.length - 1 ? "DevRoad 시작하기" : "다음으로"}</span>
                 <ArrowRight className="w-5 h-5" />
               </button>
             </div>
@@ -203,12 +335,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             {currentStep < STEPS.length - 1 && (
               <button 
                   onClick={onComplete} 
-                  className="mt-4 w-full text-center text-xs text-gray-500 hover:text-white transition-colors py-2"
+                  className="mt-6 text-sm text-gray-500 hover:text-white transition-colors underline underline-offset-4 decoration-gray-700 hover:decoration-white"
               >
                 건너뛰기
               </button>
             )}
-          </div>
         </div>
 
       </div>

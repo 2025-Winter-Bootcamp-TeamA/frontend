@@ -179,7 +179,7 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
             <div className="p-5 border-b border-white/5 flex flex-col gap-4 bg-[#2C2E33]/50 flex-shrink-0">
                 <div className="flex justify-between items-center">
                     <h3 className="font-bold text-white flex items-center gap-2 truncate">
-                        {techStackId === 0 ? "🔥 인기 기술 채용 공고" : `💼 ${techStackName} 관련 공고`}
+                        {techStackId === 0 ? "🔥 전체 기술 채용 공고" : `💼 ${techStackName} 관련 공고`}
                     </h3>
                     <span 
                         onClick={handleMoreClick}
