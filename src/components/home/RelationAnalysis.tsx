@@ -11,6 +11,7 @@ interface StackRelationAnalysisProps {
   mainLogo: string;
   relatedStacks: RelatedTechStackRelation[]; // API에서 받은 관련 기술 스택 데이터
   onClose: () => void;
+  onStackSelect?: (stackId: number) => void; // 기술 스택 선택 시 호출되는 콜백
 }
 
 // 2. 노드 상세 데이터
@@ -28,7 +29,7 @@ const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, name
   target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&size=128&bold=true`;
 };
 
-export default function StackRelationAnalysis({ mainStackName, mainLogo, relatedStacks, onClose }: StackRelationAnalysisProps) {
+export default function StackRelationAnalysis({ mainStackName, mainLogo, relatedStacks, onClose, onStackSelect }: StackRelationAnalysisProps) {
   const [focusedNode, setFocusedNode] = useState<RelatedTechStackRelation | null>(null);
   
   // relatedStacks가 변경되면 focusedNode 초기화
@@ -153,7 +154,14 @@ export default function StackRelationAnalysis({ mainStackName, mainLogo, related
                             <p className="text-sm text-gray-200 leading-relaxed font-medium">"{activeDetail.relationReason}"</p>
                         </div>
                     </div>
-                    <button className="mt-auto w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 text-sm">
+                    <button 
+                        onClick={() => {
+                            if (focusedNode && onStackSelect) {
+                                onStackSelect(focusedNode.tech_stack.id);
+                            }
+                        }}
+                        className="mt-auto w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 text-sm"
+                    >
                         <span>{activeDetail.name} 분석 화면으로 이동</span>
                         <ArrowRightCircle className="w-4 h-4" />
                     </button>

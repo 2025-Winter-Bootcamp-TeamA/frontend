@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import JobCard from './JobCard';
 
 const MOCK_JOBS = [
@@ -41,13 +42,24 @@ const MOCK_JOBS = [
 ];
 
 export default function JobSection() {
+    const router = useRouter();
+
+    const handleMoreClick = () => {
+        router.push('/map');
+    };
+
     return (
         <section className="w-full h-full">
             <div className="w-full h-full rounded-[24px] lg:rounded-[32px] bg-[#25262B] border border-gray-800 p-6 flex flex-col">
                 {/* 헤더 고정 */}
                 <div className="flex items-center justify-between mb-6 flex-shrink-0">
                     <h3 className="text-white text-xl font-bold">🔥 추천 채용 공고</h3>
-                    <span className="text-sm text-gray-500 cursor-pointer hover:text-blue-400">더보기</span>
+                    <span 
+                        onClick={handleMoreClick}
+                        className="text-sm text-gray-500 cursor-pointer hover:text-blue-400 transition-colors"
+                    >
+                        채용 지도로 이동
+                    </span>
                 </div>
 
                 {/* 리스트 내부 스크롤 */}
