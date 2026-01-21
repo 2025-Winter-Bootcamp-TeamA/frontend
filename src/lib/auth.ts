@@ -5,14 +5,15 @@ export async function startGoogleLogin() {
   try {
     // vercel.json의 rewrites를 사용하여 프록시 경로로 요청
     // /api/:path* -> https://api.devroad.cloud/api/:path*
-    // 따라서 /api/v1/auth/google/start/로 요청하면
-    // https://api.devroad.cloud/api/v1/auth/google/start/로 프록시됨
+    // 백엔드 경로: /api/v1/users/auth/google/start/
+    // 따라서 /api/v1/users/auth/google/start/로 요청하면
+    // https://api.devroad.cloud/api/v1/users/auth/google/start/로 프록시됨
     
     // 개발 환경과 프로덕션 환경 모두 /api를 통해 프록시 사용
     const API_URL = process.env.NEXT_PUBLIC_API_URL;
     const apiPath = API_URL 
-      ? `${API_URL}/api/v1/auth/google/start/`
-      : '/api/v1/auth/google/start/';
+      ? `${API_URL}/api/v1/users/auth/google/start/`
+      : '/api/v1/users/auth/google/start/';
     
     console.log('Google 로그인 요청:', apiPath);
     
@@ -153,9 +154,14 @@ export async function refreshAccessToken(): Promise<string | null> {
   if (!refreshToken) return null;
   
   try {
+    // vercel.json의 rewrites를 사용하여 프록시 경로로 요청
     const API_URL = process.env.NEXT_PUBLIC_API_URL;
+    const apiPath = API_URL 
+      ? `${API_URL}/api/v1/users/token/refresh/`
+      : '/api/v1/users/token/refresh/';
+    
     const response = await fetch(
-      `${API_URL}/api/v1/users/token/refresh/`,
+      apiPath,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

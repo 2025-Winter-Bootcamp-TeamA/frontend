@@ -1,9 +1,10 @@
 import axios from 'axios';
 import { getAuthTokens, refreshAccessToken, clearAuthTokens } from './auth';
 
-// [수정 핵심] 환경 변수 대신 프록시 경로를 직접 사용합니다.
-// 이렇게 하면 무조건 Next.js Rewrites를 거쳐서 백엔드로 가므로 Mixed Content 에러가 해결됩니다.
-const BASE_URL = '/api/proxy/api/v1'; 
+// vercel.json의 rewrites를 사용하여 프록시 경로로 요청
+// /api/:path* -> https://api.devroad.cloud/api/:path*
+// 따라서 /api/v1/...로 요청하면 https://api.devroad.cloud/api/v1/...로 프록시됨
+const BASE_URL = '/api/v1'; 
 
 export const api = axios.create({
   baseURL: BASE_URL,

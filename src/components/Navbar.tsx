@@ -34,7 +34,7 @@ export default function Navbar() {
 
                 // 2. 최신 정보를 위해 API 호출 (이름 기반 생성 로직은 삭제하고 순수 구글 이미지만 사용)
                 try {
-                    const response = await api.get('/auth/me/');
+                    const response = await api.get('/users/auth/me/');
                     const userData = response.data;
                     
                     // 백엔드(구글 로그인)에서 받은 이미지가 있다면 덮어쓰기
