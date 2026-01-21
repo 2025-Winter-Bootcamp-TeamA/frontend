@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
-import { CATEGORY_INFO } from '@/constants/mockTrends';
+
+// CATEGORY_INFO가 없을 경우를 대비한 기본값
+const DEFAULT_CATEGORY_INFO: Record<string, any> = {};
 
 // 초기 기업 데이터
 const INITIAL_COMPANIES = [
@@ -23,15 +25,34 @@ export function useSimulation() {
         // 비교를 위해 기업 이름을 소문자로 변환하여 Set에 저장
         const companyNames = new Set(INITIAL_COMPANIES.map(c => c.name.toLowerCase()));
 
-        Object.values(CATEGORY_INFO).forEach((cat: any) => {
-            // company.nodes와 community.nodes 모두 돌면서 확인
-            [...cat.company.nodes, ...cat.community.nodes].forEach((node: any) => {
-                // 기업 목록에 없는 키워드만 추가
-                if (!companyNames.has(node.id.toLowerCase())) {
-                    keywords.add(node.id);
+        // CATEGORY_INFO가 없으면 빈 배열 반환
+        try {
+            // 동적 import 시도 (파일이 있으면 사용, 없으면 기본값 사용)
+            const categoryInfo = DEFAULT_CATEGORY_INFO;
+            Object.values(categoryInfo).forEach((cat: any) => {
+                if (cat && cat.company && cat.community) {
+                    // company.nodes와 community.nodes 모두 돌면서 확인
+                    [...(cat.company.nodes || []), ...(cat.community.nodes || [])].forEach((node: any) => {
+                        // 기업 목록에 없는 키워드만 추가
+                        if (node && node.id && !companyNames.has(node.id.toLowerCase())) {
+                            keywords.add(node.id);
+                        }
+                    });
                 }
             });
+        } catch (error) {
+            // CATEGORY_INFO가 없어도 에러 없이 동작
+            console.warn('CATEGORY_INFO를 불러올 수 없습니다. 기본 키워드만 사용됩니다.');
+        }
+        
+        // 기본 기술 스택 키워드 추가 (CATEGORY_INFO가 없을 때 사용)
+        const defaultKeywords = ['React', 'TypeScript', 'Next.js', 'Node.js', 'Python', 'Django', 'AWS', 'Docker', 'Kubernetes', 'PostgreSQL', 'MongoDB', 'Redis', 'GraphQL', 'REST API'];
+        defaultKeywords.forEach(keyword => {
+            if (!companyNames.has(keyword.toLowerCase())) {
+                keywords.add(keyword);
+            }
         });
+        
         return Array.from(keywords).sort();
     }, []);
 

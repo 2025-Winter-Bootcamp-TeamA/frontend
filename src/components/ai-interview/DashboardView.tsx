@@ -2,9 +2,10 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Star, FileText, CheckCircle2, TrendingUp, AlertCircle, HelpCircle, Briefcase, Hash, ChevronRight, Info } from 'lucide-react';
+import { Star, FileText, CheckCircle2, TrendingUp, AlertCircle, HelpCircle, Briefcase, Hash, ChevronRight, Info, Search, X } from 'lucide-react';
 // ✅ [추가] 기술 스택 데이터를 가져오기 위해 서비스 임포트
 import { fetchAllTechStacks } from '@/services/trendService';
+import { api } from '@/lib/api';
 
 // --- Mock Data: 이력서 본문 ---
 const MOCK_RESUME_TEXT = `
@@ -118,6 +119,8 @@ const COMPANY_SPECIFIC_FEEDBACKS: Record<string, any[]> = {
 
 interface DashboardViewProps {
     resumeTitle: string;
+    resumeText?: string | null; // DB에서 가져온 이력서 텍스트 (work_experiences + project_experiences 또는 PDF 원본)
+    resumeId?: number; // 이력서 ID (API 호출용)
     resumeKeywords: string[];
     sortedCompanies: any[];
     selectedCompany: any;
@@ -127,10 +130,43 @@ interface DashboardViewProps {
     onOpenReport: () => void;
 }
 
+interface AnalysisFeedback {
+    id: string;
+    type: 'strength' | 'improvement' | 'matching';
+    targetText?: string;
+    comment: string;
+}
+
+interface CompanyWithJobPosting {
+    id: number;
+    name: string;
+    logo_url?: string;
+    address?: string;
+    jobPostings: Array<{
+        id: number;
+        title: string;
+        description?: string;
+        url?: string;
+    }>;
+}
+
 export default function DashboardView({
-    resumeTitle, resumeKeywords, sortedCompanies, selectedCompany, setSelectedCompany, toggleFavorite, matchScore, onOpenReport
+    resumeTitle, resumeText, resumeId, resumeKeywords, sortedCompanies, selectedCompany, setSelectedCompany, toggleFavorite, matchScore, onOpenReport
 }: DashboardViewProps) {
-    const [activeFeedbackId, setActiveFeedbackId] = useState<number | null>(null);
+    const [activeFeedbackId, setActiveFeedbackId] = useState<string | null>(null);
+    const [analysisData, setAnalysisData] = useState<{
+        positive_feedback?: string;
+        negative_feedback?: string;
+        enhancements_feedback?: string;
+    } | null>(null);
+    const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
+    const [companiesWithJobs, setCompaniesWithJobs] = useState<CompanyWithJobPosting[]>([]);
+    const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
+    const [selectedJobPostingId, setSelectedJobPostingId] = useState<number | null>(null);
+    const [companySearchQuery, setCompanySearchQuery] = useState('');
+    const [isSearchMode, setIsSearchMode] = useState(false);
+    const [searchResults, setSearchResults] = useState<CompanyWithJobPosting[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
     
     // ✅ [추가] 기술 스택 로고 매핑 상태
     const [techLogos, setTechLogos] = useState<Record<string, string>>({});
@@ -160,11 +196,254 @@ export default function DashboardView({
         loadTechLogos();
     }, []);
 
-    // 기업 선택 여부에 따라 피드백 합치기
-    const currentFeedbacks = useMemo(() => {
-        const companyFeedbacks = selectedCompany ? (COMPANY_SPECIFIC_FEEDBACKS[selectedCompany.name] || []) : [];
-        return [...COMMON_FEEDBACKS, ...companyFeedbacks];
-    }, [selectedCompany]);
+    // ✅ [추가] 즐겨찾기 기업 목록 및 채용공고 가져오기
+    useEffect(() => {
+        const loadFavoriteCompaniesWithJobs = async () => {
+            setIsLoadingCompanies(true);
+            try {
+                // 즐겨찾기 기업 목록 가져오기
+                const bookmarksResponse = await api.get('/jobs/corp-bookmarks/');
+                const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
+
+                if (bookmarks.length === 0) {
+                    setCompaniesWithJobs([]);
+                    setIsLoadingCompanies(false);
+                    return;
+                }
+
+                // ✅ 각 즐겨찾기 기업의 채용공고 가져오기
+                // 백엔드 API: /api/v1/jobs/corps/{corp_id}/job-postings/
+                // JobPosting 모델 (job_posting 테이블)에서 해당 기업의 채용공고 조회
+                const companiesData = await Promise.all(
+                    bookmarks.map(async (bookmark: any) => {
+                        const corp = bookmark.corp;
+                        try {
+                            const jobsResponse = await api.get(`/jobs/corps/${corp.id}/job-postings/`);
+                            
+                            // 응답이 배열인지 확인 (페이지네이션 사용 시 results 필드에 있을 수 있음)
+                            let jobPostings: any[] = [];
+                            if (Array.isArray(jobsResponse.data)) {
+                                jobPostings = jobsResponse.data;
+                            } else if (jobsResponse.data?.results && Array.isArray(jobsResponse.data.results)) {
+                                jobPostings = jobsResponse.data.results;
+                            }
+                            
+                            return {
+                                id: corp.id,
+                                name: corp.name,
+                                logo_url: corp.logo_url,
+                                address: corp.address,
+                                jobPostings: jobPostings.map((job: any) => ({
+                                    id: job.id,
+                                    title: job.title,
+                                    description: job.description,
+                                    url: job.url,
+                                })),
+                            };
+                        } catch (error) {
+                            console.error(`기업 ${corp.name}의 채용공고 가져오기 실패:`, error);
+                            return {
+                                id: corp.id,
+                                name: corp.name,
+                                logo_url: corp.logo_url,
+                                address: corp.address,
+                                jobPostings: [],
+                            };
+                        }
+                    })
+                );
+
+                setCompaniesWithJobs(companiesData.filter(c => c.jobPostings.length > 0));
+            } catch (error) {
+                console.error('즐겨찾기 기업 목록 가져오기 실패:', error);
+                setCompaniesWithJobs([]);
+            } finally {
+                setIsLoadingCompanies(false);
+            }
+        };
+
+        if (!isSearchMode) {
+            loadFavoriteCompaniesWithJobs();
+        }
+    }, [isSearchMode]);
+
+    // ✅ [추가] 기업 검색 (부분 일치 검색 지원)
+    useEffect(() => {
+        const searchCompanies = async () => {
+            // 검색어가 없으면 결과 초기화
+            if (!companySearchQuery || !companySearchQuery.trim()) {
+                setSearchResults([]);
+                return;
+            }
+
+            setIsSearching(true);
+            try {
+                // ✅ 백엔드 API: /api/v1/jobs/corps/?corp_name={query}
+                // Corp 모델 (corp 테이블)에서 name__icontains로 부분 일치 검색 수행
+                // is_deleted=False인 기업만 조회
+                const searchUrl = `/jobs/corps/?corp_name=${encodeURIComponent(companySearchQuery.trim())}`;
+                console.log('기업 검색 API 호출:', searchUrl);
+                
+                const response = await api.get(searchUrl);
+                console.log('기업 검색 응답:', response.data);
+                const corps = response.data || [];
+                
+                if (corps.length === 0) {
+                    console.log('검색 결과 없음 - DB에 해당 기업이 없거나 채용공고가 없을 수 있습니다.');
+                }
+
+                // ✅ 각 기업의 채용공고 가져오기
+                // 백엔드 API: /api/v1/jobs/corps/{corp_id}/job-postings/
+                // JobPosting 모델 (job_posting 테이블)에서 해당 기업의 채용공고 조회
+                const companiesData = await Promise.all(
+                    corps.map(async (corp: any) => {
+                        try {
+                            const jobsResponse = await api.get(`/jobs/corps/${corp.id}/job-postings/`);
+                            console.log(`기업 ${corp.name} (${corp.id})의 채용공고 응답:`, jobsResponse.data);
+                            
+                            // ✅ 페이지네이션 응답 처리: {count, next, previous, results: [...]}
+                            let jobPostings: any[] = [];
+                            if (Array.isArray(jobsResponse.data)) {
+                                jobPostings = jobsResponse.data;
+                            } else if (jobsResponse.data?.results && Array.isArray(jobsResponse.data.results)) {
+                                jobPostings = jobsResponse.data.results;
+                            } else {
+                                console.warn(`기업 ${corp.name}의 채용공고 응답 형식이 예상과 다릅니다:`, jobsResponse.data);
+                            }
+                            
+                            return {
+                                id: corp.id,
+                                name: corp.name,
+                                logo_url: corp.logo_url,
+                                address: corp.address,
+                                jobPostings: jobPostings.map((job: any) => ({
+                                    id: job.id,
+                                    title: job.title,
+                                    description: job.description,
+                                    url: job.url,
+                                })),
+                            };
+                        } catch (error) {
+                            console.error(`기업 ${corp.name}의 채용공고 가져오기 실패:`, error);
+                            return {
+                                id: corp.id,
+                                name: corp.name,
+                                logo_url: corp.logo_url,
+                                address: corp.address,
+                                jobPostings: [],
+                            };
+                        }
+                    })
+                );
+
+                // 채용공고가 있는 기업만 표시
+                const companiesWithJobs = companiesData.filter(c => c.jobPostings.length > 0);
+                console.log(`검색 결과: ${corps.length}개 기업 중 ${companiesWithJobs.length}개 기업에 채용공고가 있음`);
+                setSearchResults(companiesWithJobs);
+            } catch (error: any) {
+                console.error('기업 검색 실패:', error);
+                console.error('에러 상세:', {
+                    message: error.message,
+                    response: error.response?.data,
+                    status: error.response?.status,
+                    url: error.config?.url,
+                });
+                setSearchResults([]);
+            } finally {
+                setIsSearching(false);
+            }
+        };
+
+        const debounceTimer = setTimeout(() => {
+            if (isSearchMode) {
+                searchCompanies();
+            }
+        }, 300);
+
+        return () => clearTimeout(debounceTimer);
+    }, [companySearchQuery, isSearchMode]);
+
+    // ✅ [추가] 채용공고 선택 시 분석 데이터 가져오기
+    useEffect(() => {
+        const fetchAnalysis = async () => {
+            if (!resumeId || !selectedJobPostingId) {
+                setAnalysisData(null);
+                return;
+            }
+
+            setIsLoadingAnalysis(true);
+            try {
+                // 먼저 기존 매칭 데이터가 있는지 확인 (GET)
+                try {
+                    const matchingsResponse = await api.get('/resumes/matchings/');
+                    const matchings = matchingsResponse.data.results || matchingsResponse.data || [];
+                    const existingMatching = matchings.find((m: any) => 
+                        m.resume === resumeId && m.job_posting === selectedJobPostingId
+                    );
+
+                    if (existingMatching) {
+                        setAnalysisData({
+                            positive_feedback: existingMatching.positive_feedback,
+                            negative_feedback: existingMatching.negative_feedback,
+                            enhancements_feedback: existingMatching.enhancements_feedback,
+                        });
+                        setIsLoadingAnalysis(false);
+                        return;
+                    }
+                } catch (error) {
+                    console.log('기존 매칭 데이터 조회 실패, 새로 생성합니다:', error);
+                }
+
+                // 기존 데이터가 없으면 새로 생성 (POST)
+                const response = await api.post(`/resumes/${resumeId}/match/${selectedJobPostingId}/`);
+                setAnalysisData({
+                    positive_feedback: response.data.positive_feedback,
+                    negative_feedback: response.data.negative_feedback,
+                    enhancements_feedback: response.data.enhancements_feedback,
+                });
+            } catch (error) {
+                console.error('분석 데이터 가져오기 실패:', error);
+                setAnalysisData(null);
+            } finally {
+                setIsLoadingAnalysis(false);
+            }
+        };
+
+        fetchAnalysis();
+    }, [resumeId, selectedJobPostingId]);
+
+    // 분석 데이터를 피드백 형식으로 변환
+    const currentFeedbacks = useMemo((): AnalysisFeedback[] => {
+        if (!analysisData) return [];
+
+        const feedbacks: AnalysisFeedback[] = [];
+
+        if (analysisData.positive_feedback) {
+            feedbacks.push({
+                id: 'positive',
+                type: 'strength',
+                comment: analysisData.positive_feedback,
+            });
+        }
+
+        if (analysisData.negative_feedback) {
+            feedbacks.push({
+                id: 'negative',
+                type: 'improvement',
+                comment: analysisData.negative_feedback,
+            });
+        }
+
+        if (analysisData.enhancements_feedback) {
+            feedbacks.push({
+                id: 'enhancements',
+                type: 'improvement',
+                comment: analysisData.enhancements_feedback,
+            });
+        }
+
+        return feedbacks;
+    }, [analysisData]);
 
     const getHighlightStyle = (type: string, isActive: boolean) => {
         switch (type) {
@@ -185,20 +464,24 @@ export default function DashboardView({
     };
 
     const renderHighlightedText = (text: string) => {
-        let parts = [{ text, type: 'normal', id: 0 }];
+        let parts: Array<{ text: string; type: string; id: string }> = [{ text, type: 'normal', id: '0' }];
 
         currentFeedbacks.forEach((fb) => {
-            const newParts: any[] = [];
+            const newParts: Array<{ text: string; type: string; id: string }> = [];
             parts.forEach((part) => {
                 if (part.type !== 'normal') {
                     newParts.push(part);
                     return;
                 }
-                const split = part.text.split(fb.targetText);
-                if (split.length > 1) {
-                    newParts.push({ text: split[0], type: 'normal', id: 0 });
-                    newParts.push({ text: fb.targetText, type: fb.type, id: fb.id });
-                    newParts.push({ text: split[1], type: 'normal', id: 0 });
+                if (fb.targetText) {
+                    const split = part.text.split(fb.targetText);
+                    if (split.length > 1) {
+                        newParts.push({ text: split[0], type: 'normal', id: '0' });
+                        newParts.push({ text: fb.targetText, type: fb.type, id: fb.id });
+                        newParts.push({ text: split[1], type: 'normal', id: '0' });
+                    } else {
+                        newParts.push(part);
+                    }
                 } else {
                     newParts.push(part);
                 }
@@ -236,28 +519,202 @@ export default function DashboardView({
                 
                 {/* 1. 기업 목록 */}
                 <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
-                    <h3 className="text-sm font-bold text-gray-400 mb-4 flex items-center gap-2 uppercase tracking-wider">
-                        <Briefcase size={14} /> Companies
-                    </h3>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-bold text-gray-400 flex items-center gap-2 uppercase tracking-wider">
+                            <Briefcase size={14} /> {isSearchMode ? '기업 검색' : '즐겨찾기 기업'}
+                        </h3>
+                        <button
+                            onClick={() => {
+                                setIsSearchMode(!isSearchMode);
+                                setCompanySearchQuery('');
+                                setSearchResults([]);
+                            }}
+                            className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                        >
+                            {isSearchMode ? '즐겨찾기' : '검색'}
+                        </button>
+                    </div>
+
+                    {/* 검색 입력창 */}
+                    {isSearchMode && (
+                        <div className="relative mb-4">
+                            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="text"
+                                value={companySearchQuery}
+                                onChange={(e) => setCompanySearchQuery(e.target.value)}
+                                placeholder="기업명 검색"
+                                className="w-full pl-10 pr-10 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50"
+                            />
+                            {companySearchQuery && (
+                                <button
+                                    onClick={() => setCompanySearchQuery('')}
+                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                                >
+                                    <X size={16} />
+                                </button>
+                            )}
+                        </div>
+                    )}
+
                     <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
-                        {sortedCompanies.map((c) => (
-                            <div 
-                                key={c.id} 
-                                // ✅ [수정완료] null 전달 로직 제거 -> 단순히 객체 전달 (훅 내부에서 토글 처리)
-                                onClick={() => setSelectedCompany(c)}
-                                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center gap-3 select-none ${
-                                    selectedCompany?.id === c.id ? 'bg-green-600/20 border-green-500/50' : 'bg-white/5 border-transparent hover:bg-white/10'
-                                }`}
-                            >
-                                <div className="w-8 h-8 rounded-lg bg-white p-1 flex items-center justify-center shrink-0">
-                                    <img src={c.logo} alt="" className="w-full h-full object-contain" />
+                        {isSearchMode ? (
+                            // 검색 모드
+                            isSearching ? (
+                                <div className="flex items-center justify-center h-full text-gray-500">
+                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div>
                                 </div>
-                                <div className="min-w-0">
-                                    <h4 className={`text-sm font-bold truncate ${selectedCompany?.id === c.id ? 'text-green-100' : 'text-gray-300'}`}>{c.name}</h4>
-                                    <p className="text-xs text-gray-500 truncate">{c.category}</p>
+                            ) : searchResults.length === 0 ? (
+                                <div className="flex items-center justify-center h-full text-gray-500 text-xs">
+                                    {companySearchQuery.trim() ? '검색 결과가 없습니다.' : '기업명을 입력해주세요.'}
                                 </div>
-                            </div>
-                        ))}
+                            ) : (
+                                searchResults.map((company) => (
+                                    <div key={company.id} className="space-y-1">
+                                        {/* 기업 정보 */}
+                                        <div 
+                                            onClick={() => {
+                                                // 첫 번째 채용공고를 자동 선택
+                                                if (company.jobPostings.length > 0) {
+                                                    const firstJob = company.jobPostings[0];
+                                                    setSelectedJobPostingId(firstJob.id);
+                                                    setSelectedCompany({
+                                                        ...company,
+                                                        jobPostingId: firstJob.id,
+                                                        jobPostingTitle: firstJob.title,
+                                                    });
+                                                }
+                                            }}
+                                            className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center gap-3 select-none ${
+                                                selectedCompany?.id === company.id ? 'bg-green-600/20 border-green-500/50' : 'bg-white/5 border-transparent hover:bg-white/10'
+                                            }`}
+                                        >
+                                            <div className="w-8 h-8 rounded-lg bg-white p-1 flex items-center justify-center shrink-0">
+                                                {company.logo_url ? (
+                                                    <img src={company.logo_url} alt={company.name} className="w-full h-full object-contain" />
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">{company.name.charAt(0)}</span>
+                                                )}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <h4 className={`text-sm font-bold truncate ${selectedCompany?.id === company.id ? 'text-green-100' : 'text-gray-300'}`}>
+                                                    {company.name}
+                                                </h4>
+                                                <p className="text-xs text-gray-500 truncate">
+                                                    {company.jobPostings.length}개 채용공고
+                                                </p>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* 채용공고 목록 (선택된 기업만 표시) */}
+                                        {selectedCompany?.id === company.id && company.jobPostings.length > 1 && (
+                                            <div className="ml-4 space-y-1">
+                                                {company.jobPostings.map((job) => (
+                                                    <div
+                                                        key={job.id}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedJobPostingId(job.id);
+                                                            setSelectedCompany({
+                                                                ...company,
+                                                                jobPostingId: job.id,
+                                                                jobPostingTitle: job.title,
+                                                            });
+                                                        }}
+                                                        className={`p-2 rounded-lg border text-xs cursor-pointer transition-all ${
+                                                            selectedJobPostingId === job.id
+                                                                ? 'bg-blue-600/20 border-blue-500/50 text-blue-100'
+                                                                : 'bg-white/5 border-transparent hover:bg-white/10 text-gray-400'
+                                                        }`}
+                                                    >
+                                                        <p className="truncate">{job.title}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            )
+                        ) : (
+                            // 즐겨찾기 모드
+                            isLoadingCompanies ? (
+                                <div className="flex items-center justify-center h-full text-gray-500">
+                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div>
+                                </div>
+                            ) : companiesWithJobs.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-full text-gray-500 text-xs gap-2">
+                                    <Info size={24} />
+                                    <span>즐겨찾기한 기업이 없습니다.</span>
+                                    <span className="text-[10px] text-gray-600">검색 버튼을 눌러 기업을 찾아보세요.</span>
+                                </div>
+                            ) : (
+                                companiesWithJobs.map((company) => (
+                                    <div key={company.id} className="space-y-1">
+                                        {/* 기업 정보 */}
+                                        <div 
+                                        onClick={() => {
+                                            // 첫 번째 채용공고를 자동 선택
+                                            if (company.jobPostings.length > 0) {
+                                                const firstJob = company.jobPostings[0];
+                                                setSelectedJobPostingId(firstJob.id);
+                                                setSelectedCompany({
+                                                    ...company,
+                                                    jobPostingId: firstJob.id,
+                                                    jobPostingTitle: firstJob.title,
+                                                });
+                                            }
+                                        }}
+                                        className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center gap-3 select-none ${
+                                            selectedCompany?.id === company.id ? 'bg-green-600/20 border-green-500/50' : 'bg-white/5 border-transparent hover:bg-white/10'
+                                        }`}
+                                    >
+                                        <div className="w-8 h-8 rounded-lg bg-white p-1 flex items-center justify-center shrink-0">
+                                            {company.logo_url ? (
+                                                <img src={company.logo_url} alt={company.name} className="w-full h-full object-contain" />
+                                            ) : (
+                                                <span className="text-xs text-gray-400">{company.name.charAt(0)}</span>
+                                            )}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <h4 className={`text-sm font-bold truncate ${selectedCompany?.id === company.id ? 'text-green-100' : 'text-gray-300'}`}>
+                                                {company.name}
+                                            </h4>
+                                            <p className="text-xs text-gray-500 truncate">
+                                                {company.jobPostings.length}개 채용공고
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* 채용공고 목록 (선택된 기업만 표시) */}
+                                    {selectedCompany?.id === company.id && company.jobPostings.length > 1 && (
+                                        <div className="ml-4 space-y-1">
+                                            {company.jobPostings.map((job) => (
+                                                <div
+                                                    key={job.id}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedJobPostingId(job.id);
+                                                        setSelectedCompany({
+                                                            ...company,
+                                                            jobPostingId: job.id,
+                                                            jobPostingTitle: job.title,
+                                                        });
+                                                    }}
+                                                    className={`p-2 rounded-lg border text-xs cursor-pointer transition-all ${
+                                                        selectedJobPostingId === job.id
+                                                            ? 'bg-blue-600/20 border-blue-500/50 text-blue-100'
+                                                            : 'bg-white/5 border-transparent hover:bg-white/10 text-gray-400'
+                                                    }`}
+                                                >
+                                                    <p className="truncate">{job.title}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    </div>
+                                ))
+                            )
+                        )}
                     </div>
                 </section>
 
@@ -316,7 +773,13 @@ export default function DashboardView({
                     </div>
 
                     <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#1A1B1E] rounded-xl p-6 border border-white/5 shadow-inner">
-                        {renderHighlightedText(MOCK_RESUME_TEXT)}
+                        {resumeText ? (
+                            renderHighlightedText(resumeText)
+                        ) : (
+                            <div className="text-gray-400 text-sm text-center py-8">
+                                이력서 텍스트를 불러오는 중이거나 텍스트가 없습니다.
+                            </div>
+                        )}
                     </div>
                 </section>
 
@@ -355,7 +818,7 @@ export default function DashboardView({
                         </h3>
                         {selectedCompany && (
                             <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full border border-green-500/30">
-                                {selectedCompany.name} Fit
+                                {selectedCompany.name || selectedCompany.jobPostingTitle} Fit
                             </span>
                         )}
                     </div>

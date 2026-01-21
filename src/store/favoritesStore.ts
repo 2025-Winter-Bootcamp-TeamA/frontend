@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { TechStack, Corp } from "@/types";
-import { MOCK_TECH_STACKS, MOCK_CORPS } from "@/data/mockData";
 
 interface FavoritesState {
   // 기술 스택 관련
@@ -31,7 +30,8 @@ export const useFavoritesStore = create<FavoritesState>()(
         }),
       isTechFavorite: (id) => get().favoriteTechIds.has(id),
       getFavoriteTechStacks: () => {
-        return MOCK_TECH_STACKS.filter((t) => get().favoriteTechIds.has(t.id));
+        // API에서 데이터를 가져오므로 빈 배열 반환 (실제 사용은 컴포넌트에서 처리)
+        return [];
       },
 
       // --- 기업 ---
@@ -45,7 +45,8 @@ export const useFavoritesStore = create<FavoritesState>()(
         }),
       isCorpFavorite: (id) => get().favoriteCorpIds.has(id),
       getFavoriteCorps: () => {
-        return MOCK_CORPS.filter((c) => get().favoriteCorpIds.has(c.id));
+        // API에서 데이터를 가져오므로 빈 배열 반환 (실제 사용은 컴포넌트에서 처리)
+        return [];
       },
     }),
     {

@@ -2,10 +2,10 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useFavoritesStore } from "@/store/favoritesStore";
-import { MOCK_CORPS, MOCK_TECH_STACKS } from "@/data/mockData";
 import { getAuthTokens } from "@/lib/auth";
 import LoginModal from "@/components/LoginModal";
-import { TechCategory } from "@/types";
+import { TechCategory, TechStack, Corp } from "@/types";
+import { api } from "@/lib/api";
 
 type FavoritesTab = "tech" | "company";
 type TechFilter = "all" | TechCategory;
@@ -28,6 +28,9 @@ export default function FavoritesSection() {
   const [page, setPage] = useState(1);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [techStacks, setTechStacks] = useState<TechStack[]>([]);
+  const [corps, setCorps] = useState<Corp[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // 로그인 상태 확인
   useEffect(() => {
@@ -35,23 +38,70 @@ export default function FavoritesSection() {
     setIsLoggedIn(!!accessToken);
   }, []);
 
+  // API에서 기술 스택 및 기업 목록 가져오기
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        // 기술 스택 목록 가져오기
+        const techResponse = await api.get('/trends/tech-stacks/');
+        const techData = techResponse.data.results || techResponse.data || [];
+        const formattedTechStacks: TechStack[] = techData.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          logo: item.logo || null,
+          docsUrl: item.docs_url || null,
+          createdAt: item.created_at,
+          category: undefined, // API에서 카테고리 정보가 없으면 undefined
+        }));
+        setTechStacks(formattedTechStacks);
+
+        // 기업 목록 가져오기
+        try {
+          const corpResponse = await api.get('/jobs/corps/');
+          const corpData = corpResponse.data.results || corpResponse.data || [];
+          const formattedCorps: Corp[] = corpData.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            logoUrl: item.logo_url || null,
+            address: item.address || null,
+            latitude: item.latitude || undefined,
+            longitude: item.longitude || undefined,
+          }));
+          setCorps(formattedCorps);
+        } catch (error) {
+          console.error('기업 목록 불러오기 실패:', error);
+          setCorps([]);
+        }
+      } catch (error) {
+        console.error('데이터 불러오기 실패:', error);
+        setTechStacks([]);
+        setCorps([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   // Store Hooks
   const { isTechFavorite, toggleTechFavorite, isCorpFavorite, toggleCorpFavorite } = useFavoritesStore();
 
   // --- 기술 스택 필터링 ---
   const favoriteTechs = useMemo(() => {
-    let list = MOCK_TECH_STACKS.filter((t) => isTechFavorite(t.id));
+    let list = techStacks.filter((t) => isTechFavorite(t.id));
     if (techFilter !== "all") {
       list = list.filter((t) => t.category === techFilter);
     }
     // 최신순 정렬
     return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [isTechFavorite, techFilter]);
+  }, [techStacks, isTechFavorite, techFilter]);
 
   // --- 기업 필터링 ---
   const favoriteCorps = useMemo(() => {
-    return MOCK_CORPS.filter((c) => isCorpFavorite(c.id));
-  }, [isCorpFavorite]);
+    return corps.filter((c) => isCorpFavorite(c.id));
+  }, [corps, isCorpFavorite]);
 
   // 현재 탭 데이터
   const currentData = tab === "company" ? favoriteCorps : favoriteTechs;
@@ -123,7 +173,11 @@ export default function FavoritesSection() {
 
       {/* 목록 렌더링 */}
       <div className="space-y-3 min-h-[300px]">
-        {pagedData.length === 0 ? renderEmpty("즐겨찾기한 항목이 없습니다.") : (
+        {isLoading ? (
+          <div className="flex h-40 flex-col items-center justify-center rounded-xl bg-white/5 text-zinc-400 text-sm">
+            <p>로딩 중...</p>
+          </div>
+        ) : pagedData.length === 0 ? renderEmpty("즐겨찾기한 항목이 없습니다.") : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {pagedData.map((item: any) => (
               <div key={item.id} className="flex items-center justify-between p-4 rounded-xl border border-zinc-800 bg-zinc-950/50 hover:border-zinc-700 transition-colors">
@@ -140,8 +194,8 @@ export default function FavoritesSection() {
                     <div className="text-sm font-bold text-white">{item.name}</div>
                     <div className="text-xs text-zinc-400">
                       {tab === "company" 
-                        ? `${item.industry} · ${item.area}` // 기업 정보
-                        : `Category: ${TECH_CATEGORY_LABEL[item.category as TechFilter] || item.category}` // 기술 정보
+                        ? item.address || '주소 정보 없음' // 기업 정보
+                        : `Category: ${TECH_CATEGORY_LABEL[item.category as TechFilter] || item.category || '미분류'}` // 기술 정보
                       }
                     </div>
                   </div>

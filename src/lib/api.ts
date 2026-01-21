@@ -22,8 +22,19 @@ api.interceptors.request.use(
     }
     
     // Django 호환성: URL 끝에 슬래시(/) 자동 추가
-    if (config.url && !config.url.endsWith('/') && !config.url.includes('?')) {
-      config.url += '/';
+    // 쿼리 파라미터가 있는 경우는 이미 슬래시가 있을 수 있으므로 확인 필요
+    if (config.url && !config.url.includes('?')) {
+      // 쿼리 파라미터가 없고 슬래시로 끝나지 않으면 추가
+      if (!config.url.endsWith('/')) {
+        config.url += '/';
+      }
+    } else if (config.url && config.url.includes('?')) {
+      // 쿼리 파라미터가 있는 경우: /path/?param=value 형태로 유지
+      // /path?param=value 형태를 /path/?param=value로 변환
+      const [path, query] = config.url.split('?');
+      if (path && !path.endsWith('/')) {
+        config.url = `${path}/?${query}`;
+      }
     }
 
     if (config.data instanceof FormData) {

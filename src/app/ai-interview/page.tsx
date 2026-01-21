@@ -17,7 +17,6 @@ import SimulationView from '@/components/ai-interview/SimulationView';
 
 import { useSimulation } from '@/hooks/useSimulation';
 import type { Resume } from '@/types';
-import { MOCK_RESUMES } from '@/data/mockData';
 import { api } from '@/lib/api';
 
 // --- 헬퍼 컴포넌트 ---
@@ -52,6 +51,8 @@ function AIInterviewContent() {
     const [isResumePickerOpen, setIsResumePickerOpen] = useState(false);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false); 
     const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
+    const [resumes, setResumes] = useState<Resume[]>([]);
+    const [isLoadingResumes, setIsLoadingResumes] = useState(false);
 
     const simulationData = useSimulation();
 
@@ -69,6 +70,41 @@ function AIInterviewContent() {
         return Math.min(simulationData.selectedCompany.baseScore + (resumeKeywords.length * 8), 98);
     }, [simulationData.selectedCompany, resumeKeywords]);
 
+    // 이력서 목록 불러오기
+    const fetchResumes = async () => {
+        setIsLoadingResumes(true);
+        try {
+            const response = await api.get('/resumes/');
+            const resumeList = response.data.results || response.data || [];
+            
+            // API 응답을 Resume 타입으로 변환
+            const formattedResumes: Resume[] = resumeList.map((resumeData: any) => ({
+                id: resumeData.resume_id || resumeData.id,
+                title: resumeData.resume_title || resumeData.title,
+                url: resumeData.resume_url || resumeData.url,
+                extractedText: null, // 목록에서는 텍스트를 가져오지 않음
+                techStacks: resumeData.tech_stacks?.map((ts: any) => ({
+                    techStack: {
+                        id: ts.tech_stack?.id || ts.id,
+                        name: ts.tech_stack?.name || ts.name,
+                        logo: ts.tech_stack?.logo || ts.tech_stack?.image || ts.image || null,
+                        docsUrl: ts.tech_stack?.docs_url || ts.tech_stack?.link || ts.link || null,
+                        createdAt: '',
+                    }
+                })) || [],
+                createdAt: resumeData.created_at,
+                updatedAt: resumeData.updated_at,
+            }));
+            
+            setResumes(formattedResumes);
+        } catch (error) {
+            console.error('이력서 목록 불러오기 실패:', error);
+            setResumes([]);
+        } finally {
+            setIsLoadingResumes(false);
+        }
+    };
+
     // 쿼리 파라미터에서 resumeId를 받아서 이력서 자동 로드
     useEffect(() => {
         const resumeId = searchParams?.get('resumeId');
@@ -81,15 +117,16 @@ function AIInterviewContent() {
                     
                     // API 응답을 Resume 타입으로 변환
                     const resume: Resume = {
-                        id: resumeData.id,
-                        title: resumeData.title,
-                        url: resumeData.url,
+                        id: resumeData.resume_id || resumeData.id,
+                        title: resumeData.resume_title || resumeData.title,
+                        url: resumeData.resume_url || resumeData.url,
+                        extractedText: resumeData.extracted_text || null, // DB에서 합쳐진 텍스트
                         techStacks: resumeData.tech_stacks?.map((ts: any) => ({
                             techStack: {
                                 id: ts.tech_stack?.id || ts.id,
                                 name: ts.tech_stack?.name || ts.name,
-                                logo: ts.tech_stack?.image || ts.image || null,
-                                docsUrl: ts.tech_stack?.link || ts.link || null,
+                                logo: ts.tech_stack?.logo || ts.tech_stack?.image || ts.image || null,
+                                docsUrl: ts.tech_stack?.docs_url || ts.tech_stack?.link || ts.link || null,
                                 createdAt: '',
                             }
                         })) || [],
@@ -99,7 +136,9 @@ function AIInterviewContent() {
                     
                     setSelectedResume(resume);
                     setViewMode('dashboard');
-                    handleStartAnalysis();
+                    setShowDropdown(false);
+                    setStep('analyzing');
+                    setTimeout(() => setStep('result'), 3000);
                 } catch (error) {
                     console.error('이력서 불러오기 실패:', error);
                     alert('이력서를 불러올 수 없습니다.');
@@ -112,17 +151,42 @@ function AIInterviewContent() {
         }
     }, [searchParams]);
 
+    // 이력서 선택 모달이 열릴 때 목록 불러오기
+    useEffect(() => {
+        if (isResumePickerOpen) {
+            fetchResumes();
+        }
+    }, [isResumePickerOpen]);
+
     const handleStartAnalysis = () => {
         setShowDropdown(false);
         setStep('analyzing');
         setTimeout(() => setStep('result'), 3000);
     };
     
-    const handleSelectResume = (resume: Resume) => {
-        setSelectedResume(resume);
-        setIsResumePickerOpen(false);
-        setViewMode('dashboard'); 
-        handleStartAnalysis();
+    const handleSelectResume = async (resume: Resume) => {
+        // 이력서 상세 정보 가져오기 (텍스트 포함)
+        try {
+            const response = await api.get(`/resumes/${resume.id}/`);
+            const resumeData = response.data;
+            
+             const detailedResume: Resume = {
+                 ...resume,
+                 extractedText: resumeData.extracted_text || null, // DB에서 합쳐진 텍스트
+             };
+            
+            setSelectedResume(detailedResume);
+            setIsResumePickerOpen(false);
+            setViewMode('dashboard'); 
+            handleStartAnalysis();
+        } catch (error) {
+            console.error('이력서 상세 정보 불러오기 실패:', error);
+            // 실패해도 기본 정보로 진행
+            setSelectedResume(resume);
+            setIsResumePickerOpen(false);
+            setViewMode('dashboard'); 
+            handleStartAnalysis();
+        }
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,7 +246,13 @@ function AIInterviewContent() {
                     </div>
                 </header>
 
-                <ResumePickerModal open={isResumePickerOpen} resumes={MOCK_RESUMES} onClose={() => setIsResumePickerOpen(false)} onSelect={handleSelectResume} />
+                <ResumePickerModal 
+                    open={isResumePickerOpen} 
+                    resumes={resumes} 
+                    isLoading={isLoadingResumes}
+                    onClose={() => setIsResumePickerOpen(false)} 
+                    onSelect={handleSelectResume} 
+                />
 
                 <main className="flex-1">
                     <AnimatePresence mode="wait">
@@ -197,6 +267,8 @@ function AIInterviewContent() {
                                 <DashboardView 
                                     key="dashboard"
                                     resumeTitle={selectedResume?.title || '나의 이력서'}
+                                    resumeText={selectedResume?.extractedText || null}
+                                    resumeId={selectedResume?.id}
                                     resumeKeywords={resumeKeywords}
                                     sortedCompanies={simulationData.sortedCompanies}
                                     selectedCompany={simulationData.selectedCompany}
