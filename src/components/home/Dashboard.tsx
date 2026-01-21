@@ -8,7 +8,7 @@ import StackComparison, { StackData } from "./Comparison";
 import StackRelationAnalysis from "./RelationAnalysis";
 
 // API 서비스 및 타입
-import { searchTechStacks } from "@/services/trendService";
+import { searchTechStacks, getTechStackRelations, RelatedTechStackRelation, getExternalLogoUrl } from "@/services/trendService";
 import { TechStackData } from "@/types/trend";
 
 // --- 헬퍼 함수: 디바운스 ---
@@ -65,8 +65,10 @@ export default function Dashboard() {
     const [filteredStacks, setFilteredStacks] = useState<DashboardStackData[]>([]); 
     const [isSearching, setIsSearching] = useState(false);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
-
-    const relatedNodes: string[] = ["Next.js", "TypeScript", "Tailwind CSS", "Redux", "Vite"];
+    
+    // 관련 기술 스택 상태
+    const [relatedStacks, setRelatedStacks] = useState<RelatedTechStackRelation[]>([]);
+    const [isLoadingRelations, setIsLoadingRelations] = useState(false);
 
     // ✅ 데이터 포맷팅: API 데이터(TechStackData) -> 대시보드 데이터(DashboardStackData) 변환
     const formatApiData = (apiResults: TechStackData[]): DashboardStackData[] => {
@@ -77,8 +79,8 @@ export default function Dashboard() {
             count: Math.floor(Math.random() * 5000) + 1000, 
             growth: parseFloat((Math.random() * 20).toFixed(1)),
             color: index % 2 === 0 ? "from-blue-500 to-indigo-500" : "from-green-500 to-emerald-500",
-            // trendService에서 처리된 logo 사용
-            logo: stack.logo || "", 
+            // trendService에서 처리된 logo 사용 (항상 정규화된 URL)
+            logo: stack.logo || getExternalLogoUrl(stack.name), 
             themeColor: "#3B82F6", 
             description: stack.description || stack.docs_url || "상세 설명이 없습니다.",
             officialSite: stack.docs_url || "#",
@@ -131,6 +133,44 @@ export default function Dashboard() {
 
         fetchStacks();
     }, [debouncedSearchQuery, isInitialLoading]);
+
+    // activeStack 변경 시 관련 기술 스택 로드
+    useEffect(() => {
+        if (!activeStack?.id) {
+            // activeStack이 없으면 관련 스택도 초기화
+            setRelatedStacks([]);
+            return;
+        }
+
+        const loadRelations = async () => {
+            // 먼저 이전 데이터 초기화하여 중복 표시 방지
+            setRelatedStacks([]);
+            setIsLoadingRelations(true);
+            try {
+                const relationsData = await getTechStackRelations(activeStack.id);
+                
+                // 모든 관계 유형의 기술 스택을 하나의 배열로 합치기
+                const allRelatedStacks: RelatedTechStackRelation[] = [];
+                Object.keys(relationsData.relationships).forEach(relType => {
+                    allRelatedStacks.push(...relationsData.relationships[relType]);
+                });
+                
+                // 가중치 순으로 정렬 (높은 순서대로)
+                // TODO: 언급량 순 정렬 (현재는 주석처리)
+                // const sortedByMentionCount = allRelatedStacks.sort((a, b) => (b.tech_stack.count || 0) - (a.tech_stack.count || 0));
+                const sortedByWeight = allRelatedStacks.sort((a, b) => b.weight - a.weight);
+                
+                setRelatedStacks(sortedByWeight);
+            } catch (error) {
+                console.error("Failed to load tech stack relations:", error);
+                setRelatedStacks([]);
+            } finally {
+                setIsLoadingRelations(false);
+            }
+        };
+
+        loadRelations();
+    }, [activeStack?.id]);
 
     // 이미지 에러 핸들러 (CDN에도 이미지가 없을 때)
     const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, name: string) => {
@@ -263,7 +303,12 @@ export default function Dashboard() {
                     )}
                     {viewMode === "graph" && (
                         <motion.div key="node-graph" className="absolute inset-0 overflow-hidden">
-                            <StackRelationAnalysis mainStackName={activeStack.name} mainLogo={activeStack.logo || ""} relatedNodes={relatedNodes} onClose={() => setViewMode("chart")} />
+                            <StackRelationAnalysis 
+                                mainStackName={activeStack.name} 
+                                mainLogo={activeStack.logo || ""} 
+                                relatedStacks={relatedStacks}
+                                onClose={() => setViewMode("chart")} 
+                            />
                         </motion.div>
                     )}
                     {viewMode === "chart" && (
