@@ -1,8 +1,7 @@
 'use client';
 
-export const dynamic = "force-dynamic";
-
-import { useState, useRef, useEffect, useMemo } from 'react';
+// 1. Suspense 추가
+import { useState, useRef, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Monitor, ArrowRightLeft } from 'lucide-react';
@@ -21,6 +20,7 @@ import type { Resume } from '@/types';
 import { MOCK_RESUMES } from '@/data/mockData';
 import { api } from '@/lib/api';
 
+// --- 헬퍼 컴포넌트 ---
 function DropdownButton({ onClick, icon, text, hasBorder = false }: any) {
     return (
         <button onClick={onClick} className={`w-full flex items-center gap-4 px-6 py-5 text-sm hover:bg-white/5 text-left font-medium transition-colors ${hasBorder ? 'border-b border-white/5' : ''}`}>
@@ -41,7 +41,8 @@ function ScrollbarStyles() {
     );
 }
 
-export default function AIInterviewPage() {
+// 2. 알맹이 컴포넌트 (모든 로직은 여기로 이동)
+function AIInterviewContent() {
     const searchParams = useSearchParams();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -226,5 +227,14 @@ export default function AIInterviewPage() {
                 totalScore={viewMode === 'simulation' ? simulationData.matchScore : resumeMatchScore}
             />
         </div>
+    );
+}
+
+// 3. 껍데기 페이지 (Suspense 적용)
+export default function AIInterviewPage() {
+    return (
+        <Suspense fallback={<div className="h-screen bg-[#1A1B1E] text-white flex items-center justify-center">Loading...</div>}>
+            <AIInterviewContent />
+        </Suspense>
     );
 }
