@@ -2,17 +2,19 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, TrendingUp, Scale, ExternalLink, Star, Trophy, Info } from "lucide-react"; // Share2 제거
+import { Search, TrendingUp, Scale, ExternalLink, Star, Trophy, Info } from "lucide-react";
 import TrendChart from "./TrendChart";
 import StackComparison, { StackData } from "./Comparison";
 import StackRelationAnalysis from "./RelationAnalysis";
 import JobSection from "./JobSection";
 import { api } from "@/lib/api"; 
+// ✅ [추가] 로그인 체크를 위한 함수 임포트
+import { getAuthTokens } from "@/lib/auth"; 
 
 import { searchTechStacks, getTechStackRelations, RelatedTechStackRelation, getExternalLogoUrl } from "@/services/trendService";
 import { TechStackData } from "@/types/trend";
 
-// ✅ [추가] 커스텀 노드 연결 아이콘 (연관 분석용)
+// ✅ [추가] 커스텀 노드 연결 아이콘
 const NetworkIcon = ({ size = 20, className = "" }: { size?: number, className?: string }) => (
   <svg 
     width={size} 
@@ -239,7 +241,17 @@ export default function Dashboard() {
         target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&size=128&bold=true`;
     };
 
+    // ✅ [수정] 기술 스택 즐겨찾기 토글 (로그인 체크)
     const toggleStackFavorite = (id: number) => {
+        const { accessToken } = getAuthTokens();
+        
+        if (!accessToken) {
+            if (confirm("로그인이 필요한 서비스입니다.\n로그인 페이지로 이동하시겠습니까?")) {
+                window.location.href = '/login'; 
+            }
+            return;
+        }
+
         const nextFavorites = stackFavorites.includes(id)
             ? stackFavorites.filter(favId => favId !== id)
             : [...stackFavorites, id];
@@ -327,12 +339,7 @@ export default function Dashboard() {
                     {/* 오른쪽: 검색창 및 토글 */}
                     <div className="flex items-center gap-4 w-full xl:w-auto">
                         
-                        {/* ✅ [수정 1] 검색창 애니메이션
-                            - transition-all duration-300: 부드러운 전환
-                            - w-full xl:w-72: 기본 너비 (데스크탑 기준 288px)
-                            - focus-within:xl:w-[480px]: 클릭(포커스) 시 너비 480px로 확장
-                            - group: 아이콘 색상 변경용
-                        */}
+                        {/* 검색창 애니메이션 */}
                         <div className="relative flex-1 group transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] w-full xl:w-72 focus-within:xl:w-[480px]">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-blue-400 transition-colors" size={20} />
                             <input 
@@ -387,7 +394,7 @@ export default function Dashboard() {
                             </AnimatePresence>
                         </div>
 
-                        {/* ✅ [수정 2] 토글 버튼 크기 확대 & 커스텀 아이콘 */}
+                        {/* 토글 버튼 */}
                         {!isLanding && (
                             <div className="flex p-1.5 bg-white/5 rounded-2xl border border-white/10">
                                 <button 
@@ -402,7 +409,6 @@ export default function Dashboard() {
                                     className={`p-3 rounded-xl transition-all ${viewMode === "graph" ? "bg-white/10 text-white shadow-sm" : "text-white/40 hover:text-white"}`}
                                     title="연관 기술 분석"
                                 >
-                                    {/* ✅ Share2 대신 직접 만든 NetworkIcon 사용 */}
                                     <NetworkIcon size={20} />
                                 </button>
                                 <button 

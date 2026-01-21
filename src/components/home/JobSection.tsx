@@ -3,14 +3,17 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from 'next/navigation';
 import JobCard from './JobCard';
-import { api } from "@/lib/api"; 
+import { api } from "@/lib/api";
+// ✅ [추가] 로그인 체크 함수 임포트
+import { getAuthTokens } from "@/lib/auth";
 
+// API 데이터 타입 정의
 interface JobPostingData {
     id: number;
     company_name: string;
     title: string;
     url: string;
-    deadline: string | null; // ✅ null 허용
+    deadline: string | null; 
     logo_url?: string; 
 }
 
@@ -50,7 +53,6 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
                     company_name: item.corp?.name || "기업명 없음", 
                     title: item.title,
                     url: item.url,
-                    // ✅ DB에 마감일이 없으면 null로 설정
                     deadline: item.expiry_date || null, 
                     logo_url: item.corp?.logo_url 
                 }));
@@ -70,9 +72,18 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
         }
     }, [techStackId, techStackName]);
 
+    // ✅ [수정] 채용공고 즐겨찾기 토글 (로그인 체크)
     const handleToggleFavorite = (e: React.MouseEvent, id: number) => {
         e.preventDefault(); 
         e.stopPropagation();
+
+        const { accessToken } = getAuthTokens();
+        if (!accessToken) {
+            if (confirm("로그인이 필요한 서비스입니다.\n로그인 페이지로 이동하시겠습니까?")) {
+                window.location.href = '/login'; 
+            }
+            return;
+        }
 
         const nextFavorites = favorites.includes(id)
             ? favorites.filter(favId => favId !== id)
@@ -82,18 +93,14 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
         localStorage.setItem("job_favorites", JSON.stringify(nextFavorites));
     };
 
-    // 정렬 로직 (1. 즐겨찾기, 2. 마감일 순, 3. 마감일 없으면 맨 뒤)
     const sortedJobs = useMemo(() => {
         return [...jobs].sort((a, b) => {
             const aFav = favorites.includes(a.id);
             const bFav = favorites.includes(b.id);
 
-            // 1순위: 즐겨찾기
             if (aFav && !bFav) return -1;
             if (!aFav && bFav) return 1;
 
-            // 2순위: 마감일 비교
-            // 마감일이 없으면(null) 아주 큰 숫자로 취급해 맨 뒤로 보냄
             const dateA = a.deadline ? new Date(a.deadline).getTime() : Number.MAX_SAFE_INTEGER;
             const dateB = b.deadline ? new Date(b.deadline).getTime() : Number.MAX_SAFE_INTEGER;
             
