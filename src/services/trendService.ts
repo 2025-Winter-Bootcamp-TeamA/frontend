@@ -13,7 +13,7 @@ interface PaginatedResponse<T> {
 /**
  * ✅ [핵심] 기술 스택 이름을 기반으로 외부 CDN(Simple Icons) 주소 생성
  */
-const getExternalLogoUrl = (name: string): string => {
+export const getExternalLogoUrl = (name: string): string => {
     // Simple Icons 슬러그 규칙 (소문자, 공백/특수문자 제거 및 변환)
     const slug = name.toLowerCase()
         .replace(/\./g, 'dot')      // . -> dot
@@ -25,17 +25,19 @@ const getExternalLogoUrl = (name: string): string => {
 };
 
 /**
- * 이미지 URL 정규화 (백엔드 로고 우선, 없으면 외부 CDN)
+ * 이미지 URL 정규화 (백엔드에서 S3 URL을 반환하므로 그대로 사용, 없으면 외부 CDN)
+ * 백엔드에서 이미 DB의 파일 주소를 S3 URL로 변환해서 반환하므로, 프론트엔드에서는 그대로 사용
  */
-const normalizeLogoUrl = (url: string | null, name: string): string => {
-    // 1. 백엔드 DB에 로고 URL이 있는 경우
-    if (url) {
-        if (url.startsWith('http')) return url;
-        const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-        return `${baseURL}${url.startsWith('/') ? '' : '/'}${url}`;
+const normalizeLogoUrl = (url: string | null | undefined, name: string): string => {
+    // 빈 문자열이나 null/undefined 체크
+    if (!url || url.trim() === '') {
+        // 없으면 외부 CDN 주소 생성
+        return getExternalLogoUrl(name);
     }
-    // 2. 없으면 외부 CDN 주소 생성
-    return getExternalLogoUrl(name);
+    
+    // 백엔드에서 이미 S3 URL로 변환해서 반환하므로 그대로 사용
+    // S3 URL (https://버킷이름.s3.amazonaws.com/...) 또는 완전한 HTTP URL인 경우 그대로 반환
+    return url;
 };
 
 /**
@@ -76,34 +78,34 @@ export const getTrendDataByCategory = async (category: string): Promise<Category
 };
 
 /**
- * ✅ 기술 스택 검색 (전체 데이터 캐싱 + 필터링)
+ * ✅ 기술 스택 검색 (백엔드 API의 search 파라미터 사용)
  */
 let cachedAllStacks: TechStackData[] | null = null;
 
 export const searchTechStacks = async (query: string): Promise<TechStackData[]> => {
     try {
-        // 1. 캐시 없으면 전체 데이터 로딩 (페이지네이션 순회)
-        if (!cachedAllStacks || cachedAllStacks.length === 0) {
-            cachedAllStacks = await fetchAllPages('/trends/tech-stacks/');
-        }
-
-        // 2. 데이터 가공 (로고 URL 생성)
-        const formattedStacks = cachedAllStacks.map(stack => ({
-            ...stack,
-            logo: normalizeLogoUrl(stack.logo, stack.name)
-        }));
-
-        // 3. 검색어 필터링
+        // 1. 검색어가 없으면 전체 데이터 반환 (캐시 사용)
         if (!query.trim()) {
-            return formattedStacks; 
+            if (!cachedAllStacks || cachedAllStacks.length === 0) {
+                cachedAllStacks = await fetchAllPages('/trends/tech-stacks/');
+            }
+            // 백엔드에서 이미 S3 URL을 반환하므로 그대로 사용, 없으면 외부 CDN
+            return cachedAllStacks.map(stack => ({
+                ...stack,
+                logo: stack.logo || getExternalLogoUrl(stack.name)
+            }));
         }
 
-        const lowerQuery = query.toLowerCase();
-        
-        return formattedStacks.filter(stack => 
-            stack.name.toLowerCase().includes(lowerQuery) ||
-            (stack.description && stack.description.toLowerCase().includes(lowerQuery))
-        );
+        // 2. 검색어가 있으면 백엔드 API의 search 파라미터 사용
+        // 백엔드에서 이름만 부분 일치 검색 수행
+        const searchUrl = `/trends/tech-stacks/?search=${encodeURIComponent(query.trim())}`;
+        const searchResults = await fetchAllPages(searchUrl);
+
+        // 3. 백엔드에서 이미 S3 URL을 반환하므로 그대로 사용, 없으면 외부 CDN
+        return searchResults.map(stack => ({
+            ...stack,
+            logo: stack.logo || getExternalLogoUrl(stack.name)
+        }));
 
     } catch (error) {
         console.error("Failed to search tech stacks:", error);
@@ -113,4 +115,57 @@ export const searchTechStacks = async (query: string): Promise<TechStackData[]> 
 
 export const fetchAllTechStacks = async (): Promise<TechStackData[]> => {
     return searchTechStacks('');
+};
+
+/**
+ * 관련 기술 스택 관계 타입
+ */
+export interface RelatedTechStackRelation {
+    tech_stack: TechStackData;
+    weight: number;
+    relationship_type_display: string;
+    direction: 'outgoing' | 'incoming';
+}
+
+export interface TechStackRelationsResponse {
+    id: number;
+    name: string;
+    description: string;
+    logo: string | null;
+    docs_url: string | null;
+    relationships: {
+        [key: string]: RelatedTechStackRelation[];
+    };
+    created_at: string;
+}
+
+/**
+ * 기술 스택의 관련 기술 스택 조회
+ */
+export const getTechStackRelations = async (techStackId: number): Promise<TechStackRelationsResponse> => {
+    try {
+        const response = await api.get<TechStackRelationsResponse>(`/trends/tech-stacks/${techStackId}/relations/`);
+        
+        // 백엔드에서 이미 DB의 파일 주소를 S3 URL로 변환해서 반환하므로 그대로 사용
+        // 로고가 없을 때만 외부 CDN URL 생성
+        if (!response.data.logo || response.data.logo.trim() === '') {
+            response.data.logo = getExternalLogoUrl(response.data.name);
+        }
+        
+        // 관련 기술 스택들의 로고 URL 처리
+        // 백엔드에서 이미 S3 URL로 변환해서 반환하므로 그대로 사용
+        Object.keys(response.data.relationships).forEach(relType => {
+            response.data.relationships[relType].forEach(rel => {
+                // 로고가 없을 때만 외부 CDN URL 생성
+                if (!rel.tech_stack.logo || rel.tech_stack.logo.trim() === '') {
+                    rel.tech_stack.logo = getExternalLogoUrl(rel.tech_stack.name);
+                }
+            });
+        });
+        
+        return response.data;
+    } catch (error) {
+        console.error("Failed to fetch tech stack relations:", error);
+        throw error;
+    }
 };

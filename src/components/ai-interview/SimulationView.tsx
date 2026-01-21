@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Sparkles, CheckCircle2, HelpCircle, Star, Building2, MousePointerClick } from 'lucide-react';
+import { Search, Sparkles, CheckCircle2, HelpCircle, Star, Building2, MousePointerClick, ExternalLink } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { searchTechStacks } from '@/services/trendService';
 import { TechStackData } from '@/types/trend';
