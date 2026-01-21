@@ -71,12 +71,7 @@ export default function StackRelationAnalysis({
         <div className="absolute top-6 left-6 z-40 max-w-xs pointer-events-none">
             <div className="flex items-center gap-2 mb-2">
                 <Quote className="w-4 h-4 text-blue-400 rotate-180" />
-                <span className="text-blue-400 text-xs font-bold uppercase tracking-wider">About {mainStackName}</span>
-            </div>
-            <div className="bg-black/40 p-4 rounded-xl border border-white/5 backdrop-blur-sm shadow-lg">
-                <p className="text-sm text-gray-300 font-medium leading-relaxed line-clamp-4">
-                    {mainStackDescription || "이 기술에 대한 설명 데이터가 없습니다."}
-                </p>
+                <span className="text-blue-400 text-x font-bold uppercase tracking-wider">{mainStackName} 연관 기술 스택 맵</span>
             </div>
         </div>
 
@@ -204,11 +199,11 @@ export default function StackRelationAnalysis({
                         </div>
                     </div>
                     <div className="mb-6">
-                        <h4 className="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wider mb-2"><Info className="w-3.5 h-3.5" /> Description</h4>
+                        <h4 className="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wider mb-2"><Info className="w-3.5 h-3.5" /> 기술 설명</h4>
                         <p className="text-sm text-gray-300 leading-relaxed bg-gray-800/50 p-3 rounded-lg border border-gray-700/50">{activeDetail.description}</p>
                     </div>
                     <div className="mb-6 flex-1">
-                        <h4 className="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wider mb-2"><Share2 className="w-3.5 h-3.5" /> Relation</h4>
+                        <h4 className="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wider mb-2"><Share2 className="w-3.5 h-3.5" /> 기술과의 관계</h4>
                         <div className="bg-gradient-to-b from-blue-900/10 to-transparent p-4 rounded-xl border border-blue-500/20">
                             <p className="text-sm text-gray-200 leading-relaxed font-medium">"{activeDetail.relationReason}"</p>
                         </div>

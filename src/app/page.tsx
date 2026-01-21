@@ -5,6 +5,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import WithdrawalThanksModal from "@/components/home/WithdrawalThanksModal";
 import Dashboard from "@/components/home/Dashboard";
 import Onboarding from "@/components/home/OnBoarding";
+// ✅ 인증 토큰 확인 함수 임포트
+import { getAuthTokens } from "@/lib/auth";
 
 export default function Home({
   searchParams,
@@ -17,10 +19,19 @@ export default function Home({
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
+    const { accessToken } = getAuthTokens();
     const hasVisited = localStorage.getItem("hasVisited");
-    if (hasVisited) {
-      setShowOnboarding(false);
+
+    // ✅ 로그인 안 되어 있으면 무조건 온보딩 노출 (새로고침 시 계속)
+    if (!accessToken) {
+        setShowOnboarding(true);
+    } else {
+        // 로그인 상태라면 방문 기록에 따라 처리
+        if (hasVisited) {
+            setShowOnboarding(false);
+        }
     }
+    
     setIsInitialized(true); 
   }, []);
 
@@ -46,7 +57,6 @@ export default function Home({
           >
             <div className="w-full h-auto origin-top scale-100 lg:w-[125%] lg:h-[125%] lg:origin-top-left lg:scale-[0.8]">
               <div className="max-w-[2400px] mx-auto h-full px-4 pb-10 lg:px-12 lg:pt-6 lg:pb-20">
-                 {/* Dashboard가 이제 차트와 채용공고 레이아웃을 모두 포함합니다. */}
                  <Dashboard />
               </div>
             </div>

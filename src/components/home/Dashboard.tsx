@@ -2,19 +2,21 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, TrendingUp, Scale, ExternalLink, Star, Trophy, Info } from "lucide-react";
+import { Search, TrendingUp, Scale, ExternalLink, Star, Trophy, AlertCircle, ArrowLeft } from "lucide-react";
 import TrendChart from "./TrendChart";
 import StackComparison, { StackData } from "./Comparison";
 import StackRelationAnalysis from "./RelationAnalysis";
 import JobSection from "./JobSection";
 import { api } from "@/lib/api"; 
-// ✅ [추가] 로그인 체크를 위한 함수 임포트
 import { getAuthTokens } from "@/lib/auth"; 
+
+import LoginCheckModal from "@/components/LoginCheckModal";
+import LoginModal from "@/components/LoginModal";
 
 import { searchTechStacks, getTechStackRelations, RelatedTechStackRelation, getExternalLogoUrl } from "@/services/trendService";
 import { TechStackData } from "@/types/trend";
 
-// ✅ [추가] 커스텀 노드 연결 아이콘
+// 커스텀 노드 아이콘
 const NetworkIcon = ({ size = 20, className = "" }: { size?: number, className?: string }) => (
   <svg 
     width={size} 
@@ -68,20 +70,19 @@ interface TechTrendResponse {
     reference_date: string;
 }
 
-const DEFAULT_STACKS: DashboardStackData[] = [
-  {
-    id: 1,
-    name: "React",
+// 빈 객체 초기값
+const EMPTY_STACK: DashboardStackData = {
+    id: 0,
+    name: "",
     count: 0,
     growth: 0,
-    color: "from-blue-500 to-cyan-400",
-    logo: "https://cdn.simpleicons.org/react",
-    themeColor: "#3B82F6",
-    description: "Meta가 개발한 컴포넌트 기반 UI 라이브러리",
-    officialSite: "https://react.dev",
-    created_at: new Date().toISOString()
-  },
-];
+    color: "",
+    logo: "",
+    themeColor: "",
+    description: "",
+    officialSite: "",
+    created_at: ""
+};
 
 const MOCK_CHART_DATA = [
   { year: "2024.01", company: 45, community: 30 },
@@ -93,9 +94,9 @@ const MOCK_CHART_DATA = [
 ];
 
 export default function Dashboard() {
-    const [activeStack, setActiveStack] = useState<DashboardStackData>(DEFAULT_STACKS[0]);
-    const [viewMode, setViewMode] = useState<"chart" | "compare" | "graph">("chart");
     const [isLanding, setIsLanding] = useState(true); 
+    const [activeStack, setActiveStack] = useState<DashboardStackData>(EMPTY_STACK);
+    const [viewMode, setViewMode] = useState<"chart" | "compare" | "graph">("chart");
     
     const [searchQuery, setSearchQuery] = useState("");
     const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -109,6 +110,9 @@ export default function Dashboard() {
     const [isLoadingRelations, setIsLoadingRelations] = useState(false);
 
     const [stackFavorites, setStackFavorites] = useState<number[]>([]);
+
+    const [showLoginCheck, setShowLoginCheck] = useState(false);
+    const [showLoginModal, setShowLoginModal] = useState(false);
 
     const formatSearchResults = (apiResults: TechStackData[]): DashboardStackData[] => {
         return apiResults.map((stack, index) => ({
@@ -140,6 +144,7 @@ export default function Dashboard() {
         }));
     };
 
+    // 초기 데이터 로드 (Top 5)
     useEffect(() => {
         const loadInitialData = async () => {
             setIsInitialLoading(true);
@@ -150,18 +155,22 @@ export default function Dashboard() {
                 }
 
                 const response = await api.get('/trends/ranking/');
-                const rankingData = response.data as TechTrendResponse[];
+                
+                const rankingData = Array.isArray(response.data) 
+                    ? response.data 
+                    : response.data.results || [];
 
                 if (rankingData && rankingData.length > 0) {
                     const formattedTop5 = formatRankingData(rankingData.slice(0, 5));
                     setTopStacks(formattedTop5);
-                    setActiveStack(formattedTop5[0]);
+                    setActiveStack(formattedTop5[0]); 
                 } else {
-                    setTopStacks(DEFAULT_STACKS);
+                    setTopStacks([]);
+                    setActiveStack(EMPTY_STACK);
                 }
             } catch (e) {
                 console.error("Initial load error:", e);
-                setTopStacks(DEFAULT_STACKS);
+                setTopStacks([]);
             } finally {
                 setIsInitialLoading(false);
             }
@@ -169,6 +178,7 @@ export default function Dashboard() {
         loadInitialData();
     }, []);
 
+    // 검색 로직
     useEffect(() => {
         if (isInitialLoading) return;
 
@@ -190,6 +200,7 @@ export default function Dashboard() {
         }
     }, [debouncedSearchQuery, isInitialLoading]);
 
+    // 연관 기술 스택 로드
     useEffect(() => {
         if (!activeStack?.id) {
             setRelatedStacks([]);
@@ -203,7 +214,6 @@ export default function Dashboard() {
                 const relationsData = await getTechStackRelations(activeStack.id);
                 
                 const allRelatedStacks: RelatedTechStackRelation[] = [];
-                
                 if (relationsData && relationsData.relationships) {
                     Object.keys(relationsData.relationships).forEach(relType => {
                         const items = relationsData.relationships[relType];
@@ -241,14 +251,11 @@ export default function Dashboard() {
         target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&size=128&bold=true`;
     };
 
-    // ✅ [수정] 기술 스택 즐겨찾기 토글 (로그인 체크)
     const toggleStackFavorite = (id: number) => {
         const { accessToken } = getAuthTokens();
         
         if (!accessToken) {
-            if (confirm("로그인이 필요한 서비스입니다.\n로그인 페이지로 이동하시겠습니까?")) {
-                window.location.href = '/login'; 
-            }
+            setShowLoginCheck(true); 
             return;
         }
 
@@ -267,11 +274,31 @@ export default function Dashboard() {
         setFilteredStacks([]);
     };
 
+    const handleBackToLanding = () => {
+        setIsLanding(true);
+        setSearchQuery("");
+        setFilteredStacks([]);
+        if (topStacks.length > 0) {
+            setActiveStack(topStacks[0]);
+        }
+    };
+
     return (
       <div className="w-full h-full">
+        <LoginCheckModal 
+            isOpen={showLoginCheck} 
+            onClose={() => setShowLoginCheck(false)}
+            onConfirm={() => {
+                setShowLoginCheck(false);
+                setShowLoginModal(true);
+            }}
+        />
+        <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
+
         <div className="grid grid-cols-1 gap-6 h-full lg:grid-cols-12 min-h-0">
             
-            <div className="h-[600px] lg:col-span-9 lg:h-full lg:min-h-0 flex flex-col gap-6 p-6 bg-[#212226] rounded-[32px] border border-white/5 relative overflow-hidden shadow-2xl">
+            {/* ✅ [수정 1] 높이를 600px -> 800px로 증가 */}
+            <div className="h-[800px] lg:col-span-9 lg:h-full lg:min-h-0 flex flex-col gap-6 p-6 bg-[#212226] rounded-[32px] border border-white/5 relative overflow-hidden shadow-2xl">
                 
                 {/* 헤더 영역 */}
                 <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 relative z-10">
@@ -287,59 +314,78 @@ export default function Dashboard() {
                             </div>
                         </div>
                     ) : (
-                        <div className="flex items-start gap-5 max-w-2xl">
-                            <div className={`w-20 h-20 shrink-0 rounded-2xl bg-gradient-to-br ${activeStack.color} p-[2px] shadow-lg`}>
-                                <div className="w-full h-full bg-[#2A2B30] rounded-2xl flex items-center justify-center p-3 overflow-hidden">
-                                    <img 
-                                        src={activeStack.logo || ""} 
-                                        alt={activeStack.name} 
-                                        className="w-full h-full object-contain"
-                                        onError={(e) => handleImageError(e, activeStack.name)}
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-3 mb-1">
-                                    <h2 className="text-3xl font-bold text-white tracking-tight">{activeStack.name}</h2>
-                                    <button 
-                                        onClick={() => toggleStackFavorite(activeStack.id)}
-                                        className="p-1.5 rounded-full hover:bg-white/10 transition-colors"
-                                    >
-                                        <Star 
-                                            size={20} 
-                                            fill={stackFavorites.includes(activeStack.id) ? "#FACC15" : "none"} 
-                                            className={stackFavorites.includes(activeStack.id) ? "text-yellow-400" : "text-gray-400"}
+                        activeStack.id !== 0 ? (
+                            <div className="flex items-start gap-4 max-w-2xl">
+                                <button 
+                                    onClick={handleBackToLanding}
+                                    className="mt-1 p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors border border-white/5 flex-shrink-0"
+                                    title="초기 화면으로 돌아가기"
+                                >
+                                    <ArrowLeft size={24} />
+                                </button>
+
+                                <div className={`w-20 h-20 shrink-0 rounded-2xl bg-gradient-to-br ${activeStack.color} p-[2px] shadow-lg`}>
+                                    <div className="w-full h-full bg-[#2A2B30] rounded-2xl flex items-center justify-center p-3 overflow-hidden">
+                                        <img 
+                                            src={activeStack.logo || ""} 
+                                            alt={activeStack.name} 
+                                            className="w-full h-full object-contain"
+                                            onError={(e) => handleImageError(e, activeStack.name)}
                                         />
-                                    </button>
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-3 text-[#9FA0A8] text-sm mb-2">
-                                    {activeStack.count > 0 && <span>언급량 {activeStack.count?.toLocaleString()}회</span>}
-                                    
-                                    {activeStack.officialSite && activeStack.officialSite !== '#' && (
-                                        <>
-                                            {activeStack.count > 0 && <span className="w-1 h-1 rounded-full bg-white/20" />}
-                                            <a 
-                                                href={activeStack.officialSite} 
-                                                target="_blank" 
-                                                rel="noreferrer" 
-                                                className="hover:text-blue-400 transition-colors flex items-center gap-1"
-                                            >
-                                                Official Docs <ExternalLink size={10}/>
-                                            </a>
-                                        </>
-                                    )}
+                                <div>
+                                    <div className="flex items-center gap-3 mb-1">
+                                        <h2 className="text-3xl font-bold text-white tracking-tight">{activeStack.name}</h2>
+                                        <button 
+                                            onClick={() => toggleStackFavorite(activeStack.id)}
+                                            className="p-1.5 rounded-full hover:bg-white/10 transition-colors"
+                                        >
+                                            <Star 
+                                                size={20} 
+                                                fill={stackFavorites.includes(activeStack.id) ? "#FACC15" : "none"} 
+                                                className={stackFavorites.includes(activeStack.id) ? "text-yellow-400" : "text-gray-400"}
+                                            />
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-[#9FA0A8] text-sm mb-2">
+                                        {activeStack.count > 0 && <span>언급량 {activeStack.count?.toLocaleString()}회</span>}
+                                        
+                                        {activeStack.officialSite && activeStack.officialSite !== '#' && (
+                                            <>
+                                                {activeStack.count > 0 && <span className="w-1 h-1 rounded-full bg-white/20" />}
+                                                <a 
+                                                    href={activeStack.officialSite} 
+                                                    target="_blank" 
+                                                    rel="noreferrer" 
+                                                    className="hover:text-blue-400 transition-colors flex items-center gap-1"
+                                                >
+                                                    Official Docs <ExternalLink size={10}/>
+                                                </a>
+                                            </>
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-gray-400 leading-relaxed line-clamp-2">
+                                        {activeStack.description}
+                                    </p>
                                 </div>
-                                <p className="text-sm text-gray-400 leading-relaxed line-clamp-2">
-                                    {activeStack.description}
-                                </p>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="flex items-center gap-3 opacity-50">
+                                <button onClick={handleBackToLanding} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                    <ArrowLeft className="text-gray-400" size={24} />
+                                </button>
+                                <AlertCircle className="text-gray-400" size={24} />
+                                <div>
+                                    <h2 className="text-xl font-bold text-white">기술 스택 정보 없음</h2>
+                                    <p className="text-gray-400 text-xs">오른쪽 검색창을 통해 기술 스택을 찾아보세요.</p>
+                                </div>
+                            </div>
+                        )
                     )}
 
-                    {/* 오른쪽: 검색창 및 토글 */}
+                    {/* 검색창 및 토글 */}
                     <div className="flex items-center gap-4 w-full xl:w-auto">
-                        
-                        {/* 검색창 애니메이션 */}
                         <div className="relative flex-1 group transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] w-full xl:w-72 focus-within:xl:w-[480px]">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-blue-400 transition-colors" size={20} />
                             <input 
@@ -394,28 +440,15 @@ export default function Dashboard() {
                             </AnimatePresence>
                         </div>
 
-                        {/* 토글 버튼 */}
-                        {!isLanding && (
+                        {!isLanding && activeStack.id !== 0 && (
                             <div className="flex p-1.5 bg-white/5 rounded-2xl border border-white/10">
-                                <button 
-                                    onClick={() => setViewMode("chart")} 
-                                    className={`p-3 rounded-xl transition-all ${viewMode === "chart" ? "bg-white/10 text-white shadow-sm" : "text-white/40 hover:text-white"}`}
-                                    title="트렌드 차트"
-                                >
+                                <button onClick={() => setViewMode("chart")} className={`p-3 rounded-xl transition-all ${viewMode === "chart" ? "bg-white/10 text-white shadow-sm" : "text-white/40 hover:text-white"}`}>
                                     <TrendingUp size={20} />
                                 </button>
-                                <button 
-                                    onClick={() => setViewMode("graph")} 
-                                    className={`p-3 rounded-xl transition-all ${viewMode === "graph" ? "bg-white/10 text-white shadow-sm" : "text-white/40 hover:text-white"}`}
-                                    title="연관 기술 분석"
-                                >
+                                <button onClick={() => setViewMode("graph")} className={`p-3 rounded-xl transition-all ${viewMode === "graph" ? "bg-white/10 text-white shadow-sm" : "text-white/40 hover:text-white"}`}>
                                     <NetworkIcon size={20} />
                                 </button>
-                                <button 
-                                    onClick={() => setViewMode("compare")} 
-                                    className={`p-3 rounded-xl transition-all ${viewMode === "compare" ? "bg-white/10 text-white shadow-sm" : "text-white/40 hover:text-white"}`}
-                                    title="기술 비교"
-                                >
+                                <button onClick={() => setViewMode("compare")} className={`p-3 rounded-xl transition-all ${viewMode === "compare" ? "bg-white/10 text-white shadow-sm" : "text-white/40 hover:text-white"}`}>
                                     <Scale size={20} />
                                 </button>
                             </div>
@@ -434,49 +467,57 @@ export default function Dashboard() {
                                     exit={{ opacity: 0, y: -20 }}
                                     className="h-full flex flex-col justify-center items-center pb-10"
                                 >
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 w-full max-w-6xl">
-                                        {topStacks.map((stack, index) => (
-                                            <motion.button
-                                                key={stack.id}
-                                                whileHover={{ scale: 1.05, y: -5 }}
-                                                whileTap={{ scale: 0.95 }}
-                                                onClick={() => handleTopStackClick(stack)}
-                                                className="relative group bg-[#2A2B30] border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-white/5 hover:border-blue-500/50 transition-all text-center shadow-lg"
-                                            >
-                                                <div className={`absolute top-4 left-4 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border
-                                                    ${index === 0 ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/50" : 
-                                                      index === 1 ? "bg-gray-400/20 text-gray-300 border-gray-400/50" :
-                                                      index === 2 ? "bg-orange-700/20 text-orange-400 border-orange-700/50" :
-                                                      "bg-white/5 text-white/50 border-white/10"}`}
+                                    {topStacks.length === 0 ? (
+                                        <div className="text-center text-gray-500 opacity-60">
+                                            <AlertCircle className="w-12 h-12 mx-auto mb-2" />
+                                            <p>현재 집계된 트렌드 데이터가 없습니다.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 w-full max-w-6xl">
+                                            {topStacks.map((stack, index) => (
+                                                <motion.button
+                                                    key={stack.id}
+                                                    whileHover={{ scale: 1.05, y: -5 }}
+                                                    whileTap={{ scale: 0.95 }}
+                                                    onClick={() => handleTopStackClick(stack)}
+                                                    className="relative group bg-[#2A2B30] border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-white/5 hover:border-blue-500/50 transition-all text-center shadow-lg"
                                                 >
-                                                    {index + 1}
-                                                </div>
+                                                    <div className={`absolute top-4 left-4 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border
+                                                        ${index === 0 ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/50" : 
+                                                          index === 1 ? "bg-gray-400/20 text-gray-300 border-gray-400/50" :
+                                                          index === 2 ? "bg-orange-700/20 text-orange-400 border-orange-700/50" :
+                                                          "bg-white/5 text-white/50 border-white/10"}`}
+                                                    >
+                                                        {index + 1}
+                                                    </div>
 
-                                                <div className="w-16 h-16 bg-white/10 rounded-xl p-2 flex items-center justify-center group-hover:bg-white/20 transition-colors mt-4">
-                                                    <img 
-                                                        src={stack.logo || ""} 
-                                                        alt={stack.name} 
-                                                        className="w-full h-full object-contain"
-                                                        onError={(e) => handleImageError(e, stack.name)}
-                                                    />
-                                                </div>
-                                                
-                                                <div>
-                                                    <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">
-                                                        {stack.name}
-                                                    </h3>
-                                                    <p className="text-xs text-gray-500 mt-1">
-                                                        언급량 {stack.count.toLocaleString()}회
-                                                    </p>
-                                                </div>
-                                            </motion.button>
-                                        ))}
-                                    </div>
+                                                    <div className="w-16 h-16 bg-white/10 rounded-xl p-2 flex items-center justify-center group-hover:bg-white/20 transition-colors mt-4">
+                                                        <img 
+                                                            src={stack.logo || ""} 
+                                                            alt={stack.name} 
+                                                            className="w-full h-full object-contain"
+                                                            onError={(e) => handleImageError(e, stack.name)}
+                                                        />
+                                                    </div>
+                                                    
+                                                    <div>
+                                                        <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">
+                                                            {stack.name}
+                                                        </h3>
+                                                        <p className="text-xs text-gray-500 mt-1">
+                                                            언급량 {stack.count.toLocaleString()}회
+                                                        </p>
+                                                    </div>
+                                                </motion.button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </motion.div>
                             ) : (
                                 <>
                                     {viewMode === "compare" && (
-                                        <motion.div key="compare" className="absolute inset-0 pb-20 pr-2">
+                                        // ✅ [수정 2] pb-20 -> pb-4 로 하단 여백 대폭 감소
+                                        <motion.div key="compare" className="absolute inset-0 pb-4 pr-2">
                                             <StackComparison initialBaseStack={activeStack} allStacks={topStacks} onBack={() => setViewMode("chart")} />
                                         </motion.div>
                                     )}
