@@ -1,75 +1,144 @@
 'use client';
 
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from 'next/navigation';
 import JobCard from './JobCard';
+import { api } from "@/lib/api"; 
 
-const MOCK_JOBS = [
-    { 
-        id: 1, 
-        company: '네이버', 
-        position: 'Backend Developer (Search)', 
-        logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Naver_Logotype.svg/800px-Naver_Logotype.svg.png', 
-        description: '수억 건의 데이터를 처리하는 검색 엔진의 백엔드 시스템을 설계하고 최적화합니다.' 
-    },
-    { 
-        id: 2, 
-        company: '카카오', 
-        position: 'Frontend Developer (Wallet)', 
-        logo: 'https://upload.wikimedia.org/wikipedia/commons/e/e3/Kakao_Corp._logo.svg', 
-        description: '사용자의 일상을 바꾸는 카카오톡 내 자산 관리 및 결제 서비스의 UI를 개발합니다.' 
-    },
-    { 
-        id: 3, 
-        company: '라인', 
-        position: 'iOS Developer', 
-        logo: 'https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg', 
-        description: '전 세계 2억 명 이상의 유저가 사용하는 글로벌 메신저 LINE의 모바일 앱을 고도화합니다.' 
-    },
-    { 
-        id: 4, 
-        company: '쿠팡', 
-        position: 'Data Engineer', 
-        logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/Coupang_logo.svg/800px-Coupang_logo.svg.png', 
-        description: '로켓배송을 가능케 하는 물류 최적화 알고리즘을 위한 대규모 데이터 파이프라인을 구축합니다.' 
-    },
-     { 
-        id: 5, 
-        company: '토스', 
-        position: 'Server Developer', 
-        logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Toss_Logo_Primary.png/800px-Toss_Logo_Primary.png', 
-        description: '금융의 모든 순간을 혁신하는 토스 서버를 개발합니다.' 
-    },
-];
+interface JobPostingData {
+    id: number;
+    company_name: string;
+    title: string;
+    url: string;
+    deadline: string | null; // ✅ null 허용
+    logo_url?: string; 
+}
 
-export default function JobSection() {
+interface JobSectionProps {
+    techStackId: number;   
+    techStackName: string; 
+}
+
+export default function JobSection({ techStackId, techStackName }: JobSectionProps) {
     const router = useRouter();
+    const [jobs, setJobs] = useState<JobPostingData[]>([]);
+    const [favorites, setFavorites] = useState<number[]>([]);
+    const [loading, setLoading] = useState(true);
 
     const handleMoreClick = () => {
         router.push('/map');
     };
 
-    return (
-        <section className="w-full h-full">
-            <div className="w-full h-full rounded-[24px] lg:rounded-[32px] bg-[#25262B] border border-gray-800 p-6 flex flex-col">
-                {/* 헤더 고정 */}
-                <div className="flex items-center justify-between mb-6 flex-shrink-0">
-                    <h3 className="text-white text-xl font-bold">🔥 추천 채용 공고</h3>
-                    <span 
-                        onClick={handleMoreClick}
-                        className="text-sm text-gray-500 cursor-pointer hover:text-blue-400 transition-colors"
-                    >
-                        채용 지도로 이동
-                    </span>
-                </div>
+    useEffect(() => {
+        const fetchFilteredJobs = async () => {
+            setLoading(true);
+            setJobs([]); 
 
-                {/* 리스트 내부 스크롤 */}
-                <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar pb-10">
-                    {MOCK_JOBS.map((job) => (
-                        <div key={job.id} className="w-full flex-shrink-0">
-                            <JobCard {...job} />
-                        </div>
-                    ))}
-                </div>
+            try {
+                const savedFavs = localStorage.getItem("job_favorites");
+                if (savedFavs) {
+                    setFavorites(JSON.parse(savedFavs));
+                }
+
+                // API 호출
+                const response = await api.get(`/by-tech/${techStackId}/`);
+                
+                const rawData = Array.isArray(response.data) ? response.data : response.data.results || [];
+                
+                const mappedData = rawData.map((item: any) => ({
+                    id: item.id,
+                    company_name: item.corp?.name || "기업명 없음", 
+                    title: item.title,
+                    url: item.url,
+                    // ✅ DB에 마감일이 없으면 null로 설정
+                    deadline: item.expiry_date || null, 
+                    logo_url: item.corp?.logo_url 
+                }));
+
+                setJobs(mappedData);
+
+            } catch (error) {
+                console.error(`${techStackName} 채용공고 로딩 실패:`, error);
+                setJobs([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (techStackId) {
+            fetchFilteredJobs();
+        }
+    }, [techStackId, techStackName]);
+
+    const handleToggleFavorite = (e: React.MouseEvent, id: number) => {
+        e.preventDefault(); 
+        e.stopPropagation();
+
+        const nextFavorites = favorites.includes(id)
+            ? favorites.filter(favId => favId !== id)
+            : [...favorites, id];
+        
+        setFavorites(nextFavorites);
+        localStorage.setItem("job_favorites", JSON.stringify(nextFavorites));
+    };
+
+    // 정렬 로직 (1. 즐겨찾기, 2. 마감일 순, 3. 마감일 없으면 맨 뒤)
+    const sortedJobs = useMemo(() => {
+        return [...jobs].sort((a, b) => {
+            const aFav = favorites.includes(a.id);
+            const bFav = favorites.includes(b.id);
+
+            // 1순위: 즐겨찾기
+            if (aFav && !bFav) return -1;
+            if (!aFav && bFav) return 1;
+
+            // 2순위: 마감일 비교
+            // 마감일이 없으면(null) 아주 큰 숫자로 취급해 맨 뒤로 보냄
+            const dateA = a.deadline ? new Date(a.deadline).getTime() : Number.MAX_SAFE_INTEGER;
+            const dateB = b.deadline ? new Date(b.deadline).getTime() : Number.MAX_SAFE_INTEGER;
+            
+            return dateA - dateB;
+        });
+    }, [jobs, favorites]);
+
+    return (
+        <section className="w-full h-full flex flex-col bg-[#25262B] rounded-2xl border border-white/5 overflow-hidden">
+            <div className="p-5 border-b border-white/5 flex justify-between items-center bg-[#2C2E33]/50 flex-shrink-0">
+                <h3 className="font-bold text-white flex items-center gap-2 truncate">
+                    💼 {techStackName} 관련 공고
+                </h3>
+                <span 
+                    onClick={handleMoreClick}
+                    className="text-xs text-gray-500 cursor-pointer hover:text-blue-400 transition-colors whitespace-nowrap"
+                >
+                    더보기
+                </span>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                {loading ? (
+                    <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+                        로딩 중...
+                    </div>
+                ) : sortedJobs.length > 0 ? (
+                    sortedJobs.map((job) => (
+                        <JobCard
+                            key={job.id}
+                            id={job.id}
+                            company={job.company_name}
+                            position={job.title}
+                            logo={job.logo_url}
+                            deadline={job.deadline}
+                            url={job.url}
+                            isFavorite={favorites.includes(job.id)}
+                            onToggleFavorite={handleToggleFavorite}
+                        />
+                    ))
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-500 text-sm py-10">
+                        <p>'{techStackName}' 관련 공고가 없습니다.</p>
+                    </div>
+                )}
             </div>
         </section>
     );
