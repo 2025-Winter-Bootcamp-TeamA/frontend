@@ -1,15 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // 1. 기존 설정 유지 (ESLint, TypeScript 무시)
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   reactStrictMode: true,
   
-  // 2. 기존 이미지 설정 유지
+  // 이미지 도메인 허용
   images: {
     remotePatterns: [
       {
@@ -19,18 +12,29 @@ const nextConfig = {
     ],
     domains: ['lh3.googleusercontent.com', 'k.kakaocdn.net'],
   },
-
-  // 3. [추가됨] 백엔드 통신을 위한 Rewrites(프록시) 설정
+  
+  // 빌드 시 ESLint 검사 무시 (Vercel 배포 오류 방지)
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  
+  // 빌드 시 TypeScript 타입 오류 무시 (배포 안정성)
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  
+  /*
+  // API 프록시 설정 (vercel.json의 rewrites로 대체)
+  // vercel.json에서 /api/:path* -> https://api.devroad.cloud/api/:path*로 설정됨
   async rewrites() {
     return [
       {
-        // 프론트엔드에서 '/api/proxy/...'로 시작하는 요청이 오면
-        source: "/api/proxy/:path*",
-        // 백엔드(http) 서버의 해당 경로로 토스해준다.
-        destination: "http://43.202.253.103:8000/:path*",
+        source: '/api/:path*',
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/:path*`,
       },
     ];
   },
+  */
 };
 
 module.exports = nextConfig;

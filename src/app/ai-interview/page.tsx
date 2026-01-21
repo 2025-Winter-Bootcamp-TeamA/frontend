@@ -6,6 +6,9 @@ import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Monitor, ArrowRightLeft } from 'lucide-react';
 
+// 동적 렌더링 강제 (정적 생성 방지)
+export const dynamic = 'force-dynamic';
+
 // 컴포넌트 임포트
 import { AnalyzingState } from '@/components/ai-interview/States';
 import UploadSection from '@/components/ai-interview/UploadSection';
