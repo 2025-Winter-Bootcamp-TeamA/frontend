@@ -114,15 +114,26 @@ export default function Navbar() {
                                 로그아웃
                             </button>
                             <Link href="/mypage">
-                                <div className="w-[40px] h-[40px] overflow-hidden hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-lg"
+                                <div className="w-[40px] h-[40px] overflow-hidden hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-lg bg-gray-700 flex items-center justify-center"
                                      style={{ borderRadius: '10px' }}>
                                     {/* ✅ 이미지 태그 */}
-                                    <img
-                                        src={profileImage || "https://via.placeholder.com/40"}
-                                        alt="프로필"
-                                        className="w-full h-full object-cover"
-                                        referrerPolicy="no-referrer"
-                                    />
+                                    {profileImage ? (
+                                        <img
+                                            src={profileImage}
+                                            alt="프로필"
+                                            className="w-full h-full object-cover"
+                                            referrerPolicy="no-referrer"
+                                            onError={(e) => {
+                                                // 이미지 로드 실패 시 기본 아바타로 대체
+                                                const target = e.target as HTMLImageElement;
+                                                target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent('User')}&background=3b82f6&color=fff&size=40&bold=true`;
+                                            }}
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-blue-600 text-white font-bold text-sm">
+                                            U
+                                        </div>
+                                    )}
                                 </div>
                             </Link>
                         </div>
