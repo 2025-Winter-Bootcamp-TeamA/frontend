@@ -76,34 +76,33 @@ export const getTrendDataByCategory = async (category: string): Promise<Category
 };
 
 /**
- * ✅ 기술 스택 검색 (전체 데이터 캐싱 + 필터링)
+ * ✅ 기술 스택 검색 (백엔드 API의 search 파라미터 사용)
  */
 let cachedAllStacks: TechStackData[] | null = null;
 
 export const searchTechStacks = async (query: string): Promise<TechStackData[]> => {
     try {
-        // 1. 캐시 없으면 전체 데이터 로딩 (페이지네이션 순회)
-        if (!cachedAllStacks || cachedAllStacks.length === 0) {
-            cachedAllStacks = await fetchAllPages('/trends/tech-stacks/');
+        // 1. 검색어가 없으면 전체 데이터 반환 (캐시 사용)
+        if (!query.trim()) {
+            if (!cachedAllStacks || cachedAllStacks.length === 0) {
+                cachedAllStacks = await fetchAllPages('/trends/tech-stacks/');
+            }
+            return cachedAllStacks.map(stack => ({
+                ...stack,
+                logo: normalizeLogoUrl(stack.logo, stack.name)
+            }));
         }
 
-        // 2. 데이터 가공 (로고 URL 생성)
-        const formattedStacks = cachedAllStacks.map(stack => ({
+        // 2. 검색어가 있으면 백엔드 API의 search 파라미터 사용
+        // 백엔드에서 이름만 부분 일치 검색 수행
+        const searchUrl = `/trends/tech-stacks/?search=${encodeURIComponent(query.trim())}`;
+        const searchResults = await fetchAllPages(searchUrl);
+
+        // 3. 데이터 가공 (로고 URL 생성)
+        return searchResults.map(stack => ({
             ...stack,
             logo: normalizeLogoUrl(stack.logo, stack.name)
         }));
-
-        // 3. 검색어 필터링
-        if (!query.trim()) {
-            return formattedStacks; 
-        }
-
-        const lowerQuery = query.toLowerCase();
-        
-        return formattedStacks.filter(stack => 
-            stack.name.toLowerCase().includes(lowerQuery) ||
-            (stack.description && stack.description.toLowerCase().includes(lowerQuery))
-        );
 
     } catch (error) {
         console.error("Failed to search tech stacks:", error);
