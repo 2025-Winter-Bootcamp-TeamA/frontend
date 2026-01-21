@@ -155,10 +155,19 @@ export default function Dashboard() {
                     allRelatedStacks.push(...relationsData.relationships[relType]);
                 });
                 
-                // 가중치 순으로 정렬 (높은 순서대로)
-                // TODO: 언급량 순 정렬 (현재는 주석처리)
-                // const sortedByMentionCount = allRelatedStacks.sort((a, b) => (b.tech_stack.count || 0) - (a.tech_stack.count || 0));
-                const sortedByWeight = allRelatedStacks.sort((a, b) => b.weight - a.weight);
+                // 중복 제거: tech_stack.id 기준으로 중복 제거 (같은 기술이 여러 관계 유형에 속할 수 있음)
+                const uniqueStacksMap = new Map<number, RelatedTechStackRelation>();
+                allRelatedStacks.forEach(relation => {
+                    const stackId = relation.tech_stack.id;
+                    // 이미 존재하는 경우, 가중치가 더 높은 것으로 유지
+                    if (!uniqueStacksMap.has(stackId) || uniqueStacksMap.get(stackId)!.weight < relation.weight) {
+                        uniqueStacksMap.set(stackId, relation);
+                    }
+                });
+                
+                // Map에서 배열로 변환 후 가중치 순으로 정렬
+                const uniqueStacks = Array.from(uniqueStacksMap.values());
+                const sortedByWeight = uniqueStacks.sort((a, b) => b.weight - a.weight);
                 
                 setRelatedStacks(sortedByWeight);
             } catch (error) {
@@ -307,7 +316,25 @@ export default function Dashboard() {
                                 mainStackName={activeStack.name} 
                                 mainLogo={activeStack.logo || ""} 
                                 relatedStacks={relatedStacks}
-                                onClose={() => setViewMode("chart")} 
+                                onClose={() => setViewMode("chart")}
+                                onStackSelect={(stackId: number) => {
+                                    // 해당 기술 스택으로 이동
+                                    (async () => {
+                                        try {
+                                            const allData = await searchTechStacks("");
+                                            const targetStack = allData.find(s => s.id === stackId);
+                                            if (targetStack) {
+                                                const formatted = formatApiData([targetStack]);
+                                                if (formatted.length > 0) {
+                                                    setActiveStack(formatted[0]);
+                                                    setViewMode("chart"); // 차트 화면으로 이동
+                                                }
+                                            }
+                                        } catch (error) {
+                                            console.error("Failed to load tech stack:", error);
+                                        }
+                                    })();
+                                }}
                             />
                         </motion.div>
                     )}

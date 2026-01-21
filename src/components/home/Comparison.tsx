@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, ArrowRightLeft, CheckCircle2, Building2, Info, Plus } from "lucide-react";
 import Image from "next/image";
+import { searchTechStacks, getExternalLogoUrl } from "@/services/trendService";
+import { TechStackData } from "@/types/trend";
 
 // ✅ 데이터 타입 정의 (외부에서 쓸 수 있게 export)
 export interface StackData {
@@ -22,7 +24,7 @@ export interface StackData {
 
 interface StackComparisonProps {
   initialBaseStack: StackData; // 대시보드에서 넘어온 초기 스택
-  allStacks: StackData[];      // 검색할 전체 스택 리스트
+  allStacks: StackData[];      // 검색할 전체 스택 리스트 (기존 데이터, 하위 호환성)
   onBack: () => void;          // 뒤로가기
 }
 
@@ -48,6 +50,82 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
   const debouncedLeftSearch = useDebounce(leftSearchTerm, 300);
   const debouncedRightSearch = useDebounce(rightSearchTerm, 300);
 
+  // 3. API에서 검색한 기술 스택 목록 (각 슬롯별로 독립적으로 관리)
+  const [leftApiStacks, setLeftApiStacks] = useState<StackData[]>([]);
+  const [rightApiStacks, setRightApiStacks] = useState<StackData[]>([]);
+  const [isLeftSearching, setIsLeftSearching] = useState(false);
+  const [isRightSearching, setIsRightSearching] = useState(false);
+
+  // 왼쪽 슬롯 API 검색
+  useEffect(() => {
+    const searchStacks = async () => {
+      if (!debouncedLeftSearch.trim()) {
+        setLeftApiStacks([]);
+        return;
+      }
+
+      setIsLeftSearching(true);
+      try {
+        const results = await searchTechStacks(debouncedLeftSearch);
+        // TechStackData를 StackData로 변환
+        const formatted = results.map((stack: TechStackData, index: number) => ({
+          id: stack.id,
+          name: stack.name,
+          count: Math.floor(Math.random() * 5000) + 1000,
+          growth: parseFloat((Math.random() * 20).toFixed(1)),
+          color: index % 2 === 0 ? "from-blue-500 to-indigo-500" : "from-green-500 to-emerald-500",
+          logo: stack.logo || getExternalLogoUrl(stack.name),
+          themeColor: "#3B82F6",
+          description: stack.description || "상세 설명이 없습니다.",
+          officialSite: stack.docs_url || "#",
+        }));
+        setLeftApiStacks(formatted);
+      } catch (error) {
+        console.error("Failed to search tech stacks:", error);
+        setLeftApiStacks([]);
+      } finally {
+        setIsLeftSearching(false);
+      }
+    };
+
+    searchStacks();
+  }, [debouncedLeftSearch]);
+
+  // 오른쪽 슬롯 API 검색
+  useEffect(() => {
+    const searchStacks = async () => {
+      if (!debouncedRightSearch.trim()) {
+        setRightApiStacks([]);
+        return;
+      }
+
+      setIsRightSearching(true);
+      try {
+        const results = await searchTechStacks(debouncedRightSearch);
+        // TechStackData를 StackData로 변환
+        const formatted = results.map((stack: TechStackData, index: number) => ({
+          id: stack.id,
+          name: stack.name,
+          count: Math.floor(Math.random() * 5000) + 1000,
+          growth: parseFloat((Math.random() * 20).toFixed(1)),
+          color: index % 2 === 0 ? "from-blue-500 to-indigo-500" : "from-green-500 to-emerald-500",
+          logo: stack.logo || getExternalLogoUrl(stack.name),
+          themeColor: "#3B82F6",
+          description: stack.description || "상세 설명이 없습니다.",
+          officialSite: stack.docs_url || "#",
+        }));
+        setRightApiStacks(formatted);
+      } catch (error) {
+        console.error("Failed to search tech stacks:", error);
+        setRightApiStacks([]);
+      } finally {
+        setIsRightSearching(false);
+      }
+    };
+
+    searchStacks();
+  }, [debouncedRightSearch]);
+
   // 3. 매칭률 계산 (Mock Logic)
   const getMatchingRate = () => {
     if (!leftStack || !rightStack) return 0;
@@ -70,13 +148,24 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
   const getFilteredStacks = (side: "left" | "right") => {
     const term = side === "left" ? debouncedLeftSearch : debouncedRightSearch;
     const otherStack = side === "left" ? rightStack : leftStack;
+    const apiResults = side === "left" ? leftApiStacks : rightApiStacks;
     
-    if (!term) return []; // 검색어 없으면 빈 배열 (또는 전체 리스트)
+    if (!term) return []; // 검색어 없으면 빈 배열
 
-    return allStacks.filter(s => 
-        s.id !== otherStack?.id && 
+    // API 검색 결과 사용 (부분 일치 검색 - 백엔드에서 이미 처리됨)
+    const searchResults = apiResults.filter(s => 
+        s.id !== otherStack?.id
+    );
+
+    // 기존 allStacks와 병합 (중복 제거)
+    const existingIds = new Set(searchResults.map(s => s.id));
+    const additionalStacks = allStacks.filter(s => 
+        s.id !== otherStack?.id &&
+        !existingIds.has(s.id) &&
         s.name.toLowerCase().includes(term.toLowerCase())
     );
+
+    return [...searchResults, ...additionalStacks];
   };
 
   return (
@@ -105,6 +194,7 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
             onRemove={() => setLeftStack(null)}
             onSelect={(s:any) => handleSelect("left", s)}
             suggestions={getFilteredStacks("left")}
+            isSearching={isLeftSearching}
         />
 
         {/* Center: VS or Matching Rate */}
@@ -145,6 +235,7 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
             onRemove={() => setRightStack(null)}
             onSelect={(s:any) => handleSelect("right", s)}
             suggestions={getFilteredStacks("right")}
+            isSearching={isRightSearching}
         />
       </div>
 
@@ -235,7 +326,7 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
 }
 
 // 🧩 하위 컴포넌트: 스택 슬롯 (선택됨/비어있음/검색 처리)
-function StackSlot({ side, stack, searchTerm, onSearchChange, onRemove, onSelect, suggestions }: any) {
+function StackSlot({ side, stack, searchTerm, onSearchChange, onRemove, onSelect, suggestions, isSearching }: any) {
     return (
         <div className="flex flex-col items-center gap-2 w-[140px] md:w-[180px] relative z-20">
             <AnimatePresence mode="wait">
@@ -289,7 +380,9 @@ function StackSlot({ side, stack, searchTerm, onSearchChange, onRemove, onSelect
                     {/* 자동완성 드롭다운 */}
                     {searchTerm && (
                         <div className="absolute top-full left-0 right-0 mt-1 bg-[#25262B] border border-gray-600 rounded-lg shadow-2xl z-50 max-h-[200px] overflow-y-auto custom-scrollbar">
-                            {suggestions.length > 0 ? (
+                            {isSearching ? (
+                                <div className="p-3 text-center text-xs text-gray-500">검색 중...</div>
+                            ) : suggestions.length > 0 ? (
                                 suggestions.map((s: StackData) => (
                                     <button
                                         key={s.id}
