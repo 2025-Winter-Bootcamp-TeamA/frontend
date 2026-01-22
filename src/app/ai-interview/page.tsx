@@ -10,10 +10,8 @@ import { User, Monitor, ArrowRightLeft } from 'lucide-react';
 import { AnalyzingState } from '@/components/ai-interview/States';
 import UploadSection from '@/components/ai-interview/UploadSection';
 import ResumePickerModal from '@/components/ai-interview/ResumePickerModal';
-import ViewSwitcher from '@/components/ai-interview/ViewSwitcher';
 import ReportModal from '@/components/ai-interview/ReportModal';
 import DashboardView from '@/components/ai-interview/DashboardView'; 
-import SimulationView from '@/components/ai-interview/SimulationView';
 
 import { useSimulation } from '@/hooks/useSimulation';
 import type { Resume } from '@/types';
@@ -46,7 +44,6 @@ function AIInterviewContent() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [step, setStep] = useState<'empty' | 'analyzing' | 'result'>('empty');
-    const [viewMode, setViewMode] = useState<'dashboard' | 'simulation'>('dashboard');
     const [showDropdown, setShowDropdown] = useState(false);
     const [isResumePickerOpen, setIsResumePickerOpen] = useState(false);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false); 
@@ -135,7 +132,6 @@ function AIInterviewContent() {
                     };
                     
                     setSelectedResume(resume);
-                    setViewMode('dashboard');
                     setShowDropdown(false);
                     setStep('analyzing');
                     setTimeout(() => setStep('result'), 3000);
@@ -186,7 +182,6 @@ function AIInterviewContent() {
             
             setSelectedResume(detailedResume);
             setIsResumePickerOpen(false);
-            setViewMode('dashboard'); 
             
             // 인위적인 지연 (UX를 위해)
             setTimeout(() => setStep('result'), 1500);
@@ -194,7 +189,6 @@ function AIInterviewContent() {
             console.error('이력서 상세 정보 불러오기 실패:', error);
             setSelectedResume(resume);
             setIsResumePickerOpen(false);
-            setViewMode('dashboard'); 
             setStep('result');
         }
     };
@@ -241,7 +235,6 @@ function AIInterviewContent() {
             };
 
             setSelectedResume(formattedResume);
-            setViewMode('dashboard');
             setStep('result');
             
         } catch (error: any) {
@@ -251,11 +244,25 @@ function AIInterviewContent() {
             setStep('empty');
         }
     };
+
+    // ✅ [추가] 이력서 삭제 함수
+    const handleDeleteResume = async (id: number) => {
+        if (!confirm("정말로 이 이력서를 삭제하시겠습니까? (삭제 후 복구 불가)")) return;
+
+        try {
+            await api.delete(`/resumes/${id}/`); // 백엔드 삭제 요청
+            alert("이력서가 삭제되었습니다.");
+            fetchResumes(); // 목록 새로고침
+        } catch (error) {
+            console.error("이력서 삭제 실패:", error);
+            alert("삭제 중 오류가 발생했습니다.");
+        }
+    };
     
     const triggerFileUpload = () => fileInputRef.current?.click();
 
     return (
-        <div className="min-h-screen bg-[#1A1B1E] overflow-y-auto flex flex-col items-center justify-start pt-6 text-white">
+        <div className="min-h-screen bg-[#1A1B1E] overflow-y-auto flex flex-col items-center justify-start text-white">
             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".pdf,.doc,.docx" />
             
             {/* ✅ max-w-[1800px] */}
@@ -263,15 +270,9 @@ function AIInterviewContent() {
                 <header className="flex justify-between items-center mb-4">
                     <div className="space-y-1">
                         <h1 className="text-3xl font-black tracking-tighter uppercase">AI 역량 분석 리포트</h1>
-                        <p className="text-sm text-[#9FA0A8]">
-                            {selectedResume ? `분석 중인 이력서: ${selectedResume.title}` : '이력서를 등록하여 맞춤형 분석을 받아보세요.'}
-                        </p>
                     </div>
 
                     <div className="flex items-center gap-4">
-                        {step === 'result' && (
-                            <ViewSwitcher currentView={viewMode} onChange={setViewMode} />
-                        )}
 
                         {step !== 'empty' && (
                             <div className="relative">
@@ -300,6 +301,7 @@ function AIInterviewContent() {
                     isLoading={isLoadingResumes}
                     onClose={() => setIsResumePickerOpen(false)} 
                     onSelect={handleSelectResume} 
+                    onDelete={handleDeleteResume}
                 />
 
                 <main className="flex-1">
@@ -311,26 +313,20 @@ function AIInterviewContent() {
                         {step === 'analyzing' && <AnalyzingState key="analyzing" />}
 
                         {step === 'result' && (
-                            viewMode === 'dashboard' ? (
-                                <DashboardView 
-                                    key="dashboard"
-                                    resumeTitle={selectedResume?.title || '나의 이력서'}
-                                    resumeText={selectedResume?.extractedText || null}
-                                    resumeId={selectedResume?.id}
-                                    resumeKeywords={resumeKeywords}
-                                    sortedCompanies={simulationData.sortedCompanies}
-                                    selectedCompany={simulationData.selectedCompany}
-                                    setSelectedCompany={simulationData.toggleCompany} 
-                                    toggleFavorite={simulationData.toggleFavorite}
-                                    matchScore={resumeMatchScore}
-                                    onOpenReport={() => setIsReportModalOpen(true)}
-                                />
-                            ) : (
-                                <SimulationView 
-                                    key="simulation"
-                                    simulationData={simulationData}
-                                />
-                            )
+                            // ✅ [수정] 항상 DashboardView만 렌더링 (SimulationView 제거)
+                            <DashboardView 
+                                key="dashboard"
+                                resumeTitle={selectedResume?.title || '나의 이력서'}
+                                resumeText={selectedResume?.extractedText || null}
+                                resumeId={selectedResume?.id}
+                                resumeKeywords={resumeKeywords}
+                                sortedCompanies={simulationData.sortedCompanies}
+                                selectedCompany={simulationData.selectedCompany}
+                                setSelectedCompany={simulationData.toggleCompany} 
+                                toggleFavorite={simulationData.toggleFavorite}
+                                matchScore={resumeMatchScore}
+                                onOpenReport={() => setIsReportModalOpen(true)}
+                            />
                         )}
                     </AnimatePresence>
                 </main>
@@ -343,8 +339,8 @@ function AIInterviewContent() {
                 isOpen={isReportModalOpen}
                 onClose={() => setIsReportModalOpen(false)}
                 selectedCompany={simulationData.selectedCompany as any} 
-                selectedKeywords={viewMode === 'simulation' ? simulationData.selectedKeywords : resumeKeywords}
-                totalScore={viewMode === 'simulation' ? simulationData.matchScore : resumeMatchScore}
+                selectedKeywords={resumeKeywords}
+                totalScore={resumeMatchScore}
             />
         </div>
     );
