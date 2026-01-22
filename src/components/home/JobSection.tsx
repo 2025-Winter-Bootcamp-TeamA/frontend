@@ -4,11 +4,9 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from 'next/navigation';
 import { Search, AlertCircle } from 'lucide-react';
 import JobCard from './JobCard';
-import { api } from "@/lib/api"; 
+import { api } from "@/lib/api";
 import { getAuthTokens } from "@/lib/auth"; 
 
-import LoginCheckModal from "@/components/LoginCheckModal";
-import LoginModal from "@/components/LoginModal"; 
 
 interface JobPostingData {
     id: number;
@@ -27,12 +25,9 @@ interface JobSectionProps {
 export default function JobSection({ techStackId, techStackName }: JobSectionProps) {
     const router = useRouter();
     const [jobs, setJobs] = useState<JobPostingData[]>([]);
-    const [favorites, setFavorites] = useState<number[]>([]);
     const [loading, setLoading] = useState(true);
     
     const [searchQuery, setSearchQuery] = useState("");
-    const [showLoginCheck, setShowLoginCheck] = useState(false);
-    const [showLoginModal, setShowLoginModal] = useState(false);
 
     const handleMoreClick = () => {
         router.push('/map');
@@ -44,46 +39,47 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
             setJobs([]); 
 
             try {
-                const savedFavs = localStorage.getItem("job_favorites");
-                if (savedFavs) {
-                    setFavorites(JSON.parse(savedFavs));
-                }
-
                 let allJobs: any[] = [];
 
                 if (techStackId === 0) {
-                    // ✅ [우회 로직] 전체 공고 API 부재 시 Top 5 기술 공고 병합
+                    // ✅ 즐겨찾기된 기업의 채용공고 가져오기
                     try {
-                        const rankingRes = await api.get('/trends/ranking/');
+                        const { accessToken } = getAuthTokens();
                         
-                        // 🛠️ [수정] 응답 데이터가 배열인지 객체(results)인지 확인
-                        const rankingData = Array.isArray(rankingRes.data) 
-                            ? rankingRes.data 
-                            : rankingRes.data.results || [];
-
-                        const topStacks = rankingData.slice(0, 5);
-
-                        // 각 기술별 공고 병렬 호출 (에러 나도 무시하고 빈 배열 반환)
-                        const promises = topStacks.map((stack: any) => 
-                            api.get(`/jobs/by-tech/${stack.tech_stack.id}/`)
-                               .then(res => Array.isArray(res.data) ? res.data : res.data.results || [])
-                               .catch(() => [])
-                        );
-                        
-                        const results = await Promise.all(promises);
-
-                        // 결과 병합
-                        results.forEach(data => {
-                            allJobs = [...allJobs, ...data];
-                        });
-
-                        // 중복 제거 (ID 기준)
-                        const uniqueJobsMap = new Map();
-                        allJobs.forEach(job => uniqueJobsMap.set(job.id, job));
-                        allJobs = Array.from(uniqueJobsMap.values());
-
+                        if (accessToken) {
+                            // 즐겨찾기된 기업 목록 가져오기
+                            const bookmarksResponse = await api.get('/jobs/corp-bookmarks/');
+                            const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
+                            
+                            if (bookmarks.length > 0) {
+                                // 각 기업의 채용공고를 병렬로 가져오기
+                                const promises = bookmarks.map((bookmark: any) => {
+                                    const corpId = bookmark.corp?.id || bookmark.corp_id;
+                                    if (!corpId) return Promise.resolve([]);
+                                    
+                                    return api.get(`/jobs/corps/${corpId}/job-postings/`)
+                                        .then(res => {
+                                            const jobs = Array.isArray(res.data) ? res.data : res.data.results || [];
+                                            return jobs;
+                                        })
+                                        .catch(() => []);
+                                });
+                                
+                                const results = await Promise.all(promises);
+                                
+                                // 결과 병합
+                                results.forEach(data => {
+                                    allJobs = [...allJobs, ...data];
+                                });
+                                
+                                // 중복 제거 (ID 기준)
+                                const uniqueJobsMap = new Map();
+                                allJobs.forEach(job => uniqueJobsMap.set(job.id, job));
+                                allJobs = Array.from(uniqueJobsMap.values());
+                            }
+                        }
                     } catch (err) {
-                        console.error("Top 5 공고 수집 중 오류:", err);
+                        console.error("즐겨찾기 기업 공고 수집 중 오류:", err);
                     }
 
                 } else {
@@ -121,24 +117,6 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
         }
     }, [techStackId]);
 
-    const handleToggleFavorite = (e: React.MouseEvent, id: number) => {
-        e.preventDefault(); 
-        e.stopPropagation();
-
-        const { accessToken } = getAuthTokens();
-        if (!accessToken) {
-            setShowLoginCheck(true); 
-            return;
-        }
-
-        const nextFavorites = favorites.includes(id)
-            ? favorites.filter(favId => favId !== id)
-            : [...favorites, id];
-        
-        setFavorites(nextFavorites);
-        localStorage.setItem("job_favorites", JSON.stringify(nextFavorites));
-    };
-
     const processedJobs = useMemo(() => {
         let filtered = jobs;
         if (searchQuery.trim()) {
@@ -149,33 +127,17 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
             );
         }
 
+        // 즐겨찾기 정렬 제거, 마감일 기준으로만 정렬
         return [...filtered].sort((a, b) => {
-            const aFav = favorites.includes(a.id);
-            const bFav = favorites.includes(b.id);
-
-            if (aFav && !bFav) return -1;
-            if (!aFav && bFav) return 1;
-
             const dateA = a.deadline ? new Date(a.deadline).getTime() : Number.MAX_SAFE_INTEGER;
             const dateB = b.deadline ? new Date(b.deadline).getTime() : Number.MAX_SAFE_INTEGER;
             
             return dateA - dateB;
         });
-    }, [jobs, favorites, searchQuery]);
+    }, [jobs, searchQuery]);
 
     return (
         <section className="w-full h-full flex flex-col bg-[#25262B] rounded-2xl border border-white/5 overflow-hidden relative shadow-lg">
-            
-            <LoginCheckModal 
-                isOpen={showLoginCheck} 
-                onClose={() => setShowLoginCheck(false)}
-                onConfirm={() => {
-                    setShowLoginCheck(false);
-                    setShowLoginModal(true);
-                }}
-            />
-            <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
-
             <div className="p-5 border-b border-white/5 flex flex-col gap-4 bg-[#2C2E33]/50 flex-shrink-0">
                 <div className="flex justify-between items-center">
                     <h3 className="font-bold text-white flex items-center gap-2 truncate">
@@ -217,8 +179,6 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
                             logo={job.logo_url}
                             deadline={job.deadline}
                             url={job.url}
-                            isFavorite={favorites.includes(job.id)}
-                            onToggleFavorite={handleToggleFavorite}
                         />
                     ))
                 ) : (

@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { Map as KakaoMap, CustomOverlayMap, useKakaoLoader } from "react-kakao-maps-sdk";
 import { Search, MapPin, RefreshCw, ArrowLeft, Building2, Star } from "lucide-react";
 import { api } from "@/lib/api";
+import { getAuthTokens } from "@/lib/auth";
 import JobCard from "../home/JobCard";
 
 // --- 데이터 타입 정의 ---
@@ -24,6 +26,7 @@ interface Company {
 }
 
 export default function JobMap() {
+  const searchParams = useSearchParams();
   const [loading, error] = useKakaoLoader({
     appkey: process.env.NEXT_PUBLIC_KAKAO_MAP_KEY as string,
     libraries: ["clusterer", "services"],
@@ -48,8 +51,18 @@ export default function JobMap() {
     const fetchAllData = async () => {
       setIsDataLoading(true);
       try {
-        const savedFavs = localStorage.getItem("company_favorites");
-        if (savedFavs) setFavoriteCompanyIds(JSON.parse(savedFavs));
+        // ✅ 백엔드에서 즐겨찾기 목록 가져오기
+        const { accessToken } = getAuthTokens();
+        if (accessToken) {
+          try {
+            const bookmarksResponse = await api.get('/jobs/corp-bookmarks/');
+            const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
+            const favoriteIds = bookmarks.map((b: any) => b.corp?.id || b.corp_id);
+            setFavoriteCompanyIds(favoriteIds);
+          } catch (error) {
+            console.error('즐겨찾기 목록 불러오기 실패:', error);
+          }
+        }
 
         const response = await api.get('/jobs/corps/'); 
         const rawCorps = Array.isArray(response.data) ? response.data : response.data.results || [];
@@ -104,15 +117,51 @@ export default function JobMap() {
     }
   };
 
-  // ✅ 기업 즐겨찾기 토글 함수
-  const toggleCompanyFavorite = (e: React.MouseEvent, corpId: number) => {
+  // ✅ 기업 즐겨찾기 토글 함수 (백엔드 API 연동)
+  const toggleCompanyFavorite = async (e: React.MouseEvent, corpId: number) => {
     e.stopPropagation();
-    const nextFavs = favoriteCompanyIds.includes(corpId) 
-      ? favoriteCompanyIds.filter(id => id !== corpId) 
-      : [...favoriteCompanyIds, corpId];
     
-    setFavoriteCompanyIds(nextFavs);
-    localStorage.setItem("company_favorites", JSON.stringify(nextFavs));
+    const { accessToken } = getAuthTokens();
+    if (!accessToken) {
+      // 로그인 모달 표시 (필요시 추가)
+      return;
+    }
+
+    try {
+      const isFavorite = favoriteCompanyIds.includes(corpId);
+      
+      if (isFavorite) {
+        // 즐겨찾기 제거
+        try {
+          const bookmarksResponse = await api.get('/jobs/corp-bookmarks/');
+          const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
+          const bookmarkToDelete = bookmarks.find((b: any) => b.corp?.id === corpId || b.corp_id === corpId);
+          
+          if (bookmarkToDelete) {
+            await api.delete(`/jobs/corp-bookmarks/${bookmarkToDelete.corp_bookmark_id || bookmarkToDelete.id}/`);
+            const nextFavs = favoriteCompanyIds.filter(id => id !== corpId);
+            setFavoriteCompanyIds(nextFavs);
+            // 즐겨찾기 변경 이벤트 발생
+            window.dispatchEvent(new CustomEvent('favoriteChanged', { detail: { type: 'company', action: 'removed', id: corpId } }));
+          }
+        } catch (error) {
+          console.error('즐겨찾기 제거 실패:', error);
+        }
+      } else {
+        // 즐겨찾기 추가
+        try {
+          await api.post('/jobs/corp-bookmarks/', { corp_id: corpId });
+          const nextFavs = [...favoriteCompanyIds, corpId];
+          setFavoriteCompanyIds(nextFavs);
+          // 즐겨찾기 변경 이벤트 발생
+          window.dispatchEvent(new CustomEvent('favoriteChanged', { detail: { type: 'company', action: 'added', id: corpId } }));
+        } catch (error) {
+          console.error('즐겨찾기 추가 실패:', error);
+        }
+      }
+    } catch (error) {
+      console.error('즐겨찾기 토글 실패:', error);
+    }
   };
 
   const handleSelectCompany = (company: Company) => {
@@ -121,6 +170,21 @@ export default function JobMap() {
     setLevel(3);
     fetchCompanyJobs(company.id); 
   };
+
+  // ✅ URL 파라미터에서 기업 ID를 받아서 해당 기업을 자동 선택
+  useEffect(() => {
+    const corpIdParam = searchParams?.get('corpId');
+    if (corpIdParam && companies.length > 0) {
+      const corpId = parseInt(corpIdParam, 10);
+      if (!isNaN(corpId)) {
+        const company = companies.find(c => c.id === corpId);
+        if (company && (!selectedCompany || selectedCompany.id !== corpId)) {
+          handleSelectCompany(company);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, companies]);
 
   const filteredCompanies = useMemo(() => {
     return companies.filter(c => 
@@ -187,7 +251,7 @@ export default function JobMap() {
                     <div className="space-y-3">
                         {isJobsLoading ? <div className="text-center py-10 text-gray-500">공고 로딩 중...</div> :
                           companyJobs.map(job => (
-                            <JobCard key={job.id} id={job.id} company={selectedCompany.name} logo={selectedCompany.logo_url} position={job.title} url={job.url} deadline={job.deadline} isFavorite={false} onToggleFavorite={() => {}} />
+                            <JobCard key={job.id} id={job.id} company={selectedCompany.name} logo={selectedCompany.logo_url} position={job.title} url={job.url} deadline={job.deadline} />
                         ))}
                     </div>
                 </div>

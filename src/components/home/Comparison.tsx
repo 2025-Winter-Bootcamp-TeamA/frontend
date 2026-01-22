@@ -334,9 +334,7 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
                                     position={job.title}
                                     logo={job.logo_url}
                                     deadline={job.deadline}
-                                    url={job.url}
-                                    isFavorite={false}
-                                    onToggleFavorite={() => {}} 
+                                    url={job.url} 
                                 />
                             ))}
                         </div>

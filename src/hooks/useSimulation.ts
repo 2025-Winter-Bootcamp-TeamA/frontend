@@ -1,4 +1,6 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { api } from '@/lib/api';
+import { getAuthTokens } from '@/lib/auth';
 
 // CATEGORY_INFO가 없을 경우를 대비한 기본값
 const DEFAULT_CATEGORY_INFO: Record<string, any> = {};
@@ -18,6 +20,29 @@ export function useSimulation() {
     const [selectedCompany, setSelectedCompany] = useState<any>(null);
     const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
     const [keywordSearch, setKeywordSearch] = useState('');
+
+    // ✅ 초기 즐겨찾기 상태를 백엔드에서 가져오기
+    useEffect(() => {
+        const loadFavorites = async () => {
+            const { accessToken } = getAuthTokens();
+            if (!accessToken) return;
+
+            try {
+                const bookmarksResponse = await api.get('/jobs/corp-bookmarks/');
+                const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
+                const favoriteIds = new Set(bookmarks.map((b: any) => b.corp?.id || b.corp_id));
+                
+                setCompanies(prev => prev.map(c => ({
+                    ...c,
+                    favorite: favoriteIds.has(c.id)
+                })));
+            } catch (error) {
+                console.error('즐겨찾기 목록 불러오기 실패:', error);
+            }
+        };
+
+        loadFavorites();
+    }, []);
 
     // ✅ [수정됨] 기술 스택 목록에서 기업 이름 제외
     const allTechKeywords = useMemo(() => {
@@ -77,11 +102,51 @@ export function useSimulation() {
         setSelectedCompany((prev: any) => (prev?.id === company.id ? null : company));
     }, []);
 
-    // 핸들러: 즐겨찾기
-    const toggleFavorite = useCallback((e: React.MouseEvent, id: number) => {
+    // 핸들러: 즐겨찾기 (백엔드 API 연동)
+    const toggleFavorite = useCallback(async (e: React.MouseEvent, id: number) => {
         e.stopPropagation();
-        setCompanies(prev => prev.map(c => c.id === id ? { ...c, favorite: !c.favorite } : c));
-    }, []);
+        
+        const { accessToken } = getAuthTokens();
+        if (!accessToken) {
+            // 로그인 필요 (필요시 모달 표시)
+            return;
+        }
+
+        try {
+            const company = companies.find(c => c.id === id);
+            const isFavorite = company?.favorite || false;
+            
+            if (isFavorite) {
+                // 즐겨찾기 제거
+                try {
+                    const bookmarksResponse = await api.get('/jobs/corp-bookmarks/');
+                    const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
+                    const bookmarkToDelete = bookmarks.find((b: any) => b.corp?.id === id || b.corp_id === id);
+                    
+                    if (bookmarkToDelete) {
+                        await api.delete(`/jobs/corp-bookmarks/${bookmarkToDelete.corp_bookmark_id || bookmarkToDelete.id}/`);
+                        setCompanies(prev => prev.map(c => c.id === id ? { ...c, favorite: false } : c));
+                        // 즐겨찾기 변경 이벤트 발생
+                        window.dispatchEvent(new CustomEvent('favoriteChanged', { detail: { type: 'company', action: 'removed', id } }));
+                    }
+                } catch (error) {
+                    console.error('즐겨찾기 제거 실패:', error);
+                }
+            } else {
+                // 즐겨찾기 추가
+                try {
+                    await api.post('/jobs/corp-bookmarks/', { corp_id: id });
+                    setCompanies(prev => prev.map(c => c.id === id ? { ...c, favorite: true } : c));
+                    // 즐겨찾기 변경 이벤트 발생
+                    window.dispatchEvent(new CustomEvent('favoriteChanged', { detail: { type: 'company', action: 'added', id } }));
+                } catch (error) {
+                    console.error('즐겨찾기 추가 실패:', error);
+                }
+            }
+        } catch (error) {
+            console.error('즐겨찾기 토글 실패:', error);
+        }
+    }, [companies]);
 
     // 핸들러: 키워드 선택
     const toggleKeyword = useCallback((k: string) => {

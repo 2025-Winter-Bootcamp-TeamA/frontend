@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Star, Calendar, Building, Briefcase } from 'lucide-react';
+import { Calendar, Building, Briefcase } from 'lucide-react';
 
 interface JobCardProps {
     id: number;
@@ -10,8 +10,6 @@ interface JobCardProps {
     logo?: string;
     deadline: string | null; // null 허용 (상시채용 대응)
     url: string;
-    isFavorite: boolean;
-    onToggleFavorite: (e: React.MouseEvent, id: number) => void;
 }
 
 export default function JobCard({ 
@@ -20,9 +18,7 @@ export default function JobCard({
     position, 
     logo, 
     deadline, 
-    url,
-    isFavorite,
-    onToggleFavorite 
+    url
 }: JobCardProps) {
     
     // 마감일 배지 렌더링 로직
@@ -60,23 +56,8 @@ export default function JobCard({
     return (
         <motion.div 
             whileHover={{ y: -5 }}
-            className={`relative w-full min-w-[280px] rounded-2xl p-6 cursor-pointer border transition-all duration-200
-                ${isFavorite 
-                    ? "bg-blue-500/5 border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]" 
-                    : "bg-[#25262B] border-white/5 hover:bg-[#2C2D33] hover:border-white/20"
-                }`}
+            className="relative w-full min-w-[280px] rounded-2xl p-6 cursor-pointer border transition-all duration-200 bg-[#25262B] border-white/5 hover:bg-[#2C2D33] hover:border-white/20"
         >
-            {/* 즐겨찾기 버튼 */}
-            <button 
-                onClick={(e) => onToggleFavorite(e, id)}
-                className="absolute top-4 right-4 text-gray-500 hover:text-yellow-400 transition-colors z-20"
-            >
-                <Star 
-                    size={20} 
-                    fill={isFavorite ? "#FACC15" : "none"} 
-                    className={isFavorite ? "text-yellow-400" : ""}
-                />
-            </button>
 
             {/* 카드 전체 링크 */}
             <a href={url} target="_blank" rel="noopener noreferrer" className="block">

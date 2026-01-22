@@ -13,7 +13,7 @@ import { getAuthTokens } from "@/lib/auth";
 import LoginCheckModal from "@/components/LoginCheckModal";
 import LoginModal from "@/components/LoginModal";
 
-import { searchTechStacks, getTechStackRelations, RelatedTechStackRelation, getExternalLogoUrl } from "@/services/trendService";
+import { searchTechStacks, getTechStackRelations, RelatedTechStackRelation, getExternalLogoUrl, fetchAllTechStacks } from "@/services/trendService";
 import { TechStackData } from "@/types/trend";
 
 // 커스텀 노드 아이콘
@@ -148,19 +148,49 @@ export default function Dashboard() {
         const loadInitialData = async () => {
             setIsInitialLoading(true);
             try {
-                const savedFavs = localStorage.getItem("stack_favorites");
-                if (savedFavs) {
-                    setStackFavorites(JSON.parse(savedFavs));
+                // ✅ 백엔드에서 즐겨찾기 목록 가져오기
+                const { accessToken } = getAuthTokens();
+                if (accessToken) {
+                    try {
+                        const bookmarksResponse = await api.get('/trends/tech-bookmarks/');
+                        const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
+                        const favoriteIds = bookmarks.map((b: any) => {
+                            const techStack = b.tech_stack || b;
+                            return techStack.tech_stack_id || techStack.id;
+                        });
+                        setStackFavorites(favoriteIds);
+                    } catch (error) {
+                        console.error('즐겨찾기 목록 불러오기 실패:', error);
+                    }
                 }
 
-                const response = await api.get('/trends/ranking/');
-                
-                const rankingData = Array.isArray(response.data) 
-                    ? response.data 
-                    : response.data.results || [];
+                // ✅ article_stack_count가 많은 순서대로 Top 5 가져오기
+                // 모든 페이지를 가져오기 위해 fetchAllTechStacks 사용
+                const allStacksData = await fetchAllTechStacks();
 
-                if (rankingData && rankingData.length > 0) {
-                    const formattedTop5 = formatRankingData(rankingData.slice(0, 5));
+                if (allStacksData && allStacksData.length > 0) {
+                    // article_stack_count로 정렬하고 상위 5개만 선택
+                    // 숫자로 변환하여 정확한 정렬 보장
+                    const sortedStacks = [...allStacksData].sort((a: any, b: any) => {
+                        const countA = Number(a.article_stack_count) || 0;
+                        const countB = Number(b.article_stack_count) || 0;
+                        return countB - countA; // 내림차순 정렬
+                    });
+                    
+                    const top5Stacks = sortedStacks.slice(0, 5);
+                    
+                    const formattedTop5 = top5Stacks.map((stack: any, index: number) => ({
+                        id: stack.id,
+                        name: stack.name,
+                        count: Number(stack.article_stack_count) || 0, // article_stack_count를 count로 사용
+                        growth: 0,
+                        color: index % 2 === 0 ? "from-blue-500 to-indigo-500" : "from-green-500 to-emerald-500",
+                        logo: stack.logo || getExternalLogoUrl(stack.name),
+                        themeColor: "#3B82F6",
+                        description: stack.description || "상세 설명이 없습니다.",
+                        officialSite: stack.docs_url || "#",
+                        created_at: stack.created_at
+                    }));
                     setTopStacks(formattedTop5);
                     setActiveStack(formattedTop5[0]); 
                 } else {
@@ -266,7 +296,7 @@ export default function Dashboard() {
         target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&size=128&bold=true`;
     };
 
-    const toggleStackFavorite = (id: number) => {
+    const toggleStackFavorite = async (id: number) => {
         const { accessToken } = getAuthTokens();
         
         if (!accessToken) {
@@ -274,12 +304,45 @@ export default function Dashboard() {
             return;
         }
 
-        const nextFavorites = stackFavorites.includes(id)
-            ? stackFavorites.filter(favId => favId !== id)
-            : [...stackFavorites, id];
-        
-        setStackFavorites(nextFavorites);
-        localStorage.setItem("stack_favorites", JSON.stringify(nextFavorites));
+        try {
+            const isFavorite = stackFavorites.includes(id);
+            
+            if (isFavorite) {
+                // 즐겨찾기 제거
+                try {
+                    // 즐겨찾기 ID 찾기
+                    const bookmarksResponse = await api.get('/trends/tech-bookmarks/');
+                    const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
+                    const bookmarkToDelete = bookmarks.find((b: any) => {
+                        const techStack = b.tech_stack || b;
+                        return (techStack.tech_stack_id || techStack.id) === id;
+                    });
+                    
+                    if (bookmarkToDelete) {
+                        await api.delete(`/trends/tech-bookmarks/${bookmarkToDelete.tech_bookmark_id || bookmarkToDelete.id}/`);
+                        const nextFavorites = stackFavorites.filter(favId => favId !== id);
+                        setStackFavorites(nextFavorites);
+                        // 즐겨찾기 변경 이벤트 발생
+                        window.dispatchEvent(new CustomEvent('favoriteChanged', { detail: { type: 'tech', action: 'removed', id } }));
+                    }
+                } catch (error) {
+                    console.error('즐겨찾기 제거 실패:', error);
+                }
+            } else {
+                // 즐겨찾기 추가
+                try {
+                    await api.post('/trends/tech-bookmarks/', { tech_id: id });
+                    const nextFavorites = [...stackFavorites, id];
+                    setStackFavorites(nextFavorites);
+                    // 즐겨찾기 변경 이벤트 발생
+                    window.dispatchEvent(new CustomEvent('favoriteChanged', { detail: { type: 'tech', action: 'added', id } }));
+                } catch (error) {
+                    console.error('즐겨찾기 추가 실패:', error);
+                }
+            }
+        } catch (error) {
+            console.error('즐겨찾기 토글 실패:', error);
+        }
     };
 
     const handleTopStackClick = (stack: DashboardStackData) => {
