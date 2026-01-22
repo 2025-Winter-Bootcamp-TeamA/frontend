@@ -1,23 +1,96 @@
+// ========== Google OAuth 로그인 (주석 처리) ==========
+// /**
+//  * Google OAuth 로그인 시작
+//  */
+// export async function startGoogleLogin() {
+//   try {
+//     const API_URL = process.env.NEXT_PUBLIC_API_URL;
+//     const response = await fetch(
+//       `${API_URL}/api/v1/users/auth/google/start/`
+//     );
+    
+//     if (!response.ok) {
+//       throw new Error("OAuth URL을 가져올 수 없습니다.");
+//     }
+    
+//     const data = await response.json();
+    
+//     // Google 로그인 페이지로 리다이렉트
+//     window.location.href = data.redirectUrl;
+//   } catch (error) {
+//     console.error("Google 로그인 시작 실패:", error);
+//     throw error;
+//   }
+// }
+
 /**
- * Google OAuth 로그인 시작
+ * 일반 JWT 로그인
  */
-export async function startGoogleLogin() {
+export async function login(email: string, password: string) {
   try {
     const API_URL = process.env.NEXT_PUBLIC_API_URL;
     const response = await fetch(
-      `${API_URL}/api/v1/users/auth/google/start/`
+      `${API_URL}/api/v1/users/login/`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      }
     );
     
     if (!response.ok) {
-      throw new Error("OAuth URL을 가져올 수 없습니다.");
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || '로그인에 실패했습니다.');
     }
     
     const data = await response.json();
     
-    // Google 로그인 페이지로 리다이렉트
-    window.location.href = data.redirectUrl;
+    // JWT 토큰 저장
+    setAuthTokens(data.access, data.refresh);
+    
+    // 프로필 이미지 저장
+    if (data.user?.profile_image) {
+      setUserProfileImage(data.user.profile_image);
+    }
+    
+    // 인증 성공 이벤트 발생
+    window.dispatchEvent(new Event('authSuccess'));
+    
+    return data;
   } catch (error) {
-    console.error("Google 로그인 시작 실패:", error);
+    console.error("로그인 실패:", error);
+    throw error;
+  }
+}
+
+/**
+ * 일반 JWT 회원가입
+ */
+export async function signup(email: string, username: string, name: string, password: string, passwordConfirm: string) {
+  try {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL;
+    const response = await fetch(
+      `${API_URL}/api/v1/users/signup/`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, username, name, password, password_confirm: passwordConfirm }),
+      }
+    );
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || '회원가입에 실패했습니다.');
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("회원가입 실패:", error);
     throw error;
   }
 }
