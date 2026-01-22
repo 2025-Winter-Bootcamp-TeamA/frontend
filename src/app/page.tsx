@@ -53,10 +53,17 @@ export default function Home({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5 }}
-            className="min-h-screen bg-[#1A1B1E] overflow-y-auto lg:overflow-hidden pt-16 lg:fixed lg:inset-0 lg:pt-20"
+            // ✅ [수정 1] pt-[70px]: Navbar 높이(70px)만큼 정확히 내려서 시작
+            className="min-h-screen bg-[#1A1B1E] overflow-y-auto lg:overflow-hidden pt-[70px] lg:fixed lg:inset-0"
           >
-            <div className="w-full h-auto origin-top scale-100 lg:w-[125%] lg:h-[125%] lg:origin-top-left lg:scale-[0.8]">
-              <div className="max-w-[2400px] mx-auto h-full px-4 pb-10 lg:px-12 lg:pt-6 lg:pb-20">
+            {/* ✅ [수정 2] origin-top-left: 축소 시 왼쪽 위를 기준으로 잡아서 오른쪽 쏠림 방지
+                ✅ 125% 크기 * 0.8 배율 = 100% (화면 꽉 채움) 
+            */}
+            <div className="w-full h-auto origin-top-left scale-100 lg:w-[125%] lg:h-[125%] lg:scale-[0.8]">
+              {/* ✅ [수정 3] lg:p-10: 상하좌우 패딩을 40px로 통일
+                 -> 0.8배 축소되므로 실제 눈에 보이는 간격은 32px로 네 방향 모두 동일해짐
+              */}
+              <div className="max-w-[2400px] mx-auto h-full px-4 pb-10 lg:p-10">
                  <Dashboard />
               </div>
             </div>

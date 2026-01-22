@@ -9,7 +9,7 @@ import { TechStackData } from "@/types/trend";
 import { api } from "@/lib/api"; 
 import JobCard from "./JobCard"; 
 
-// ... (인터페이스 및 헬퍼 함수 동일) ...
+// 인터페이스 정의
 export interface StackData {
   id: number;
   name: string;
@@ -39,6 +39,7 @@ interface JobData {
     logo_url?: string;
 }
 
+// 디바운스 훅
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
@@ -49,7 +50,6 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 export default function StackComparison({ initialBaseStack, allStacks, onBack }: StackComparisonProps) {
-  // ... (상태 및 useEffect 로직 기존과 동일) ...
   const [leftStack, setLeftStack] = useState<StackData | null>(initialBaseStack);
   const [rightStack, setRightStack] = useState<StackData | null>(null);
 
@@ -64,9 +64,11 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
   const [isLeftSearching, setIsLeftSearching] = useState(false);
   const [isRightSearching, setIsRightSearching] = useState(false);
 
+  // ✅ 교집합 공고 데이터 상태
   const [commonJobs, setCommonJobs] = useState<JobData[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  // 왼쪽 검색 API 연동
   useEffect(() => {
     const searchStacks = async () => {
       if (!debouncedLeftSearch.trim()) {
@@ -97,6 +99,7 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
     searchStacks();
   }, [debouncedLeftSearch]);
 
+  // 오른쪽 검색 API 연동
   useEffect(() => {
     const searchStacks = async () => {
       if (!debouncedRightSearch.trim()) {
@@ -127,6 +130,7 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
     searchStacks();
   }, [debouncedRightSearch]);
 
+  // ✅ 두 스택이 모두 선택되었을 때 공통 공고 분석 실행
   useEffect(() => {
     if (leftStack && rightStack) {
         findCommonJobs();
@@ -135,29 +139,34 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
     }
   }, [leftStack, rightStack]);
 
+  // ✅ 공통 공고 찾기 함수 (API 연동)
   const findCommonJobs = async () => {
     if (!leftStack || !rightStack) return;
     setIsAnalyzing(true);
     setCommonJobs([]);
 
     try {
+        // 두 기술 스택의 채용 공고를 병렬로 가져옴
         const [jobsLeftRes, jobsRightRes] = await Promise.all([
-            api.get(`/by-tech/${leftStack.id}/`).catch(() => ({ data: [] })),
-            api.get(`/by-tech/${rightStack.id}/`).catch(() => ({ data: [] }))
+            api.get(`/jobs/by-tech/${leftStack.id}/`).catch(() => ({ data: [] })),
+            api.get(`/jobs/by-tech/${rightStack.id}/`).catch(() => ({ data: [] }))
         ]);
 
+        // 데이터 파싱 (배열 형태 확인)
         const jobsLeft = Array.isArray(jobsLeftRes.data) ? jobsLeftRes.data : jobsLeftRes.data.results || [];
         const jobsRight = Array.isArray(jobsRightRes.data) ? jobsRightRes.data : jobsRightRes.data.results || [];
 
+        // 교집합 찾기 (공고 ID 기준)
         const rightIds = new Set(jobsRight.map((j: any) => j.id));
         const intersection = jobsLeft.filter((j: any) => rightIds.has(j.id));
 
+        // JobData 형식으로 매핑
         const mappedCommonJobs = intersection.map((item: any) => ({
             id: item.id,
             company_name: item.corp?.name || "기업명 없음",
             title: item.title,
             url: item.url,
-            deadline: item.expiry_date || null,
+            deadline: item.expiry_date || "채용시 마감",
             logo_url: item.corp?.logo_url
         }));
 
@@ -204,8 +213,8 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
     <div className="w-full h-full min-h-[500px] relative flex flex-col bg-[#25262B]/50 rounded-[32px]">
       
       {/* Header */}
-      <div className="flex items-center justify-between mb-2 p-1">
-        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+      <div className="flex items-center justify-between p-1 mt-3 ml-3">
+        <h3 className="text-xl font-bold text-white flex items-center gap-2">
           <ArrowRightLeft className="w-5 h-5 text-blue-400" />
           기술 스택 비교 분석
         </h3>
@@ -216,7 +225,6 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
 
       {/* Stack Selectors & VS */}
       <div className="flex items-start justify-center gap-4 md:gap-16 mb-8 relative pt-6">
-        
         <StackSlot 
             side="left"
             stack={leftStack}
@@ -258,19 +266,18 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Descriptions */}
                     <div className="bg-[#1A1B1E] p-5 rounded-2xl border border-gray-800 shadow-sm flex flex-col justify-between">
-                        <h4 className="text-gray-500 text-[10px] font-bold mb-4 uppercase tracking-wider flex items-center gap-2">
-                            <Info className="w-3 h-3" /> Core Description
+                        <h4 className="text-gray-500 text-[18px] font-bold mb-4 uppercase tracking-wider flex items-center gap-2">
+                            <Info className="w-6 h-6" /> 기술 설명
                         </h4>
                         <div className="space-y-4">
                             <div>
-                                <span className="text-blue-400 font-bold text-xs mb-1 block">{leftStack.name}</span>
-                                {/* ✅ [수정 3] line-clamp-3 -> line-clamp-6 으로 확장 */}
+                                <span className="text-blue-400 font-bold text-xm mb-1 block">{leftStack.name}</span>
                                 <p className="text-sm text-gray-300 leading-relaxed line-clamp-6">
                                     {leftStack.description || "설명 데이터가 없습니다."}
                                 </p>
                             </div>
                             <div className="border-t border-gray-800 pt-3">
-                                <span className="text-purple-400 font-bold text-xs mb-1 block">{rightStack.name}</span>
+                                <span className="text-purple-400 font-bold text-xm mb-1 block">{rightStack.name}</span>
                                 <p className="text-sm text-gray-300 leading-relaxed line-clamp-6">
                                     {rightStack.description || "설명 데이터가 없습니다."}
                                 </p>
@@ -279,11 +286,11 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
                     </div>
 
                     {/* Mention Count Bar */}
-                    <div className="bg-[#1A1B1E] p-5 rounded-2xl border border-gray-800 shadow-sm flex flex-col justify-center">
-                         <h4 className="text-gray-500 text-[10px] font-bold mb-4 uppercase tracking-wider flex items-center gap-2">
-                            <Building2 className="w-3 h-3" /> Mention Volume
+                    <div className="bg-[#1A1B1E] p-5 rounded-2xl border border-gray-800 shadow-sm flex flex-col justify-start">
+                         <h4 className="text-gray-500 text-[18px] font-bold mb-8 uppercase tracking-wider flex items-center gap-2">
+                            <Building2 className="w-6 h-6" /> 언급량 차이 비교
                          </h4>
-                         <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+                         <div className="flex items-center justify-between text-xm text-gray-400 mb-2">
                             <span className="text-blue-400 font-bold">{leftStack.name}</span>
                             <span className="text-purple-400 font-bold">{rightStack.name}</span>
                          </div>
@@ -292,7 +299,7 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
                                 style={{ width: `${(leftStack.count / (leftStack.count + rightStack.count || 1)) * 100}%` }} 
                                 className="h-full bg-blue-600 relative group min-w-[10%] transition-all duration-1000 ease-out flex items-center pl-3"
                             >
-                                <span className="text-[10px] font-bold text-white/90 whitespace-nowrap">
+                                <span className="text-[14px] font-bold text-white/90 whitespace-nowrap">
                                     {leftStack.count.toLocaleString()}
                                 </span>
                             </div>
@@ -300,22 +307,19 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
                                 style={{ width: `${(rightStack.count / (leftStack.count + rightStack.count || 1)) * 100}%` }} 
                                 className="h-full bg-purple-600 relative group min-w-[10%] transition-all duration-1000 ease-out flex items-center justify-end pr-3"
                             >
-                                <span className="text-[10px] font-bold text-white/90 whitespace-nowrap">
+                                <span className="text-[14px] font-bold text-white/90 whitespace-nowrap">
                                     {rightStack.count.toLocaleString()}
                                 </span>
                             </div>
                          </div>
-                         <p className="text-[10px] text-gray-500 mt-3 text-center">
-                            전체 채용 공고 내 언급량 비교
-                         </p>
                     </div>
                 </div>
 
-                {/* 2. Co-occurring Jobs */}
+                {/* ✅ 2. Co-occurring Jobs (API 연동됨) */}
                 <div className="bg-[#1A1B1E] p-5 rounded-2xl border border-gray-800 shadow-sm">
-                    <h4 className="text-gray-500 text-[10px] font-bold mb-4 uppercase tracking-wider flex items-center gap-2">
-                        <LinkIcon className="w-3 h-3" /> Co-occurring Jobs 
-                        <span className="bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded text-[10px] ml-1">
+                    <h4 className="text-gray-500 text-[18px] font-bold mb-4 uppercase tracking-wider flex items-center gap-2">
+                        <LinkIcon className="w-6 h-6" /> 교집합 관련 채용 공고
+                        <span className="bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded text-[14px] ml-1">
                             {commonJobs.length}
                         </span>
                     </h4>
@@ -353,7 +357,7 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
   );
 }
 
-// 스택 슬롯 컴포넌트는 기존과 동일하므로 생략
+// 하단 StackSlot 컴포넌트는 기존 디자인을 완벽히 유지합니다.
 function StackSlot({ side, stack, searchTerm, onSearchChange, onRemove, onSelect, suggestions, isSearching }: any) {
     const [isFocused, setIsFocused] = useState(false);
 

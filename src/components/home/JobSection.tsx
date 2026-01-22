@@ -140,12 +140,12 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
         <section className="w-full h-full flex flex-col bg-[#25262B] rounded-2xl border border-white/5 overflow-hidden relative shadow-lg">
             <div className="p-5 border-b border-white/5 flex flex-col gap-4 bg-[#2C2E33]/50 flex-shrink-0">
                 <div className="flex justify-between items-center">
-                    <h3 className="font-bold text-white flex items-center gap-2 truncate">
+                    <h1 className="font-bold text-white flex items-center gap-2 truncate text-2xl">
                         {techStackId === 0 ? "🔥 전체 기술 채용 공고" : `💼 ${techStackName} 관련 공고`}
-                    </h3>
+                    </h1>
                     <span 
                         onClick={handleMoreClick}
-                        className="text-xs text-gray-500 cursor-pointer hover:text-blue-400 transition-colors whitespace-nowrap"
+                        className="text-xm text-gray-500 cursor-pointer hover:text-blue-400 transition-colors whitespace-nowrap"
                     >
                         더보기
                     </span>
@@ -158,7 +158,7 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="기업명, 공고 제목으로 검색..."
-                        className="w-full h-10 bg-[#1A1B1E] border border-white/10 rounded-xl pl-9 pr-4 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500/50 transition-colors shadow-inner"
+                        className="w-full h-14 bg-[#1A1B1E] border border-white/10 rounded-xl pl-9 pr-4 text-xm text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500/50 transition-colors shadow-inner"
                     />
                 </div>
             </div>

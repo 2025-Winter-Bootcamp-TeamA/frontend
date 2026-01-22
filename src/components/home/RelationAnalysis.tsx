@@ -70,8 +70,7 @@ export default function StackRelationAnalysis({
         {/* 왼쪽 위: 기술 설명 */}
         <div className="absolute top-6 left-6 z-40 max-w-xs pointer-events-none">
             <div className="flex items-center gap-2 mb-2">
-                <Quote className="w-4 h-4 text-blue-400 rotate-180" />
-                <span className="text-blue-400 text-x font-bold uppercase tracking-wider">{mainStackName} 연관 기술 스택 맵</span>
+                <span className="text-blue-400 text-x font-bold uppercase tracking-wider"> 연관 기술 스택 맵</span>
             </div>
         </div>
 
@@ -165,7 +164,7 @@ export default function StackRelationAnalysis({
                                     onError={(e) => handleImageError(e, stack.name)}
                                 />
                             </div>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all whitespace-nowrap ${isSelected ? 'bg-white text-blue-900 border-white scale-110' : 'text-gray-400 bg-gray-900/80 border-gray-700 group-hover:text-white'}`}>
+                            <span className={`text-[14px] font-bold px-2 py-0.5 rounded-full border transition-all whitespace-nowrap ${isSelected ? 'bg-white text-blue-900 border-white scale-110' : 'text-gray-400 bg-gray-900/80 border-gray-700 group-hover:text-white'}`}>
                                 {stack.name}
                             </span>
                         </div>
