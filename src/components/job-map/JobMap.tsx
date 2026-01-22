@@ -166,7 +166,7 @@ export default function JobMap() {
 
   const handleSelectCompany = (company: Company) => {
     setSelectedCompany(company);
-    setCenter({ lat: company.latitude, lng: company.longitude });
+    setCenter({ lat: Number(company.latitude), lng: Number(company.longitude) });
     setLevel(3);
     fetchCompanyJobs(company.id); 
   };
@@ -279,14 +279,29 @@ export default function JobMap() {
 
       {/* 🔵 지도 영역 */}
       <div className="flex-1 relative bg-gray-900">
-        <KakaoMap center={center} style={{ width: "100%", height: "100%" }} level={level} isPanto={true} onZoomChanged={(map) => setLevel(map.getLevel())}>
+        <KakaoMap 
+            center={center} 
+            style={{ width: "100%", height: "100%" }} 
+            level={level} 
+            onZoomChanged={(map) => setLevel(map.getLevel())}
+            onIdle={(map) => setCenter({
+                lat: map.getCenter().getLat(),
+                lng: map.getCenter().getLng()
+            })}
+        >
           {filteredCompanies.map((company) => (
             <CustomOverlayMap 
                 key={company.id} 
                 position={{ lat: company.latitude, lng: company.longitude }} 
-                yAnchor={1}
+                yAnchor={0.5}
             >
-                <div onClick={() => handleSelectCompany(company)} className="relative cursor-pointer group">
+                <div 
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectCompany(company);
+                    }} 
+                    className="relative cursor-pointer group"
+                >
                     <div className="flex flex-col items-center">
                         {/* 기업명 및 즐겨찾기 툴팁 */}
                         <div className={`px-2 py-1 bg-gray-900 text-white text-[10px] font-bold rounded mb-1.5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-white/20 flex items-center gap-1 ${selectedCompany?.id === company.id ? "opacity-100 bg-blue-600" : ""}`}>
