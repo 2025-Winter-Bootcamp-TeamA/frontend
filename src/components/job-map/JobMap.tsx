@@ -51,12 +51,12 @@ export default function JobMap() {
         const savedFavs = localStorage.getItem("company_favorites");
         if (savedFavs) setFavoriteCompanyIds(JSON.parse(savedFavs));
 
-        const response = await api.get('/corps/'); 
+        const response = await api.get('/jobs/corps/'); 
         const rawCorps = Array.isArray(response.data) ? response.data : response.data.results || [];
         
         // 모든 기업의 상세 좌표를 병렬로 호출
         const detailPromises = rawCorps.map((c: any) => 
-          api.get(`/corps/${c.id}/`).catch(() => null)
+          api.get(`/jobs/corps/${c.id}/`).catch(() => null)
         );
         
         const details = await Promise.all(detailPromises);
@@ -89,7 +89,7 @@ export default function JobMap() {
   const fetchCompanyJobs = async (corpId: number) => {
     setIsJobsLoading(true);
     try {
-      const response = await api.get(`/corps/${corpId}/job-postings/`);
+      const response = await api.get(`/jobs/corps/${corpId}/job-postings/`);
       const rawJobs = Array.isArray(response.data) ? response.data : response.data.results || [];
       setCompanyJobs(rawJobs.map((j: any) => ({
         id: j.id,

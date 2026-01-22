@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { FileUp, Sparkles } from 'lucide-react';
+import { useAuthStore } from '@/store/authStore'; // ✅ authStore 임포트
 
 export function EmptyState() {
   return (
@@ -18,6 +19,10 @@ export function EmptyState() {
 }
 
 export function AnalyzingState() {
+  // ✅ 로그인한 사용자 정보 가져오기
+  const { user } = useAuthStore();
+  const displayName = user?.name || '사용자';
+
   return (
     <motion.div 
       key="analyzing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -26,7 +31,8 @@ export function AnalyzingState() {
       <motion.div animate={{ rotate: 360 }} transition={{ duration: 3, repeat: Infinity, ease: "linear" }} className="mb-8">
         <Sparkles size={80} className="text-blue-500 opacity-50" />
       </motion.div>
-      <h2 className="text-2xl font-bold mb-4 tracking-tighter">AI가 도영님의 역량을 정밀 분석 중입니다...</h2>
+      {/* {displayName}으로 변경 */}
+      <h2 className="text-2xl font-bold mb-4 tracking-tighter">AI가 {displayName}님의 역량을 정밀 분석 중입니다...</h2>
       <div className="w-64 h-2 bg-white/5 rounded-full overflow-hidden">
         <motion.div initial={{ width: 0 }} animate={{ width: "100%" }} transition={{ duration: 3 }} className="h-full bg-blue-600" />
       </div>

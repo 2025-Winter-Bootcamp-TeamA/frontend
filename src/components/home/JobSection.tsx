@@ -65,7 +65,7 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
 
                         // 각 기술별 공고 병렬 호출 (에러 나도 무시하고 빈 배열 반환)
                         const promises = topStacks.map((stack: any) => 
-                            api.get(`/by-tech/${stack.tech_stack.id}/`)
+                            api.get(`/jobs/by-tech/${stack.tech_stack.id}/`)
                                .then(res => Array.isArray(res.data) ? res.data : res.data.results || [])
                                .catch(() => [])
                         );
@@ -89,7 +89,7 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
                 } else {
                     // 특정 기술 공고 호출
                     try {
-                        const response = await api.get(`/by-tech/${techStackId}/`);
+                        const response = await api.get(`/jobs/by-tech/${techStackId}/`);
                         allJobs = Array.isArray(response.data) ? response.data : response.data.results || [];
                     } catch (error) {
                         console.error(`기술 ID ${techStackId} 공고 로딩 실패:`, error);
