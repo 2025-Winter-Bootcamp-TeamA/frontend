@@ -55,42 +55,42 @@ export default function JobCard({
 
     return (
         <motion.div 
-            whileHover={{ y: -5 }}
-            className="relative w-full min-w-[280px] rounded-2xl p-6 cursor-pointer border transition-all duration-200 bg-[#25262B] border-white/5 hover:bg-[#2C2D33] hover:border-white/20"
+            whileHover={{ y: -3 }}
+            className="relative w-full min-w-[240px] rounded-xl p-4 cursor-pointer border transition-all duration-200 bg-[#25262B] border-white/5 hover:bg-[#2C2D33] hover:border-white/20"
         >
 
             {/* 카드 전체 링크 */}
             <a href={url} target="_blank" rel="noopener noreferrer" className="block">
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex items-center gap-3 mb-3">
                     {/* 로고 영역 */}
-                    <div className="w-16 h-16 bg-white rounded-xl overflow-hidden flex items-center justify-center p-2 flex-shrink-0">
+                    <div className="w-12 h-12 bg-white rounded-lg overflow-hidden flex items-center justify-center p-1.5 flex-shrink-0">
                         {logo ? (
                             <img src={logo} alt={company} className="object-contain w-full h-full" />
                         ) : (
-                            <Building className="text-gray-400" />
+                            <Building className="text-gray-400 w-6 h-6" />
                         )}
                     </div>
                     
                     {/* 텍스트 정보 */}
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                            <h4 className="text-white font-bold truncate text-xl">{company}</h4>
+                            <h4 className="text-white font-bold truncate text-sm">{company}</h4>
                             {/* 배지 표시 (마감일 없으면 안 뜸) */}
                             {renderBadge()}
                         </div>
-                        <p className="text-gray-400 text-xm truncate">{position}</p>
+                        <p className="text-gray-400 text-xs truncate">{position}</p>
                     </div>
                 </div>
 
                 {/* 하단 정보 */}
-                <div className="flex items-center gap-3 text-xs text-gray-500 pt-2 border-t border-white/5">
-                    <div className="flex items-center gap-1 text-sm">
-                        <Calendar size={16} />
+                <div className="flex items-center gap-3 text-[10px] text-gray-500 pt-2 border-t border-white/5">
+                    <div className="flex items-center gap-1">
+                        <Calendar size={12} />
                         {/* 마감일이 있으면 날짜, 없으면 상시채용 */}
                         <span>{deadline || "상시채용"}</span>
                     </div>
-                    <div className="flex items-center gap-1 text-sm">
-                        <Briefcase size={16} />
+                    <div className="flex items-center gap-1">
+                        <Briefcase size={12} />
                         <span>채용중</span>
                     </div>
                 </div>
