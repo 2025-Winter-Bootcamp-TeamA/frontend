@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { UploadCloud, Monitor, User } from 'lucide-react';
+import { useAuthStore } from '@/store/authStore'; // ✅ authStore 임포트
 
 interface UploadSectionProps {
     onUploadClick: () => void;
@@ -9,6 +10,10 @@ interface UploadSectionProps {
 }
 
 export default function UploadSection({ onUploadClick, onMyPageClick }: UploadSectionProps) {
+    // ✅ 로그인한 사용자 정보 가져오기
+    const { user } = useAuthStore();
+    const displayName = user?.name || '사용자';
+
     return (
         <motion.div 
             key="empty"
@@ -16,14 +21,16 @@ export default function UploadSection({ onUploadClick, onMyPageClick }: UploadSe
             animate={{ opacity: 1, scale: 1 }} 
             exit={{ opacity: 0, scale: 0.98 }}
             className="h-[600px] flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-[40px] bg-white/[0.01] hover:bg-white/[0.02] transition-all cursor-pointer group p-10"
-            onClick={onUploadClick} // 영역 전체 클릭 시 파일 선택
+            onClick={onUploadClick} 
         >
             <div className="w-32 h-32 rounded-full bg-blue-600/5 flex items-center justify-center mb-8 border border-blue-600/10 group-hover:scale-110 transition-transform duration-500">
                 <UploadCloud size={56} className="text-blue-500 opacity-60" />
             </div>
             <h2 className="text-4xl font-black mb-4 tracking-tighter text-white">분석할 이력서를 업로드하세요</h2>
+            
+            {/*{displayName}으로 변경 */}
             <p className="text-[#9FA0A8] max-w-md leading-relaxed mb-10 text-lg text-center">
-                도영님의 이력서를 바탕으로 <span className="text-blue-400 font-bold">최적의 기술 스택</span>과<br />
+                <span className="text-blue-400 font-bold">{displayName}</span>님의 이력서를 바탕으로 <span className="text-blue-400 font-bold">최적의 기술 스택</span>과<br />
                 <span className="text-blue-400 font-bold">가장 적합한 기업</span>을 분석해 드립니다.
             </p>
             
