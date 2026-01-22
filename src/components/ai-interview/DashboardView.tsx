@@ -158,6 +158,7 @@ export default function DashboardView({
         positive_feedback?: string;
         negative_feedback?: string;
         enhancements_feedback?: string;
+        question?: string; // 면접 질문 (줄바꿈으로 구분된 문자열)
     } | null>(null);
     const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
     const [companiesWithJobs, setCompaniesWithJobs] = useState<CompanyWithJobPosting[]>([]);
@@ -386,6 +387,7 @@ export default function DashboardView({
                             positive_feedback: existingMatching.positive_feedback,
                             negative_feedback: existingMatching.negative_feedback,
                             enhancements_feedback: existingMatching.enhancements_feedback,
+                            question: existingMatching.question,
                         });
                         setIsLoadingAnalysis(false);
                         return;
@@ -400,6 +402,7 @@ export default function DashboardView({
                     positive_feedback: response.data.positive_feedback,
                     negative_feedback: response.data.negative_feedback,
                     enhancements_feedback: response.data.enhancements_feedback,
+                    question: response.data.question,
                 });
             } catch (error) {
                 console.error('분석 데이터 가져오기 실패:', error);
@@ -512,10 +515,10 @@ export default function DashboardView({
     return (
         <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} 
-            className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full items-start"
+            className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full items-start"
         >
             {/* ================= LEFT COLUMN (3/12) ================= */}
-            <div className="lg:col-span-3 flex flex-col gap-6 h-[800px]">
+            <div className="lg:col-span-3 flex flex-col gap-6 min-h-[800px]">
                 
                 {/* 1. 기업 목록 */}
                 <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
@@ -747,13 +750,13 @@ export default function DashboardView({
             </div>
 
             {/* ================= CENTER COLUMN (6/12) ================= */}
-            <div className="lg:col-span-6 flex flex-col gap-6 h-[800px]">
+            <div className="lg:col-span-6 flex flex-col gap-6 min-h-[800px]">
                 
                 {/* 3. 이력서 뷰어 */}
-                <section className="flex-[2] bg-[#212226] border border-white/5 rounded-[24px] p-8 flex flex-col relative overflow-hidden group">
+                <section className="flex-[2] bg-[#212226] border border-white/5 rounded-[24px] p-8 flex flex-col relative overflow-hidden group min-h-[400px] max-h-[500px]">
                     <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${selectedCompany ? 'from-blue-500 via-green-500 to-orange-500' : 'from-blue-500 to-orange-500'} opacity-50`} />
                     
-                    <div className="flex justify-between items-center mb-6">
+                    <div className="flex justify-between items-center mb-6 flex-shrink-0">
                         <h3 className="text-lg font-bold text-white flex items-center gap-2">
                             <FileText size={18} className="text-blue-400" /> 
                             {resumeTitle}
@@ -772,7 +775,7 @@ export default function DashboardView({
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#1A1B1E] rounded-xl p-6 border border-white/5 shadow-inner">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#1A1B1E] rounded-xl p-6 border border-white/5 shadow-inner min-h-0">
                         {resumeText ? (
                             renderHighlightedText(resumeText)
                         ) : (
@@ -784,35 +787,60 @@ export default function DashboardView({
                 </section>
 
                 {/* 4. AI 면접 질문 */}
-                <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-6 flex flex-col">
-                    <h3 className="text-sm font-bold text-purple-400 mb-4 flex items-center gap-2 uppercase tracking-wider">
+                <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-6 flex flex-col overflow-hidden min-h-[300px] max-h-[400px]">
+                    <h3 className="text-sm font-bold text-purple-400 mb-4 flex items-center gap-2 uppercase tracking-wider flex-shrink-0">
                         <HelpCircle size={16} /> AI Interview Questions
                     </h3>
-                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
-                        <div className="bg-purple-500/5 border border-purple-500/10 p-4 rounded-xl flex gap-3 hover:bg-purple-500/10 transition-colors">
-                            <span className="flex items-center justify-center w-5 h-5 rounded bg-purple-500/20 text-purple-400 text-xs font-bold shrink-0">Q1</span>
-                            <p className="text-gray-200 text-sm font-medium">
-                                {selectedCompany 
-                                    ? `${selectedCompany.name}의 채용 공고에 언급된 핵심 역량과 관련하여, 본인의 ${resumeKeywords[0] || '프로젝트'} 경험을 어떻게 기여할 수 있을지 설명해주세요.` 
-                                    : "이력서에 언급된 '초기 로딩 속도 50% 개선' 과정에서 가장 큰 기술적 병목은 무엇이었나요?"}
-                            </p>
-                        </div>
-                         <div className="bg-purple-500/5 border border-purple-500/10 p-4 rounded-xl flex gap-3 hover:bg-purple-500/10 transition-colors">
-                            <span className="flex items-center justify-center w-5 h-5 rounded bg-purple-500/20 text-purple-400 text-xs font-bold shrink-0">Q2</span>
-                            <p className="text-gray-200 text-sm font-medium">
-                                Redux Toolkit을 도입하면서 느꼈던 장점과, 만약 다른 상태 관리 라이브러리(Zustand 등)를 쓴다면 어떤 점이 달랐을지 비교해 보세요.
-                            </p>
-                        </div>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 min-h-0">
+                        {(() => {
+                            // ✅ DB에서 가져온 질문 파싱
+                            if (analysisData?.question) {
+                                // question 필드는 "- 질문1\n- 질문2\n..." 형식으로 저장됨
+                                const questions = analysisData.question
+                                    .split('\n')
+                                    .map(q => q.trim())
+                                    .filter(q => q.length > 0 && q.startsWith('-'))
+                                    .map(q => q.substring(1).trim()); // "- " 제거
+                                
+                                if (questions.length > 0) {
+                                    return questions.map((question, index) => (
+                                        <div 
+                                            key={index}
+                                            className="bg-purple-500/5 border border-purple-500/10 p-4 rounded-xl flex gap-3 hover:bg-purple-500/10 transition-colors"
+                                        >
+                                            <span className="flex items-center justify-center w-5 h-5 rounded bg-purple-500/20 text-purple-400 text-xs font-bold shrink-0">
+                                                Q{index + 1}
+                                            </span>
+                                            <p className="text-gray-200 text-sm font-medium">
+                                                {question}
+                                            </p>
+                                        </div>
+                                    ));
+                                }
+                            }
+                            
+                            // 질문이 없을 때 기본 메시지
+                            return (
+                                <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2">
+                                    <Info size={24} />
+                                    <span className="text-xs">
+                                        {selectedJobPostingId 
+                                            ? '채용공고를 선택하면 AI 면접 질문이 생성됩니다.' 
+                                            : '채용공고를 선택하면 AI 면접 질문이 표시됩니다.'}
+                                    </span>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </section>
             </div>
 
             {/* ================= RIGHT COLUMN (3/12) ================= */}
-            <div className="lg:col-span-3 flex flex-col gap-6 h-[800px]">
+            <div className="lg:col-span-3 flex flex-col gap-6 min-h-[800px]">
                 
                 {/* 5. 상세 피드백 리스트 */}
-                <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
-                    <div className="flex justify-between items-center mb-4">
+                <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden max-h-[700px]">
+                    <div className="flex justify-between items-center mb-4 flex-shrink-0">
                         <h3 className="text-sm font-bold text-gray-400 flex items-center gap-2 uppercase tracking-wider">
                             <CheckCircle2 size={14} /> Analysis Details
                         </h3>
@@ -823,7 +851,7 @@ export default function DashboardView({
                         )}
                     </div>
                     
-                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1 min-h-0">
                         {currentFeedbacks.length === 0 && (
                             <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2">
                                 <Info size={24} />
