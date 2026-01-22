@@ -207,11 +207,11 @@ function AIInterviewContent() {
     const triggerFileUpload = () => fileInputRef.current?.click();
 
     return (
-        <div className="h-screen bg-[#1A1B1E] overflow-hidden flex flex-col items-center justify-start pt-6 text-white">
+        <div className="min-h-screen bg-[#1A1B1E] overflow-y-auto flex flex-col items-center justify-start pt-6 text-white">
             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".pdf,.doc,.docx" />
             
             {/* ✅ max-w-[1800px] */}
-            <div className="max-w-[1800px] w-full h-full flex flex-col p-6 lg:p-10 scale-[0.95] origin-top">
+            <div className="max-w-[1800px] w-full min-h-full flex flex-col p-6 lg:p-10 scale-[0.95] origin-top">
                 <header className="flex justify-between items-center mb-4">
                     <div className="space-y-1">
                         <h1 className="text-3xl font-black tracking-tighter uppercase">AI 역량 분석 리포트</h1>
