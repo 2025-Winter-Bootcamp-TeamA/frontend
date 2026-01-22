@@ -161,11 +161,11 @@ function AIInterviewContent() {
     const handleStartAnalysis = () => {
         setShowDropdown(false);
         setStep('analyzing');
-        setTimeout(() => setStep('result'), 3000);
     };
     
     const handleSelectResume = async (resume: Resume) => {
         // 이력서 상세 정보 가져오기 (텍스트 포함)
+        handleStartAnalysis();
         try {
             const response = await api.get(`/resumes/${resume.id}/`);
             const resumeData = response.data;
@@ -173,34 +173,82 @@ function AIInterviewContent() {
              const detailedResume: Resume = {
                  ...resume,
                  extractedText: resumeData.extracted_text || null, // DB에서 합쳐진 텍스트
+                 techStacks: resumeData.tech_stacks?.map((ts: any) => ({
+                    techStack: {
+                        id: ts.tech_stack?.id || ts.id,
+                        name: ts.tech_stack?.name || ts.name,
+                        logo: ts.tech_stack?.logo || ts.tech_stack?.image || ts.image || null,
+                        docsUrl: ts.tech_stack?.docs_url || ts.tech_stack?.link || ts.link || null,
+                        createdAt: '',
+                    }
+                })) || resume.techStacks,
              };
             
             setSelectedResume(detailedResume);
             setIsResumePickerOpen(false);
             setViewMode('dashboard'); 
-            handleStartAnalysis();
+            
+            // 인위적인 지연 (UX를 위해)
+            setTimeout(() => setStep('result'), 1500);
         } catch (error) {
             console.error('이력서 상세 정보 불러오기 실패:', error);
-            // 실패해도 기본 정보로 진행
             setSelectedResume(resume);
             setIsResumePickerOpen(false);
             setViewMode('dashboard'); 
-            handleStartAnalysis();
+            setStep('result');
         }
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files?.[0]) {
-             setSelectedResume({ 
-                id: 9999, // 임시 숫자 ID
-                title: e.target.files[0].name, 
-                createdAt: '2026.01.20',
-                updatedAt: '2026.01.20',
-                url: null,
-                techStacks: [] // 파일 업로드 시엔 비어있음 (분석 전)
-            });
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        handleStartAnalysis();
+        
+        try {
+            // 1. 이력서 업로드
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('title', file.name.replace(/\.[^/.]+$/, "")); // 확장자 제외 제목
+            
+            const uploadResponse = await api.post('/resumes/', formData);
+            const newResume = uploadResponse.data;
+            const resumeId = newResume.resume_id || newResume.id;
+
+            // 2. 이력서 분석 및 경험 추출 시작 (경험 데이터 분석 엔드포인트 호출)
+            await api.post(`/resumes/${resumeId}/matches/`);
+
+            // 3. 분석된 상세 데이터 가져오기
+            const detailResponse = await api.get(`/resumes/${resumeId}/`);
+            const resumeData = detailResponse.data;
+
+            const formattedResume: Resume = {
+                id: resumeData.resume_id || resumeData.id,
+                title: resumeData.resume_title || resumeData.title,
+                url: resumeData.resume_url || resumeData.url,
+                extractedText: resumeData.extracted_text || null,
+                techStacks: resumeData.tech_stacks?.map((ts: any) => ({
+                    techStack: {
+                        id: ts.tech_stack?.id || ts.id,
+                        name: ts.tech_stack?.name || ts.name,
+                        logo: ts.tech_stack?.logo || ts.tech_stack?.image || ts.image || null,
+                        docsUrl: ts.tech_stack?.docs_url || ts.tech_stack?.link || ts.link || null,
+                        createdAt: '',
+                    }
+                })) || [],
+                createdAt: resumeData.created_at,
+                updatedAt: resumeData.updated_at,
+            };
+
+            setSelectedResume(formattedResume);
             setViewMode('dashboard');
-            handleStartAnalysis();
+            setStep('result');
+            
+        } catch (error: any) {
+            console.error('이력서 처리 중 오류 발생:', error);
+            const errorMessage = error.response?.data?.error || '이력서 분석 중 오류가 발생했습니다. 다시 시도해주세요.';
+            alert(errorMessage);
+            setStep('empty');
         }
     };
     
