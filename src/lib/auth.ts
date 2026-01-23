@@ -28,6 +28,13 @@
  */
 export async function login(email: string, password: string) {
   try {
+    // vercel.json의 rewrites를 사용하여 프록시 경로로 요청
+    // /api/:path* -> https://api.devroad.cloud/api/:path*
+    // 백엔드 경로: /api/v1/users/auth/google/start/
+    // 따라서 /api/v1/users/auth/google/start/로 요청하면
+    // https://api.devroad.cloud/api/v1/users/auth/google/start/로 프록시됨
+    
+    // 개발 환경과 프로덕션 환경 모두 /api를 통해 프록시 사용
     const API_URL = process.env.NEXT_PUBLIC_API_URL;
     const response = await fetch(
       `${API_URL}/api/v1/users/login/`,
@@ -46,6 +53,12 @@ export async function login(email: string, password: string) {
     }
     
     const data = await response.json();
+    console.log('Google 로그인 응답:', data);
+    
+    if (!data.redirectUrl) {
+      console.error("응답 데이터:", data);
+      throw new Error("리다이렉트 URL을 받지 못했습니다.");
+    }
     
     // JWT 토큰 저장
     setAuthTokens(data.access, data.refresh);
@@ -202,9 +215,14 @@ export async function refreshAccessToken(): Promise<string | null> {
   if (!refreshToken) return null;
   
   try {
+    // vercel.json의 rewrites를 사용하여 프록시 경로로 요청
     const API_URL = process.env.NEXT_PUBLIC_API_URL;
+    const apiPath = API_URL 
+      ? `${API_URL}/api/v1/users/token/refresh/`
+      : '/api/v1/users/token/refresh/';
+    
     const response = await fetch(
-      `${API_URL}/api/v1/users/token/refresh/`,
+      apiPath,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

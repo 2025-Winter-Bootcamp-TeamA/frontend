@@ -3,6 +3,9 @@
 import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+// 동적 렌더링 강제 (정적 생성 방지)
+export const dynamic = 'force-dynamic';
+
 // 1. 알맹이 컴포넌트 (로직 및 화면)
 // useSearchParams는 여기서 사용합니다.
 function CallbackContent() {
