@@ -74,17 +74,31 @@ export default function JobMap() {
             const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
             const favoriteIds = bookmarks.map((b: any) => b.corp?.id || b.corp_id);
             setFavoriteCompanyIds(favoriteIds);
-          } catch (error) {
+          } catch (error: any) {
             console.error('즐겨찾기 목록 불러오기 실패:', error);
+            console.error('에러 상세:', {
+              status: error.response?.status,
+              url: error.config?.url,
+              baseURL: error.config?.baseURL,
+            });
           }
         }
 
+        const baseURL = process.env.NEXT_PUBLIC_API_URL;
+        const fullUrl = `${baseURL}/api/v1/jobs/corps/`;
+        console.log('기업 목록 요청 URL:', fullUrl);
+        
         const response = await api.get('/jobs/corps/'); 
         const rawCorps = Array.isArray(response.data) ? response.data : response.data.results || [];
         
+        console.log('기업 목록 응답:', rawCorps.length, '개');
+        
         // 모든 기업의 상세 좌표를 병렬로 호출
         const detailPromises = rawCorps.map((c: any) => 
-          api.get(`/jobs/corps/${c.id}/`).catch(() => null)
+          api.get(`/jobs/corps/${c.id}/`).catch((err: any) => {
+            console.error(`기업 ${c.id} 상세 정보 로드 실패:`, err.response?.status, err.config?.url);
+            return null;
+          })
         );
         
         const details = await Promise.all(detailPromises);
@@ -100,13 +114,22 @@ export default function JobMap() {
           })
           .filter((c: any) => !isNaN(c.latitude) && !isNaN(c.longitude) && c.latitude !== 0);
 
+        console.log('좌표 정보가 있는 기업:', enriched.length, '개');
         setAllCompanies(enriched);
         setCompanies(enriched);
         if (enriched.length > 0) {
           setCenter({ lat: enriched[0].latitude, lng: enriched[0].longitude });
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error("데이터 로드 에러:", e);
+        console.error("에러 상세:", {
+          message: e.message,
+          status: e.response?.status,
+          statusText: e.response?.statusText,
+          url: e.config?.url,
+          baseURL: e.config?.baseURL,
+          fullURL: e.config?.baseURL ? `${e.config.baseURL}${e.config.url}` : e.config?.url,
+        });
       } finally {
         setIsDataLoading(false);
       }

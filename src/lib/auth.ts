@@ -67,6 +67,13 @@ export async function login(email: string, password: string) {
 export async function signup(email: string, username: string, name: string, password: string, passwordConfirm: string) {
   try {
     const { api } = await import('./api');
+    
+    // 디버깅: 실제 요청 URL 확인
+    const baseURL = process.env.NEXT_PUBLIC_API_URL;
+    const fullUrl = `${baseURL}/api/v1/users/signup/`;
+    console.log('회원가입 요청 URL:', fullUrl);
+    console.log('요청 데이터:', { email, username, name, password: '***', password_confirm: '***' });
+    
     const response = await api.post('/users/signup', {
       email,
       username,
@@ -78,7 +85,21 @@ export async function signup(email: string, username: string, name: string, pass
     return response.data;
   } catch (error: any) {
     console.error("회원가입 실패:", error);
-    const errorMessage = error.response?.data?.error || error.message || '회원가입에 실패했습니다.';
+    console.error("에러 상세:", {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      url: error.config?.url,
+      baseURL: error.config?.baseURL,
+      fullURL: error.config?.baseURL ? `${error.config.baseURL}${error.config.url}` : error.config?.url,
+    });
+    
+    const errorMessage = error.response?.data?.error || 
+                        error.response?.data?.detail || 
+                        error.response?.data?.message ||
+                        error.message || 
+                        '회원가입에 실패했습니다.';
     throw new Error(errorMessage);
   }
 }
