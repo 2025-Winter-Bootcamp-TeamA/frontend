@@ -1,32 +1,42 @@
 import axios from 'axios';
 import { getAuthTokens, refreshAccessToken, clearAuthTokens } from './auth';
 
-// vercel.json의 rewrites를 사용하여 프록시 경로로 요청
-// /api/:path* -> https://api.devroad.cloud/api/:path*
-// 따라서 /api/v1/...로 요청하면 https://api.devroad.cloud/api/v1/...로 프록시됨
-const BASE_URL = '/api/v1'; 
+// ✅ [수정됨] 환경변수(localhost:8000) 뒤에 API 버전(/api/v1)을 붙임
+const BASE_URL = `${process.env.NEXT_PUBLIC_API_URL}/api/v1`;
 
 export const api = axios.create({
   baseURL: BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  // [추가] 쿠키 등을 주고받을 때 필요할 수 있습니다 (백엔드 설정에 따라 다름)
   withCredentials: true, 
 });
 
-// --- 아래 인터셉터 코드는 기존과 동일합니다 ---
+// --- 인터셉터 설정 (그대로 유지) ---
 
-// 요청 인터셉터: JWT 토큰을 헤더에 추가
 api.interceptors.request.use(
   async (config) => {
     const { accessToken } = getAuthTokens();
-    
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
     
-    // FormData인 경우 Content-Type을 제거하여 axios가 자동으로 boundary를 설정하도록 함
+    // Django 호환성: URL 끝에 슬래시(/) 자동 추가
+    // 쿼리 파라미터가 있는 경우는 이미 슬래시가 있을 수 있으므로 확인 필요
+    if (config.url && !config.url.includes('?')) {
+      // 쿼리 파라미터가 없고 슬래시로 끝나지 않으면 추가
+      if (!config.url.endsWith('/')) {
+        config.url += '/';
+      }
+    } else if (config.url && config.url.includes('?')) {
+      // 쿼리 파라미터가 있는 경우: /path/?param=value 형태로 유지
+      // /path?param=value 형태를 /path/?param=value로 변환
+      const [path, query] = config.url.split('?');
+      if (path && !path.endsWith('/')) {
+        config.url = `${path}/?${query}`;
+      }
+    }
+
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
@@ -36,42 +46,29 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// 응답 인터셉터: 401 에러 시 토큰 갱신 시도
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // 토큰 만료로 401 에러 발생 시
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {
-        // 토큰 갱신 시도
         const newAccessToken = await refreshAccessToken();
-        
         if (newAccessToken) {
-          // 새 토큰으로 원래 요청 재시도
-          originalRequest.headers = originalRequest.headers || {};
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
           return api(originalRequest);
-        } else {
-          // 토큰 갱신 실패 시 로그아웃
-          clearAuthTokens();
-          if (typeof window !== 'undefined') {
-            window.location.href = '/';
-          }
-          return Promise.reject(error);
         }
       } catch (refreshError) {
-        // 토큰 갱신 에러 발생 시 로그아웃
-        console.error("토큰 갱신 실패. 다시 로그인해주세요.", refreshError);
-        clearAuthTokens();
-        if (typeof window !== 'undefined') {
-          window.location.href = '/';
-        }
-        return Promise.reject(error);
+        console.error("토큰 갱신 실패:", refreshError);
       }
+      
+      clearAuthTokens();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/';
+      }
+      return Promise.reject(error);
     }
 
     return Promise.reject(error);

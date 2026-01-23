@@ -1,75 +1,196 @@
 'use client';
 
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from 'next/navigation';
+import { Search, AlertCircle } from 'lucide-react';
 import JobCard from './JobCard';
+import { api } from "@/lib/api";
+import { getAuthTokens } from "@/lib/auth"; 
 
-const MOCK_JOBS = [
-    { 
-        id: 1, 
-        company: '네이버', 
-        position: 'Backend Developer (Search)', 
-        logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Naver_Logotype.svg/800px-Naver_Logotype.svg.png', 
-        description: '수억 건의 데이터를 처리하는 검색 엔진의 백엔드 시스템을 설계하고 최적화합니다.' 
-    },
-    { 
-        id: 2, 
-        company: '카카오', 
-        position: 'Frontend Developer (Wallet)', 
-        logo: 'https://upload.wikimedia.org/wikipedia/commons/e/e3/Kakao_Corp._logo.svg', 
-        description: '사용자의 일상을 바꾸는 카카오톡 내 자산 관리 및 결제 서비스의 UI를 개발합니다.' 
-    },
-    { 
-        id: 3, 
-        company: '라인', 
-        position: 'iOS Developer', 
-        logo: 'https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg', 
-        description: '전 세계 2억 명 이상의 유저가 사용하는 글로벌 메신저 LINE의 모바일 앱을 고도화합니다.' 
-    },
-    { 
-        id: 4, 
-        company: '쿠팡', 
-        position: 'Data Engineer', 
-        logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/Coupang_logo.svg/800px-Coupang_logo.svg.png', 
-        description: '로켓배송을 가능케 하는 물류 최적화 알고리즘을 위한 대규모 데이터 파이프라인을 구축합니다.' 
-    },
-     { 
-        id: 5, 
-        company: '토스', 
-        position: 'Server Developer', 
-        logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Toss_Logo_Primary.png/800px-Toss_Logo_Primary.png', 
-        description: '금융의 모든 순간을 혁신하는 토스 서버를 개발합니다.' 
-    },
-];
 
-export default function JobSection() {
+interface JobPostingData {
+    id: number;
+    company_name: string;
+    title: string;
+    url: string;
+    deadline: string | null; 
+    logo_url?: string; 
+}
+
+interface JobSectionProps {
+    techStackId: number;   
+    techStackName: string; 
+}
+
+export default function JobSection({ techStackId, techStackName }: JobSectionProps) {
     const router = useRouter();
+    const [jobs, setJobs] = useState<JobPostingData[]>([]);
+    const [loading, setLoading] = useState(true);
+    
+    const [searchQuery, setSearchQuery] = useState("");
 
     const handleMoreClick = () => {
         router.push('/map');
     };
 
+    useEffect(() => {
+        const fetchJobs = async () => {
+            setLoading(true);
+            setJobs([]); 
+
+            try {
+                let allJobs: any[] = [];
+
+                if (techStackId === 0) {
+                    // ✅ 즐겨찾기된 기업의 채용공고 가져오기
+                    try {
+                        const { accessToken } = getAuthTokens();
+                        
+                        if (accessToken) {
+                            // 즐겨찾기된 기업 목록 가져오기
+                            const bookmarksResponse = await api.get('/jobs/corp-bookmarks/');
+                            const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
+                            
+                            if (bookmarks.length > 0) {
+                                // 각 기업의 채용공고를 병렬로 가져오기
+                                const promises = bookmarks.map((bookmark: any) => {
+                                    const corpId = bookmark.corp?.id || bookmark.corp_id;
+                                    if (!corpId) return Promise.resolve([]);
+                                    
+                                    return api.get(`/jobs/corps/${corpId}/job-postings/`)
+                                        .then(res => {
+                                            const jobs = Array.isArray(res.data) ? res.data : res.data.results || [];
+                                            return jobs;
+                                        })
+                                        .catch(() => []);
+                                });
+                                
+                                const results = await Promise.all(promises);
+                                
+                                // 결과 병합
+                                results.forEach(data => {
+                                    allJobs = [...allJobs, ...data];
+                                });
+                                
+                                // 중복 제거 (ID 기준)
+                                const uniqueJobsMap = new Map();
+                                allJobs.forEach(job => uniqueJobsMap.set(job.id, job));
+                                allJobs = Array.from(uniqueJobsMap.values());
+                            }
+                        }
+                    } catch (err) {
+                        console.error("즐겨찾기 기업 공고 수집 중 오류:", err);
+                    }
+
+                } else {
+                    // 특정 기술 공고 호출
+                    try {
+                        const response = await api.get(`/jobs/by-tech/${techStackId}/`);
+                        allJobs = Array.isArray(response.data) ? response.data : response.data.results || [];
+                    } catch (error) {
+                        console.error(`기술 ID ${techStackId} 공고 로딩 실패:`, error);
+                    }
+                }
+
+                // 데이터 매핑
+                const mappedData = allJobs.map((item: any) => ({
+                    id: item.id,
+                    company_name: item.corp?.name || "기업명 없음",
+                    title: item.title,
+                    url: item.url,
+                    deadline: item.expiry_date || null, 
+                    logo_url: item.corp?.logo_url 
+                }));
+
+                setJobs(mappedData);
+
+            } catch (error) {
+                console.error("최종 공고 처리 실패:", error);
+                setJobs([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (techStackId !== undefined && techStackId !== null) {
+            fetchJobs();
+        }
+    }, [techStackId]);
+
+    const processedJobs = useMemo(() => {
+        let filtered = jobs;
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            filtered = jobs.filter(job => 
+                job.company_name.toLowerCase().includes(query) || 
+                job.title.toLowerCase().includes(query)
+            );
+        }
+
+        // 즐겨찾기 정렬 제거, 마감일 기준으로만 정렬
+        return [...filtered].sort((a, b) => {
+            const dateA = a.deadline ? new Date(a.deadline).getTime() : Number.MAX_SAFE_INTEGER;
+            const dateB = b.deadline ? new Date(b.deadline).getTime() : Number.MAX_SAFE_INTEGER;
+            
+            return dateA - dateB;
+        });
+    }, [jobs, searchQuery]);
+
     return (
-        <section className="w-full h-full">
-            <div className="w-full h-full rounded-[24px] lg:rounded-[32px] bg-[#25262B] border border-gray-800 p-6 flex flex-col">
-                {/* 헤더 고정 */}
-                <div className="flex items-center justify-between mb-6 flex-shrink-0">
-                    <h3 className="text-white text-xl font-bold">🔥 추천 채용 공고</h3>
+        <section className="w-full h-full flex flex-col bg-[#25262B] rounded-2xl border border-white/5 overflow-hidden relative shadow-lg">
+            <div className="p-5 border-b border-white/5 flex flex-col gap-4 bg-[#2C2E33]/50 flex-shrink-0">
+                <div className="flex justify-between items-center">
+                    <h1 className="font-bold text-white flex items-center gap-2 truncate text-2xl">
+                        {techStackId === 0 ? "🔥 전체 기술 채용 공고" : `💼 ${techStackName} 관련 공고`}
+                    </h1>
                     <span 
                         onClick={handleMoreClick}
-                        className="text-sm text-gray-500 cursor-pointer hover:text-blue-400 transition-colors"
+                        className="text-xm text-gray-500 cursor-pointer hover:text-blue-400 transition-colors whitespace-nowrap"
                     >
-                        채용 지도로 이동
+                        더보기
                     </span>
                 </div>
 
-                {/* 리스트 내부 스크롤 */}
-                <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar pb-10">
-                    {MOCK_JOBS.map((job) => (
-                        <div key={job.id} className="w-full flex-shrink-0">
-                            <JobCard {...job} />
-                        </div>
-                    ))}
+                <div className="relative w-full group">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-400 transition-colors" size={16} />
+                    <input 
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="기업명, 공고 제목으로 검색..."
+                        className="w-full h-14 bg-[#1A1B1E] border border-white/10 rounded-xl pl-9 pr-4 text-xm text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500/50 transition-colors shadow-inner"
+                    />
                 </div>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-500 text-sm gap-2">
+                        <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        <p>로딩 중...</p>
+                    </div>
+                ) : processedJobs.length > 0 ? (
+                    processedJobs.map((job) => (
+                        <JobCard
+                            key={job.id}
+                            id={job.id}
+                            company={job.company_name}
+                            position={job.title}
+                            logo={job.logo_url}
+                            deadline={job.deadline}
+                            url={job.url}
+                        />
+                    ))
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-500 text-sm py-10 gap-3 opacity-60">
+                        <AlertCircle size={32} strokeWidth={1.5} />
+                        <p>
+                            {searchQuery 
+                                ? `'${searchQuery}' 검색 결과가 없습니다.` 
+                                : "등록된 채용 공고가 없습니다."}
+                        </p>
+                    </div>
+                )}
             </div>
         </section>
     );

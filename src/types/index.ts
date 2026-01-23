@@ -74,6 +74,7 @@ export interface Resume {
   title: string;
   url: string | null;
   techStacks?: { techStack: TechStack }[];
+  extractedText?: string | null; // DB에서 합쳐진 텍스트 (work_experiences + project_experiences 또는 PDF 원본)
   createdAt: string;
   updatedAt: string;
 }

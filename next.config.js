@@ -1,36 +1,31 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  
-  // 이미지 도메인 허용
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
-    ],
-    domains: ['lh3.googleusercontent.com', 'k.kakaocdn.net'],
-  },
-  
-  // 빌드 시 ESLint 검사 무시 (Vercel 배포 오류 방지)
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  
-  // 빌드 시 TypeScript 타입 오류 무시 (배포 안정성)
+  // eslint 설정은 Next.js 16+에서 제거됨 (package.json의 scripts에서 처리)
   typescript: {
     ignoreBuildErrors: true,
   },
-  
-  /*
-  // API 프록시 설정 (vercel.json의 rewrites로 대체)
-  // vercel.json에서 /api/:path* -> https://api.devroad.cloud/api/:path*로 설정됨
+  reactStrictMode: true,
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com', pathname: '**' },
+      { protocol: 'http', hostname: 'k.kakaocdn.net', pathname: '**' },
+      { protocol: 'https', hostname: 'k.kakaocdn.net', pathname: '**' },
+      { protocol: 'https', hostname: '**' },
+    ],
+  },
   async rewrites() {
+    // 환경 변수에서 API URL 가져오기 (프로덕션: api.devroad.cloud, 로컬: localhost:8000)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+    
     return [
       {
-        source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/:path*`,
+        source: "/api/proxy/:path*",
+        destination: `${apiUrl}/:path*`,
+      },
+      {
+        source: "/media/:path*",
+        // 미디어 파일(로고 이미지 등)을 백엔드로 프록시
+        destination: `${apiUrl}/media/:path*`,
       },
     ];
   },
