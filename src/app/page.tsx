@@ -1,6 +1,6 @@
 "use client"; 
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import WithdrawalThanksModal from "@/components/home/WithdrawalThanksModal";
 import Dashboard from "@/components/home/Dashboard";
@@ -11,9 +11,11 @@ import { getAuthTokens } from "@/lib/auth";
 export default function Home({
   searchParams,
 }: {
-  searchParams?: { withdrawal?: string };
+  searchParams?: Promise<{ withdrawal?: string }>;
 }) {
-  const showWithdrawalThanks = searchParams?.withdrawal === "ok";
+  // Next.js 16+: searchParams는 Promise이므로 use()로 unwrap
+  const params = searchParams ? use(searchParams) : undefined;
+  const showWithdrawalThanks = params?.withdrawal === "ok";
   
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);

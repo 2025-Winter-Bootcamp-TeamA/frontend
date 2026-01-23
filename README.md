@@ -51,21 +51,34 @@ npm --version
 
 ## 환경변수 설정
 
-### 1. .env.local 파일 생성
+프로젝트는 환경별로 다른 환경변수 파일을 사용합니다:
 
-```bash
-# frontend 폴더에 .env.local 파일 생성
-touch .env.local
-```
+### 환경변수 파일 구조
 
-### 2. 환경변수 입력
+| 파일 | 용도 | 자동 적용 |
+|------|------|----------|
+| `.env.local` | 로컬 개발 환경 | `npm run dev` |
+| `.env.production` | 프로덕션 배포 | `npm run build`, `npm start` |
+
+### 로컬 개발 환경 (.env.local)
 
 ```env
+NEXT_PUBLIC_KAKAO_MAP_KEY=your-kakao-map-api-key
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-> `.env.local` 파일은 Git에 커밋되지 않습니다.
+### 프로덕션 환경 (.env.production)
+
+```env
+NEXT_PUBLIC_KAKAO_MAP_KEY=your-kakao-map-api-key
+NEXT_PUBLIC_API_URL=https://devroad.cloud
+NEXT_PUBLIC_APP_URL=https://devroad.cloud
+```
+
+> **주의**: `.env.local`과 `.env.production` 파일은 민감한 정보를 포함하므로 Git에 커밋되지 않습니다.
+>
+> Next.js는 실행 환경에 따라 자동으로 적절한 환경변수 파일을 선택합니다.
 
 ---
 
