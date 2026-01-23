@@ -70,7 +70,7 @@ export default function Navbar() {
     const navItems = [
         { name: '대시보드', href: '/' },
         { name: '채용 지도', href: '/map' },
-        { name: 'AI 면접', href: '/ai-interview' },
+        { name: '면접 대비', href: '/ai-interview' },
     ];
 
     const handleLogout = () => {
