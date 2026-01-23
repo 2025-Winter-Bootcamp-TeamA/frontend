@@ -14,16 +14,18 @@ const nextConfig = {
     ],
   },
   async rewrites() {
+    // 환경 변수에서 API URL 가져오기 (프로덕션: api.devroad.cloud, 로컬: localhost:8000)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+    
     return [
       {
         source: "/api/proxy/:path*",
-        // ▼ 여기를 내 컴퓨터(Localhost) 주소로 변경!
-        destination: "http://127.0.0.1:8000/:path*",
+        destination: `${apiUrl}/:path*`,
       },
       {
         source: "/media/:path*",
         // 미디어 파일(로고 이미지 등)을 백엔드로 프록시
-        destination: "http://127.0.0.1:8000/media/:path*",
+        destination: `${apiUrl}/media/:path*`,
       },
     ];
   },
