@@ -210,7 +210,7 @@ function AIInterviewContent() {
             const resumeId = newResume.resume_id || newResume.id;
 
             // 2. 이력서 분석 및 경험 추출 시작 (경험 데이터 분석 엔드포인트 호출)
-            await api.post(`/resumes/${resumeId}/matches/`);
+            await api.post(`/resumes/${resumeId}/analyze/`);
 
             // 3. 분석된 상세 데이터 가져오기
             const detailResponse = await api.get(`/resumes/${resumeId}/`);
