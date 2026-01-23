@@ -14,19 +14,17 @@ const nextConfig = {
   },
   async rewrites() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-    
     return [
       {
         source: '/api/proxy/:path*',
-        destination: `${apiUrl}/:path*`,
+        destination: apiUrl + '/:path*',
       },
       {
         source: '/media/:path*',
-        destination: `${apiUrl}/media/:path*`,
+        destination: apiUrl + '/media/:path*',
       },
     ];
   },
-  */
 };
 
 module.exports = nextConfig;
