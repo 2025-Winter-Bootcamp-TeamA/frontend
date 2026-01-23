@@ -36,6 +36,11 @@ export interface CategoryDetail {
   community: TabData;
 }
 
+// CategoryInfoMap 타입 정의
+export type CategoryInfoMap = {
+  [key: string]: CategoryDetail;
+};
+
 // ✅ [수정] 백엔드 데이터 구조 반영 (description, created_at 추가)
 export interface TechStackData {
   id: number;
