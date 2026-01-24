@@ -1,4 +1,4 @@
-import api from '@/lib/api';
+import api, { apiPublic } from '@/lib/api';
 import { AxiosResponse } from 'axios';
 import { CategoryDetail, TechStackData } from '@/types/trend';
 
@@ -50,7 +50,8 @@ const fetchAllPages = async (initialUrl: string): Promise<TechStackData[]> => {
     try {
         while (nextUrl) {
             // nextUrl이 http로 시작하면 baseURL 무시됨 (정상 동작)
-            const response: AxiosResponse<PaginatedResponse<TechStackData>> = await api.get(nextUrl);
+            // apiPublic: AllowAny 엔드포인트, preflight 제거
+            const response: AxiosResponse<PaginatedResponse<TechStackData>> = await apiPublic.get(nextUrl);
             const data = response.data;
 
             if (data.results && Array.isArray(data.results)) {
@@ -144,7 +145,7 @@ export interface TechStackRelationsResponse {
  */
 export const getTechStackRelations = async (techStackId: number): Promise<TechStackRelationsResponse> => {
     try {
-        const response = await api.get<TechStackRelationsResponse>(`/trends/tech-stacks/${techStackId}/relations/`);
+        const response = await apiPublic.get<TechStackRelationsResponse>(`/trends/tech-stacks/${techStackId}/relations/`);
         
         // 백엔드에서 이미 DB의 파일 주소를 S3 URL로 변환해서 반환하므로 그대로 사용
         // 로고가 없을 때만 외부 CDN URL 생성

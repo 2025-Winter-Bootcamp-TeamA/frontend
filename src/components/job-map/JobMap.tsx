@@ -148,7 +148,7 @@ export default function JobMap() {
 
       setIsDataLoading(true);
       try {
-ㅎ        // 필터 파라미터 구성 (모든 필터가 AND 조건으로 적용됨)
+        // 필터 파라미터 구성 (모든 필터가 AND 조건으로 적용됨)
         const params: any = {};
         if (careerYear && careerYear.trim() !== "") {
           const careerValue = parseInt(careerYear);
