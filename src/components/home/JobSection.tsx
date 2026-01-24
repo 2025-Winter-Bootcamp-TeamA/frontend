@@ -42,44 +42,44 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
                 let allJobs: any[] = [];
 
                 if (techStackId === 0) {
-                    // ✅ 즐겨찾기된 기업의 채용공고 가져오기
+                    // ✅ 대시보드 첫화면: 즐겨찾기 기술 + 즐겨찾기 기업의 채용공고
                     try {
                         const { accessToken } = getAuthTokens();
                         
                         if (accessToken) {
-                            // 즐겨찾기된 기업 목록 가져오기
-                            const bookmarksResponse = await api.get('/jobs/corp-bookmarks/');
-                            const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
+                            // 1) 즐겨찾기 기술의 채용공고
+                            const techBookmarksRes = await api.get('/trends/tech-bookmarks/').catch(() => ({ data: [] }));
+                            const techBookmarks = Array.isArray(techBookmarksRes.data) 
+                                ? techBookmarksRes.data 
+                                : techBookmarksRes.data?.results || [];
+                            const techIds = techBookmarks.map((b: any) => b.tech_stack?.id ?? b.tech_stack_id).filter(Boolean);
                             
-                            if (bookmarks.length > 0) {
-                                // 각 기업의 채용공고를 병렬로 가져오기
-                                const promises = bookmarks.map((bookmark: any) => {
-                                    const corpId = bookmark.corp?.id || bookmark.corp_id;
-                                    if (!corpId) return Promise.resolve([]);
-                                    
-                                    return api.get(`/jobs/corps/${corpId}/job-postings/`)
-                                        .then(res => {
-                                            const jobs = Array.isArray(res.data) ? res.data : res.data.results || [];
-                                            return jobs;
-                                        })
-                                        .catch(() => []);
-                                });
-                                
-                                const results = await Promise.all(promises);
-                                
-                                // 결과 병합
-                                results.forEach(data => {
-                                    allJobs = [...allJobs, ...data];
-                                });
-                                
-                                // 중복 제거 (ID 기준)
-                                const uniqueJobsMap = new Map();
-                                allJobs.forEach(job => uniqueJobsMap.set(job.id, job));
-                                allJobs = Array.from(uniqueJobsMap.values());
-                            }
+                            const techPromises = techIds.map((tid: number) =>
+                                api.get(`/jobs/by-tech/${tid}/`).then(res => Array.isArray(res.data) ? res.data : res.data?.results || []).catch(() => [])
+                            );
+                            const techJobArrays = await Promise.all(techPromises);
+                            techJobArrays.forEach(arr => { allJobs = [...allJobs, ...arr]; });
+
+                            // 2) 즐겨찾기 기업의 채용공고
+                            const corpBookmarksRes = await api.get('/jobs/corp-bookmarks/').catch(() => ({ data: { results: [] } }));
+                            const corpBookmarks = corpBookmarksRes.data?.results || corpBookmarksRes.data || [];
+                            const corpPromises = (corpBookmarks as any[]).map((b: any) => {
+                                const corpId = b.corp?.id ?? b.corp_id;
+                                if (!corpId) return Promise.resolve([]);
+                                return api.get(`/jobs/corps/${corpId}/job-postings/`)
+                                    .then(res => Array.isArray(res.data) ? res.data : res.data?.results || [])
+                                    .catch(() => []);
+                            });
+                            const corpJobArrays = await Promise.all(corpPromises);
+                            corpJobArrays.forEach(arr => { allJobs = [...allJobs, ...arr]; });
+
+                            // 중복 제거 (ID 기준)
+                            const uniqueJobsMap = new Map();
+                            allJobs.forEach((j: any) => uniqueJobsMap.set(j.id, j));
+                            allJobs = Array.from(uniqueJobsMap.values());
                         }
                     } catch (err) {
-                        console.error("즐겨찾기 기업 공고 수집 중 오류:", err);
+                        console.error("즐겨찾기 공고 수집 중 오류:", err);
                     }
 
                 } else {
@@ -153,7 +153,7 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
             <div className="p-5 border-b border-white/5 flex flex-col gap-4 bg-[#2C2E33]/50 flex-shrink-0">
                 <div className="flex justify-between items-center">
                     <h1 className="font-bold text-white flex items-center gap-2 truncate text-2xl">
-                        {techStackId === 0 ? "🔥 전체 기술 채용 공고" : `💼 ${techStackName} 관련 공고`}
+                        {techStackId === 0 ? "🔥 즐겨찾기 채용 공고" : `💼 ${techStackName} 관련 공고`}
                     </h1>
                     <span 
                         onClick={handleMoreClick}
@@ -169,6 +169,10 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
+                        autoComplete="off"
+                        spellCheck={false}
+                        autoCorrect="off"
+                        autoCapitalize="off"
                         placeholder="기업명, 공고 제목으로 검색..."
                         className="w-full h-14 bg-[#1A1B1E] border border-white/10 rounded-xl pl-9 pr-4 text-xm text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500/50 transition-colors shadow-inner"
                     />

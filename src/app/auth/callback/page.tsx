@@ -2,34 +2,41 @@
 
 import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { setAuthTokens, setUserProfileImage } from "@/lib/auth";
 
 // 동적 렌더링 강제 (정적 생성 방지)
 export const dynamic = 'force-dynamic';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+
 // 1. 알맹이 컴포넌트 (로직 및 화면)
-// useSearchParams는 여기서 사용합니다.
 function CallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const access = searchParams.get("access");
-    const refresh = searchParams.get("refresh");
+    const code = searchParams.get("code");
 
-    if (access && refresh) {
-      // JWT 토큰 저장
-      localStorage.setItem("access_token", access);
-      localStorage.setItem("refresh_token", refresh);
-      
-      // ✅ 인증 성공 이벤트 발생 (Navbar가 인증 상태를 즉시 업데이트하도록)
-      window.dispatchEvent(new Event('authSuccess'));
-
-      // 메인 페이지로 이동
-      router.push("/");
-    } else {
-      // 토큰 실패 시 로그인 페이지로 이동
-      router.push("/login?error=auth_failed");
+    if (code) {
+      // 일회용 code → JWT 교환 (토큰이 URL에 노출되지 않음)
+      fetch(`${API_URL}/api/v1/users/auth/exchange-code/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+        credentials: 'omit',
+      })
+        .then((res) => res.ok ? res.json() : Promise.reject(new Error('exchange failed')))
+        .then((data) => {
+          setAuthTokens(data.access, data.refresh);
+          if (data.profile_image) setUserProfileImage(data.profile_image);
+          window.dispatchEvent(new Event('authSuccess'));
+          router.push("/");
+        })
+        .catch(() => router.push("/?error=auth_failed"));
+      return;
     }
+
+    router.push("/?error=auth_failed");
   }, [searchParams, router]);
 
   // 로딩 중 보여줄 화면
