@@ -1,6 +1,7 @@
 "use client"; 
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import WithdrawalThanksModal from "@/components/home/WithdrawalThanksModal";
 import Dashboard from "@/components/home/Dashboard";
@@ -8,12 +9,10 @@ import Onboarding from "@/components/home/OnBoarding";
 // ✅ 인증 토큰 확인 함수 임포트
 import { getAuthTokens } from "@/lib/auth";
 
-export default function Home({
-  searchParams,
-}: {
-  searchParams?: { withdrawal?: string };
-}) {
-  const showWithdrawalThanks = searchParams?.withdrawal === "ok";
+function HomeContent() {
+  // Next.js 16: useSearchParams()를 사용하여 클라이언트에서 searchParams 접근
+  const searchParams = useSearchParams();
+  const showWithdrawalThanks = searchParams?.get('withdrawal') === "ok";
   
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -73,5 +72,15 @@ export default function Home({
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#1A1B1E] flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400" />
+    </div>}>
+      <HomeContent />
+    </Suspense>
   );
 }

@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -16,11 +13,15 @@ const nextConfig = {
     ],
   },
   async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
     return [
       {
-        source: "/api/proxy/:path*",
-        // ▼ 여기를 내 컴퓨터(Localhost) 주소로 변경!
-        destination: "http://127.0.0.1:8000/:path*",
+        source: '/api/proxy/:path*',
+        destination: apiUrl + '/:path*',
+      },
+      {
+        source: '/media/:path*',
+        destination: apiUrl + '/media/:path*',
       },
     ];
   },

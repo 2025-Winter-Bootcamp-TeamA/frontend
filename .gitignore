@@ -26,6 +26,7 @@ yarn-error.log*
 # 환경변수
 .env*.local
 .env
+.env.production
 
 # Vercel
 .vercel

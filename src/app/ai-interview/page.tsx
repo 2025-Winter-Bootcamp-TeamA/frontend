@@ -6,6 +6,9 @@ import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Monitor, ArrowRightLeft } from 'lucide-react';
 
+// 동적 렌더링 강제 (정적 생성 방지)
+export const dynamic = 'force-dynamic';
+
 // 컴포넌트 임포트
 import { AnalyzingState } from '@/components/ai-interview/States';
 import UploadSection from '@/components/ai-interview/UploadSection';
@@ -210,7 +213,7 @@ function AIInterviewContent() {
             const resumeId = newResume.resume_id || newResume.id;
 
             // 2. 이력서 분석 및 경험 추출 시작 (경험 데이터 분석 엔드포인트 호출)
-            await api.post(`/resumes/${resumeId}/matches/`);
+            await api.post(`/resumes/${resumeId}/analyze/`);
 
             // 3. 분석된 상세 데이터 가져오기
             const detailResponse = await api.get(`/resumes/${resumeId}/`);
