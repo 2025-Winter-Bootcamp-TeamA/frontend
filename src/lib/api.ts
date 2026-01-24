@@ -9,8 +9,33 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, 
+  withCredentials: true,
 });
+
+/**
+ * 공개 API용 인스턴스 (AllowAny 엔드포인트 전용)
+ * - withCredentials: false, Authorization 미첨부 → CORS preflight(OPTIONS) 발생 안 함
+ * - /trends/tech-stacks/, /trends/tech-stacks/:id/relations/ 등에 사용
+ */
+export const apiPublic = axios.create({
+  baseURL: BASE_URL,
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: false,
+});
+
+// apiPublic: Django 슬래시 규칙만 적용 (Authorization 없음)
+apiPublic.interceptors.request.use(
+  (config) => {
+    if (config.url && !config.url.includes('?')) {
+      if (!config.url.endsWith('/')) config.url += '/';
+    } else if (config.url && config.url.includes('?')) {
+      const [path, query] = config.url.split('?');
+      if (path && !path.endsWith('/')) config.url = `${path}/?${query}`;
+    }
+    return config;
+  },
+  (e) => Promise.reject(e)
+);
 
 // --- 인터셉터 설정 (그대로 유지) ---
 

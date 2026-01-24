@@ -1,108 +1,97 @@
-// ========== Google OAuth 로그인 (주석 처리) ==========
+/**
+ * Google OAuth 로그인 시작
+ * 세션 쿠키를 위해 credentials: 'include' 필요 (state 검증용)
+ */
+export async function startGoogleLogin() {
+  try {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL;
+    const response = await fetch(
+      `${API_URL}/api/v1/users/auth/google/start/`,
+      { credentials: 'include' }
+    );
+
+    if (!response.ok) {
+      throw new Error("OAuth URL을 가져올 수 없습니다.");
+    }
+
+    const data = await response.json();
+    if (data.redirectUrl) {
+      window.location.href = data.redirectUrl;
+    } else {
+      throw new Error("리다이렉트 URL을 받지 못했습니다.");
+    }
+  } catch (error) {
+    console.error("Google 로그인 시작 실패:", error);
+    throw error;
+  }
+}
+
+// ========== 일반 JWT 로그인/회원가입 (주석 처리, 구글 소셜 로그인만 사용) ==========
 // /**
-//  * Google OAuth 로그인 시작
+//  * 일반 JWT 로그인
 //  */
-// export async function startGoogleLogin() {
+// export async function login(email: string, password: string) {
 //   try {
-//     const API_URL = process.env.NEXT_PUBLIC_API_URL;
-//     const response = await fetch(
-//       `${API_URL}/api/v1/users/auth/google/start/`
-//     );
-    
-//     if (!response.ok) {
-//       throw new Error("OAuth URL을 가져올 수 없습니다.");
+//     const { api } = await import('./api');
+//     const response = await api.post('/users/login', {
+//       email,
+//       password,
+//     });
+//     const data = response.data;
+//     if (!data.access || !data.refresh) {
+//       console.error("응답 데이터:", data);
+//       throw new Error("토큰을 받지 못했습니다.");
 //     }
-    
-//     const data = await response.json();
-    
-//     // Google 로그인 페이지로 리다이렉트
-//     window.location.href = data.redirectUrl;
-//   } catch (error) {
-//     console.error("Google 로그인 시작 실패:", error);
-//     throw error;
+//     setAuthTokens(data.access, data.refresh);
+//     if (data.user?.profile_image) {
+//       setUserProfileImage(data.user.profile_image);
+//     }
+//     window.dispatchEvent(new Event('authSuccess'));
+//     return data;
+//   } catch (error: any) {
+//     console.error("로그인 실패:", error);
+//     const errorMessage = error.response?.data?.error || error.message || '로그인에 실패했습니다.';
+//     throw new Error(errorMessage);
 //   }
 // }
-
-/**
- * 일반 JWT 로그인
- */
-export async function login(email: string, password: string) {
-  try {
-    const { api } = await import('./api');
-    const response = await api.post('/users/login', {
-      email,
-      password,
-    });
-    
-    const data = response.data;
-    
-    // JWT 토큰이 있는지 확인
-    if (!data.access || !data.refresh) {
-      console.error("응답 데이터:", data);
-      throw new Error("토큰을 받지 못했습니다.");
-    }
-    
-    // JWT 토큰 저장
-    setAuthTokens(data.access, data.refresh);
-    
-    // 프로필 이미지 저장
-    if (data.user?.profile_image) {
-      setUserProfileImage(data.user.profile_image);
-    }
-    
-    // 인증 성공 이벤트 발생
-    window.dispatchEvent(new Event('authSuccess'));
-    
-    return data;
-  } catch (error: any) {
-    console.error("로그인 실패:", error);
-    const errorMessage = error.response?.data?.error || error.message || '로그인에 실패했습니다.';
-    throw new Error(errorMessage);
-  }
-}
-
-/**
- * 일반 JWT 회원가입
- */
-export async function signup(email: string, username: string, name: string, password: string, passwordConfirm: string) {
-  try {
-    const { api } = await import('./api');
-    
-    // 디버깅: 실제 요청 URL 확인
-    const baseURL = process.env.NEXT_PUBLIC_API_URL;
-    const fullUrl = `${baseURL}/api/v1/users/signup/`;
-    console.log('회원가입 요청 URL:', fullUrl);
-    console.log('요청 데이터:', { email, username, name, password: '***', password_confirm: '***' });
-    
-    const response = await api.post('/users/signup', {
-      email,
-      username,
-      name,
-      password,
-      password_confirm: passwordConfirm,
-    });
-    
-    return response.data;
-  } catch (error: any) {
-    console.error("회원가입 실패:", error);
-    console.error("에러 상세:", {
-      message: error.message,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      url: error.config?.url,
-      baseURL: error.config?.baseURL,
-      fullURL: error.config?.baseURL ? `${error.config.baseURL}${error.config.url}` : error.config?.url,
-    });
-    
-    const errorMessage = error.response?.data?.error || 
-                        error.response?.data?.detail || 
-                        error.response?.data?.message ||
-                        error.message || 
-                        '회원가입에 실패했습니다.';
-    throw new Error(errorMessage);
-  }
-}
+//
+// /**
+//  * 일반 JWT 회원가입
+//  */
+// export async function signup(email: string, username: string, name: string, password: string, passwordConfirm: string) {
+//   try {
+//     const { api } = await import('./api');
+//     const baseURL = process.env.NEXT_PUBLIC_API_URL;
+//     const fullUrl = `${baseURL}/api/v1/users/signup/`;
+//     console.log('회원가입 요청 URL:', fullUrl);
+//     console.log('요청 데이터:', { email, username, name, password: '***', password_confirm: '***' });
+//     const response = await api.post('/users/signup', {
+//       email,
+//       username,
+//       name,
+//       password,
+//       password_confirm: passwordConfirm,
+//     });
+//     return response.data;
+//   } catch (error: any) {
+//     console.error("회원가입 실패:", error);
+//     console.error("에러 상세:", {
+//       message: error.message,
+//       status: error.response?.status,
+//       statusText: error.response?.statusText,
+//       data: error.response?.data,
+//       url: error.config?.url,
+//       baseURL: error.config?.baseURL,
+//       fullURL: error.config?.baseURL ? `${error.config.baseURL}${error.config.url}` : error.config?.url,
+//     });
+//     const errorMessage = error.response?.data?.error ||
+//       error.response?.data?.detail ||
+//       error.response?.data?.message ||
+//       error.message ||
+//       '회원가입에 실패했습니다.';
+//     throw new Error(errorMessage);
+//   }
+// }
 
 /**
  * JWT 토큰 저장
