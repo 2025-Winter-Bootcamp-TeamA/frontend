@@ -28,24 +28,13 @@
  */
 export async function login(email: string, password: string) {
   try {
-    const API_URL = process.env.NEXT_PUBLIC_API_URL;
-    const response = await fetch(
-      `${API_URL}/api/v1/users/login/`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      }
-    );
+    const { api } = await import('./api');
+    const response = await api.post('/users/login', {
+      email,
+      password,
+    });
     
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || '로그인에 실패했습니다.');
-    }
-    
-    const data = await response.json();
+    const data = response.data;
     
     // JWT 토큰이 있는지 확인
     if (!data.access || !data.refresh) {
@@ -65,9 +54,10 @@ export async function login(email: string, password: string) {
     window.dispatchEvent(new Event('authSuccess'));
     
     return data;
-  } catch (error) {
+  } catch (error: any) {
     console.error("로그인 실패:", error);
-    throw error;
+    const errorMessage = error.response?.data?.error || error.message || '로그인에 실패했습니다.';
+    throw new Error(errorMessage);
   }
 }
 
@@ -76,28 +66,41 @@ export async function login(email: string, password: string) {
  */
 export async function signup(email: string, username: string, name: string, password: string, passwordConfirm: string) {
   try {
-    const API_URL = process.env.NEXT_PUBLIC_API_URL;
-    const response = await fetch(
-      `${API_URL}/api/v1/users/signup/`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, username, name, password, password_confirm: passwordConfirm }),
-      }
-    );
+    const { api } = await import('./api');
     
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || '회원가입에 실패했습니다.');
-    }
+    // 디버깅: 실제 요청 URL 확인
+    const baseURL = process.env.NEXT_PUBLIC_API_URL;
+    const fullUrl = `${baseURL}/api/v1/users/signup/`;
+    console.log('회원가입 요청 URL:', fullUrl);
+    console.log('요청 데이터:', { email, username, name, password: '***', password_confirm: '***' });
     
-    const data = await response.json();
-    return data;
-  } catch (error) {
+    const response = await api.post('/users/signup', {
+      email,
+      username,
+      name,
+      password,
+      password_confirm: passwordConfirm,
+    });
+    
+    return response.data;
+  } catch (error: any) {
     console.error("회원가입 실패:", error);
-    throw error;
+    console.error("에러 상세:", {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      url: error.config?.url,
+      baseURL: error.config?.baseURL,
+      fullURL: error.config?.baseURL ? `${error.config.baseURL}${error.config.url}` : error.config?.url,
+    });
+    
+    const errorMessage = error.response?.data?.error || 
+                        error.response?.data?.detail || 
+                        error.response?.data?.message ||
+                        error.message || 
+                        '회원가입에 실패했습니다.';
+    throw new Error(errorMessage);
   }
 }
 
@@ -208,26 +211,12 @@ export async function refreshAccessToken(): Promise<string | null> {
   if (!refreshToken) return null;
   
   try {
-    // vercel.json의 rewrites를 사용하여 프록시 경로로 요청
-    const API_URL = process.env.NEXT_PUBLIC_API_URL;
-    const apiPath = API_URL 
-      ? `${API_URL}/api/v1/users/token/refresh/`
-      : '/api/v1/users/token/refresh/';
+    const { api } = await import('./api');
+    const response = await api.post('/users/auth/token/refresh', {
+      refresh: refreshToken,
+    });
     
-    const response = await fetch(
-      apiPath,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh: refreshToken }),
-      }
-    );
-    
-    if (!response.ok) {
-      throw new Error("토큰 갱신 실패");
-    }
-    
-    const data = await response.json();
+    const data = response.data;
     setAuthTokens(data.access, data.refresh);
     
     return data.access;

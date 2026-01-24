@@ -85,10 +85,22 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
                 } else {
                     // 특정 기술 공고 호출
                     try {
+                        const baseURL = process.env.NEXT_PUBLIC_API_URL;
+                        const fullUrl = `${baseURL}/api/v1/jobs/by-tech/${techStackId}/`;
+                        console.log(`기술 ID ${techStackId} 공고 요청 URL:`, fullUrl);
+                        
                         const response = await api.get(`/jobs/by-tech/${techStackId}/`);
                         allJobs = Array.isArray(response.data) ? response.data : response.data.results || [];
-                    } catch (error) {
+                        console.log(`기술 ID ${techStackId} 공고 로딩 성공:`, allJobs.length, '개');
+                    } catch (error: any) {
                         console.error(`기술 ID ${techStackId} 공고 로딩 실패:`, error);
+                        console.error('에러 상세:', {
+                            status: error.response?.status,
+                            statusText: error.response?.statusText,
+                            url: error.config?.url,
+                            baseURL: error.config?.baseURL,
+                            fullURL: error.config?.baseURL ? `${error.config.baseURL}${error.config.url}` : error.config?.url,
+                        });
                     }
                 }
 

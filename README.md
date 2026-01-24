@@ -14,74 +14,6 @@ Next.js 14 기반 프론트엔드 애플리케이션입니다.
 
 ---
 
-## 사전 요구사항
-
-### Node.js 20 설치
-
-**macOS:**
-```bash
-# Homebrew 사용
-brew install node@20
-
-# 또는 nvm 사용 (권장)
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-nvm install 20
-nvm use 20
-
-# 설치 확인
-node --version
-npm --version
-```
-
-**Windows:**
-1. [Node.js 공식 사이트](https://nodejs.org/)에서 20 LTS 버전 다운로드
-2. 또는 [nvm-windows](https://github.com/coreybutler/nvm-windows) 사용
-
-**Linux (Ubuntu):**
-```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# 설치 확인
-node --version
-npm --version
-```
-
----
-
-## 환경변수 설정
-
-프로젝트는 환경별로 다른 환경변수 파일을 사용합니다:
-
-### 환경변수 파일 구조
-
-| 파일 | 용도 | 자동 적용 |
-|------|------|----------|
-| `.env.local` | 로컬 개발 환경 | `npm run dev` |
-| `.env.production` | 프로덕션 배포 | `npm run build`, `npm start` |
-
-### 로컬 개발 환경 (.env.local)
-
-```env
-NEXT_PUBLIC_KAKAO_MAP_KEY=your-kakao-map-api-key
-NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-### 프로덕션 환경 (.env.production)
-
-```env
-NEXT_PUBLIC_KAKAO_MAP_KEY=your-kakao-map-api-key
-NEXT_PUBLIC_API_URL=https://devroad.cloud
-NEXT_PUBLIC_APP_URL=https://devroad.cloud
-```
-
-> **주의**: `.env.local`과 `.env.production` 파일은 민감한 정보를 포함하므로 Git에 커밋되지 않습니다.
->
-> Next.js는 실행 환경에 따라 자동으로 적절한 환경변수 파일을 선택합니다.
-
----
-
 ## 빠른 시작
 
 ### 1. 패키지 설치
@@ -95,14 +27,6 @@ npm install
 ```bash
 npm run dev
 ```
-
-브라우저에서 http://localhost:3000 접속
-
-### 3. Backend 서버 실행 (별도 터미널)
-
-| 변수명 | 설명 | 예시 |
-|--------|------|------|
-| `NEXT_PUBLIC_API_URL` | Backend API URL | `https://api.teamA.com` |
 
 ---
 
@@ -169,23 +93,3 @@ frontend/
 - **채용 공고**: 채용 정보 검색 및 필터링
 - **이력서 관리**: 이력서 업로드 및 분석
 - **면접 연습**: AI 기반 면접 질문 및 피드백
-
----
-
-## 배포
-
-### Vercel 배포 (권장)
-
-1. [Vercel](https://vercel.com)에 로그인
-2. "New Project" 클릭
-3. GitHub 저장소 연결
-4. `frontend` 폴더를 Root Directory로 설정
-5. 환경변수 설정:
-   - `NEXT_PUBLIC_API_URL`: Backend API URL
-6. Deploy 클릭
-
-### 환경변수 설정 (Vercel)
-
-| 변수명 | 설명 | 예시 |
-|--------|------|------|
-| `NEXT_PUBLIC_API_URL` | Backend API URL | `https://api.example.com` |
