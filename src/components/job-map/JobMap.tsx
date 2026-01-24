@@ -320,6 +320,23 @@ export default function JobMap() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, companies]);
 
+  // ✅ Navbar에서 'resetJobMap' 이벤트 시 채용 지도 첫 화면으로 복귀
+  const DEFAULT_CENTER = { lat: 37.496, lng: 127.029 };
+  const DEFAULT_LEVEL = 8;
+  useEffect(() => {
+    const handleReset = () => {
+      setSelectedCompany(null);
+      setCompanyJobs([]);
+      resetFilters();
+      setSearchQuery("");
+      setShowFilters(false);
+      setCenter(DEFAULT_CENTER);
+      setLevel(DEFAULT_LEVEL);
+    };
+    window.addEventListener("resetJobMap", handleReset);
+    return () => window.removeEventListener("resetJobMap", handleReset);
+  }, []);
+
   const filteredCompanies = useMemo(() => {
     return companies.filter(c => 
       c.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -568,15 +585,15 @@ export default function JobMap() {
 
                         {/* ✅ 줌 레벨에 따른 마커 디자인 변경 로직 */}
                         {level >= 6 ? (
-                            /* 줌아웃 시: 파란색 점 */
-                            <div className={`w-3 h-3 rounded-full border-2 border-white shadow-lg transition-all ${favoriteCompanyIds.includes(company.id) ? "bg-yellow-500 scale-125" : "bg-blue-600"}`} />
+                            /* 줌아웃 시: 파란색/노란색 점 (테두리 없음) */
+                            <div className={`w-3 h-3 rounded-full shadow-lg transition-all ${favoriteCompanyIds.includes(company.id) ? "bg-yellow-500 scale-125" : "bg-blue-600"}`} />
                         ) : (
-                            /* 줌인 시: 로고 마커 */
+                            /* 줌인 시: 로고 마커 (줌아웃 점과 동일한 파란색 테두리) */
                             <>
-                                <div className={`w-10 h-10 rounded-full border-4 shadow-xl flex items-center justify-center bg-white transition-all duration-300 ${selectedCompany?.id === company.id ? "border-blue-500 scale-125 ring-4 ring-blue-500/20" : "border-white"}`}>
+                                <div className={`w-10 h-10 rounded-full border-2 border-blue-600 shadow-xl flex items-center justify-center bg-white transition-all duration-300 ${selectedCompany?.id === company.id ? "!border-blue-500 scale-125 ring-4 ring-blue-500/20" : ""}`}>
                                     {company.logo_url ? <img src={company.logo_url} alt={company.name} className="w-full h-full object-contain rounded-full p-1.5" /> : <Building2 size={16} className="text-gray-400" />}
                                 </div>
-                                <div className={`w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] -mt-0.5 transition-colors ${selectedCompany?.id === company.id ? "border-t-blue-500" : "border-t-white"}`} />
+                                <div className={`w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] -mt-0.5 transition-colors ${selectedCompany?.id === company.id ? "border-t-blue-500" : "border-t-blue-600"}`} />
                             </>
                         )}
                     </div>

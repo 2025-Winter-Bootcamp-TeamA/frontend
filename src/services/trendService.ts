@@ -119,6 +119,40 @@ export const fetchAllTechStacks = async (): Promise<TechStackData[]> => {
 };
 
 /**
+ * 대시보드 첫 화면용: job_stack_count 기준 상위 5개만 1회 요청
+ */
+export const fetchTop5TechStacksByJobCount = async (): Promise<TechStackData[]> => {
+    try {
+        const response = await apiPublic.get<PaginatedResponse<TechStackData>>(
+            '/trends/tech-stacks/?ordering=-job_stack_count&page=1'
+        );
+        const results = response.data?.results ?? [];
+        const top5 = results.slice(0, 5).map(s => ({
+            ...s,
+            logo: s.logo || getExternalLogoUrl(s.name),
+        }));
+        return top5;
+    } catch (error) {
+        console.error("fetchTop5TechStacksByJobCount failed:", error);
+        return [];
+    }
+};
+
+/**
+ * 기술 스택 ID로 단일 조회 (연관 기술 탭에서 노드 선택 시 사용, fetchAllPages 회피)
+ */
+export const getTechStackById = async (id: number): Promise<TechStackData | null> => {
+    try {
+        const response = await apiPublic.get<TechStackData>(`/trends/tech-stacks/${id}/`);
+        const s = response.data;
+        return { ...s, logo: s.logo || getExternalLogoUrl(s.name) };
+    } catch (error) {
+        console.error("getTechStackById failed:", error);
+        return null;
+    }
+};
+
+/**
  * 관련 기술 스택 관계 타입
  */
 export interface RelatedTechStackRelation {

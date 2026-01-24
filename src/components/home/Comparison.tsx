@@ -210,7 +210,7 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
   };
 
   return (
-    <div className="w-full h-full min-h-[500px] relative flex flex-col bg-[#25262B]/50 rounded-[32px]">
+    <div className="w-full h-full min-h-[500px] relative flex flex-col overflow-visible bg-[#25262B]/50 rounded-[32px]">
       
       {/* Header */}
       <div className="flex items-center justify-between p-1 mt-3 ml-3">
@@ -223,8 +223,8 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
         </button>
       </div>
 
-      {/* Stack Selectors & VS */}
-      <div className="flex items-start justify-center gap-4 md:gap-16 mb-8 relative pt-6">
+      {/* Stack Selectors & VS - overflow-visible로 검색 드롭다운이 잘리지 않도록 */}
+      <div className="flex items-start justify-center gap-4 md:gap-16 mb-8 relative pt-6 overflow-visible">
         <StackSlot 
             side="left"
             stack={leftStack}
@@ -360,9 +360,10 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
 // 하단 StackSlot 컴포넌트는 기존 디자인을 완벽히 유지합니다.
 function StackSlot({ side, stack, searchTerm, onSearchChange, onRemove, onSelect, suggestions, isSearching }: any) {
     const [isFocused, setIsFocused] = useState(false);
+    const isDropdownOpen = !stack && isFocused; // 포커스 있을 때만 드롭다운(블러 시 닫힘)
 
     return (
-        <div className="flex flex-col items-center gap-2 w-[140px] md:w-[180px] relative z-20">
+        <div className={`flex flex-col items-center gap-2 w-[140px] md:w-[180px] relative overflow-visible ${isDropdownOpen ? 'z-[200]' : 'z-20'}`}>
             <AnimatePresence mode="wait">
             {stack ? (
                 <motion.div 
@@ -403,6 +404,10 @@ function StackSlot({ side, stack, searchTerm, onSearchChange, onRemove, onSelect
                             placeholder={side === 'left' ? "기준 기술 검색" : "비교 기술 검색"}
                             value={searchTerm}
                             onChange={(e) => onSearchChange(e.target.value)}
+                            autoComplete="off"
+                            spellCheck={false}
+                            autoCorrect="off"
+                            autoCapitalize="off"
                             onFocus={() => setIsFocused(true)} 
                             onBlur={() => setTimeout(() => setIsFocused(false), 200)} 
                             autoFocus
@@ -411,8 +416,8 @@ function StackSlot({ side, stack, searchTerm, onSearchChange, onRemove, onSelect
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 w-3.5 h-3.5" />
                     </div>
 
-                    {(isFocused || searchTerm) && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-[#25262B] border border-gray-600 rounded-lg shadow-2xl z-50 max-h-[200px] overflow-y-auto custom-scrollbar">
+                    {isFocused && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-[#25262B] border border-gray-600 rounded-lg shadow-2xl z-[210] max-h-[200px] overflow-y-auto custom-scrollbar">
                             {isSearching ? (
                                 <div className="p-3 text-center text-xs text-gray-500">검색 중...</div>
                             ) : suggestions.length > 0 ? (

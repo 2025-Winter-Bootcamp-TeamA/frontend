@@ -2,7 +2,7 @@
 
 // 1. Suspense와 useQuery 추가
 import { useState, useRef, useEffect, useMemo, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Monitor, ArrowRightLeft } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query'; // react-query 임포트
@@ -45,6 +45,7 @@ function ScrollbarStyles() {
 // 2. 알맹이 컴포넌트 (모든 로직은 여기로 이동)
 function AIInterviewContent() {
     const searchParams = useSearchParams();
+    const router = useRouter();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [step, setStep] = useState<'empty' | 'analyzing' | 'result'>('empty');
@@ -223,6 +224,21 @@ function AIInterviewContent() {
             fetchResumes();
         }
     }, [isResumePickerOpen]);
+
+    // ✅ Navbar에서 'resetAIInterview' 이벤트 시 면접 대비 첫 화면(업로드)으로 복귀
+    useEffect(() => {
+        const handleReset = () => {
+            setStep('empty');
+            setSelectedResume(null);
+            setShowDropdown(false);
+            setTaskId(null);
+            setAnalysisError(null);
+            setAnalyzingResumeId(null);
+            router.replace('/ai-interview');
+        };
+        window.addEventListener('resetAIInterview', handleReset);
+        return () => window.removeEventListener('resetAIInterview', handleReset);
+    }, [router]);
 
     // ✅ 분석 시작 함수 (이력서 ID를 인자로 받도록 수정)
     const handleStartAnalysis = async (resumeId: number) => {
