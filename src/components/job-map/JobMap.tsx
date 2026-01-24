@@ -125,7 +125,7 @@ export default function JobMap() {
 
       setIsDataLoading(true);
       try {
-ㅎ        // 필터 파라미터 구성 (모든 필터가 AND 조건으로 적용됨)
+       // 필터 파라미터 구성 (모든 필터가 AND 조건으로 적용됨)
         const params: any = {};
         if (careerYear && careerYear.trim() !== "") {
           const careerValue = parseInt(careerYear);
@@ -312,10 +312,11 @@ export default function JobMap() {
     }
   };
 
-  if (loading) return <div className="w-full h-screen bg-[#1A1B1E] flex items-center justify-center text-white">지도를 로드 중...</div>;
+  if (loading) return <div className="w-full h-full bg-[#1A1B1E] flex items-center justify-center text-white">지도를 로드 중...</div>;
 
   return (
-    <div className="flex flex-col lg:flex-row w-full h-[85vh] bg-[#1A1B1E] rounded-[32px] overflow-hidden border border-white/10 shadow-2xl">
+    // ✅ [수정] h-[85vh] -> h-full로 변경하여 부모(page.tsx)에서 계산된 높이를 가득 채움
+    <div className="flex flex-col lg:flex-row w-full h-full bg-[#1A1B1E] rounded-[32px] overflow-hidden border border-white/10 shadow-2xl">
       
       {/* SIDEBAR */}
       <div className="w-full lg:w-[400px] bg-[#25262B] border-r border-white/5 flex flex-col z-20">
