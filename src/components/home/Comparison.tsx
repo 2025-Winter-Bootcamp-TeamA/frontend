@@ -9,12 +9,11 @@ import { TechStackData } from "@/types/trend";
 import { api } from "@/lib/api"; 
 import JobCard from "./JobCard"; 
 
-// ✅ 인터페이스 수정: 언급량을 게시글/채용공고로 분리
 export interface StackData {
   id: number;
   name: string;
-  postCount: number; // 게시글(커뮤니티) 언급량
-  jobCount: number;  // 채용공고 언급량
+  postCount: number; 
+  jobCount: number; 
   growth: number;
   color: string;
   logo: string;
@@ -38,7 +37,6 @@ interface JobData {
     logo_url?: string;
 }
 
-// 디바운스 훅
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
@@ -67,35 +65,34 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
   const [commonJobs, setCommonJobs] = useState<JobData[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // ✅ 비교 모드 상태 (게시글 vs 채용공고)
   const [compareMode, setCompareMode] = useState<'posts' | 'jobs'>('jobs');
 
-  // ✅ 초기 진입 시 기준 스택 데이터 최신화
   useEffect(() => {
     if (initialBaseStack) {
         updateStackWithDetail(initialBaseStack, "left");
     }
   }, []);
 
-  // ✅ 사용자 즐겨찾기 목록 가져오기
   useEffect(() => {
     const fetchFavorites = async () => {
         try {
-            const response = await api.get('/trends/bookmarks/'); 
+            const response = await api.get('/trends/tech-bookmarks/'); 
             const bookmarks = response.data.results || response.data || [];
             
-            const formattedFavorites = bookmarks.map((item: any) => ({
-                id: item.tech_stack.id,
-                name: item.tech_stack.name,
-                // DB 컬럼 매핑 (없으면 0 처리)
-                postCount: item.tech_stack.count || 0, 
-                jobCount: item.tech_stack.job_posting_count || 0,
-                growth: 0,
-                color: "from-gray-500 to-gray-700",
-                logo: item.tech_stack.logo || getExternalLogoUrl(item.tech_stack.name),
-                themeColor: "#ffffff",
-                description: item.tech_stack.description,
-            }));
+            const formattedFavorites = bookmarks.map((item: any) => {
+                const tech = item.tech_stack || item;
+                return {
+                    id: tech.id || tech.tech_stack_id,
+                    name: tech.name,
+                    postCount: Number(tech.article_stack_count) || 0,
+                    jobCount: Number(tech.job_stack_count) || 0,
+                    growth: 0,
+                    color: "from-gray-500 to-gray-700",
+                    logo: tech.logo || getExternalLogoUrl(tech.name),
+                    themeColor: "#ffffff",
+                    description: tech.description,
+                };
+            });
             setFavoriteStacks(formattedFavorites);
         } catch (error) {
             console.error("Failed to fetch favorites:", error);
@@ -105,7 +102,6 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
     fetchFavorites();
   }, []);
 
-  // 왼쪽 검색
   useEffect(() => {
     const searchStacks = async () => {
       if (!debouncedLeftSearch.trim()) {
@@ -118,8 +114,8 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
         const formatted = results.map((stack: any, index: number) => ({
           id: stack.id,
           name: stack.name,
-          postCount: stack.count || 0,
-          jobCount: stack.job_posting_count || 0,
+          postCount: Number(stack.article_stack_count) || 0,
+          jobCount: Number(stack.job_stack_count) || 0,
           growth: 0,
           color: index % 2 === 0 ? "from-blue-500 to-indigo-500" : "from-green-500 to-emerald-500",
           logo: stack.logo || getExternalLogoUrl(stack.name),
@@ -136,7 +132,6 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
     searchStacks();
   }, [debouncedLeftSearch]);
 
-  // 오른쪽 검색
   useEffect(() => {
     const searchStacks = async () => {
       if (!debouncedRightSearch.trim()) {
@@ -149,8 +144,8 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
         const formatted = results.map((stack: any, index: number) => ({
           id: stack.id,
           name: stack.name,
-          postCount: stack.count || 0,
-          jobCount: stack.job_posting_count || 0,
+          postCount: Number(stack.article_stack_count) || 0,
+          jobCount: Number(stack.job_stack_count) || 0,
           growth: 0,
           color: index % 2 === 0 ? "from-blue-500 to-indigo-500" : "from-green-500 to-emerald-500",
           logo: stack.logo || getExternalLogoUrl(stack.name),
@@ -167,7 +162,6 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
     searchStacks();
   }, [debouncedRightSearch]);
 
-  // 교집합 공고 분석
   useEffect(() => {
     if (leftStack && rightStack) {
         findCommonJobs();
@@ -176,7 +170,6 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
     }
   }, [leftStack, rightStack]);
 
-  // ✅ [핵심] 상세 데이터(게시글/채용공고 수) 최신화
   const updateStackWithDetail = async (stack: StackData, side: "left" | "right") => {
       try {
           const response = await api.get(`/trends/tech-stacks/${stack.id}/`);
@@ -184,9 +177,8 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
 
           const updatedStack: StackData = {
               ...stack,
-              // 확실하게 숫자형으로 변환 및 0 처리
-              postCount: Number(detailData.count) || 0,
-              jobCount: Number(detailData.job_posting_count) || 0,
+              postCount: Number(detailData.article_stack_count) || 0,
+              jobCount: Number(detailData.job_stack_count) || 0,
               description: detailData.description || stack.description,
               logo: detailData.logo || stack.logo
           };
@@ -259,16 +251,23 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
     return favoriteStacks;
   };
 
-  // ✅ 선택된 모드에 따른 수치 가져오기 헬퍼 함수
   const getCount = (stack: StackData | null) => {
       if (!stack) return 0;
       return compareMode === 'jobs' ? stack.jobCount : stack.postCount;
   };
 
+  // ✅ 그래프 계산 로직 수정
+  const leftCount = getCount(leftStack);
+  const rightCount = getCount(rightStack);
+  const totalCount = leftCount + rightCount;
+
+  // Total이 0이면 너비도 0% (색상 표시 안 함 -> 회색 배경만 보임)
+  const leftWidth = totalCount === 0 ? 0 : (leftCount / totalCount) * 100;
+  const rightWidth = totalCount === 0 ? 0 : (rightCount / totalCount) * 100;
+
   return (
     <div className="w-full h-full min-h-[500px] relative flex flex-col bg-[#25262B]/50 rounded-[32px]">
       
-      {/* Header */}
       <div className="flex items-center justify-between p-1 mt-3 ml-3">
         <h3 className="text-xl font-bold text-white flex items-center gap-2">
           <ArrowRightLeft className="w-5 h-5 text-blue-400" />
@@ -279,7 +278,6 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
         </button>
       </div>
 
-      {/* Stack Selectors & VS */}
       <div className="flex items-start justify-center gap-4 md:gap-16 mb-8 relative pt-6">
         <StackSlot 
             side="left"
@@ -312,7 +310,6 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
         />
       </div>
 
-      {/* Result Section */}
       <AnimatePresence mode="wait">
         {leftStack && rightStack && (
             <motion.div
@@ -322,130 +319,100 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
                 className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-4 space-y-4"
             >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Descriptions */}
-                    <div className="bg-[#1A1B1E] p-5 rounded-2xl border border-gray-800 shadow-sm flex flex-col justify-between">
-                        <h4 className="text-gray-500 text-[18px] font-bold mb-4 uppercase tracking-wider flex items-center gap-2">
+                    <div className="bg-[#1A1B1E] p-5 rounded-2xl border border-gray-800 shadow-sm flex flex-col justify-start gap-4">
+                        <h4 className="text-gray-500 text-[18px] font-bold uppercase tracking-wider flex items-center gap-2">
                             <Info className="w-6 h-6" /> 기술 설명
                         </h4>
                         <div className="space-y-4">
                             <div>
                                 <span className="text-blue-400 font-bold text-xm mb-1 block">{leftStack.name}</span>
-                                <p className="text-sm text-gray-300 leading-relaxed line-clamp-6">
+                                <p className="text-sx text-gray-300 leading-relaxed line-clamp-6">
                                     {leftStack.description || "설명 데이터가 없습니다."}
                                 </p>
                             </div>
                             <div className="border-t border-gray-800 pt-3">
                                 <span className="text-purple-400 font-bold text-xm mb-1 block">{rightStack.name}</span>
-                                <p className="text-sm text-gray-300 leading-relaxed line-clamp-6">
+                                <p className="text-sx text-gray-300 leading-relaxed line-clamp-6">
                                     {rightStack.description || "설명 데이터가 없습니다."}
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    {/* Mention Count Comparison (Mode Toggle Included) */}
                     <div className="bg-[#1A1B1E] p-6 rounded-2xl border border-gray-800 shadow-sm flex flex-col">
                          <div className="flex items-center justify-between mb-6">
                              <h4 className="text-gray-500 text-[18px] font-bold uppercase tracking-wider flex items-center gap-2">
                                 <Building2 className="w-6 h-6" /> 언급량 대결
                              </h4>
-                             {/* ✅ 비교 모드 토글 버튼 */}
                              <div className="flex bg-gray-900 rounded-lg p-1 border border-gray-700">
                                  <button
-                                     onClick={() => setCompareMode('posts')}
-                                     className={`px-3 py-1 text-xs font-bold rounded-md flex items-center gap-1 transition-colors ${compareMode === 'posts' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
+                                     onClick={() => setCompareMode('jobs')}
+                                     className={`px-3 py-1 text-xm font-bold rounded-md flex items-center gap-1 transition-colors ${compareMode === 'jobs' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
                                  >
-                                     <MessageSquare className="w-3 h-3" /> 게시글
+                                     <Briefcase className="w-4 h-4" /> 채용공고
                                  </button>
                                  <button
-                                     onClick={() => setCompareMode('jobs')}
-                                     className={`px-3 py-1 text-xs font-bold rounded-md flex items-center gap-1 transition-colors ${compareMode === 'jobs' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
+                                     onClick={() => setCompareMode('posts')}
+                                     className={`px-3 py-1 text-xm font-bold rounded-md flex items-center gap-1 transition-colors ${compareMode === 'posts' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
                                  >
-                                     <Briefcase className="w-3 h-3" /> 채용공고
+                                     <MessageSquare className="w-4 h-4" /> 커뮤니티
                                  </button>
                              </div>
                          </div>
                          
-                         {/* Total Count Display */}
                          <div className="flex justify-between items-end mb-4">
                             <div className="text-left">
                                 <div className="text-3xl font-black text-blue-400">
-                                    {getCount(leftStack).toLocaleString()}
+                                    {leftCount.toLocaleString()}
                                 </div>
                                 <div className="text-xs text-gray-500 font-bold mt-1">
-                                    {compareMode === 'jobs' ? 'JOB POSTINGS' : 'COMMUNITY POSTS'}
+                                    {compareMode === 'jobs' ? '채용 공고' : '커뮤니티'}
                                 </div>
                             </div>
                             <div className="text-right">
                                 <div className="text-3xl font-black text-purple-400">
-                                    {getCount(rightStack).toLocaleString()}
+                                    {rightCount.toLocaleString()}
                                 </div>
                                 <div className="text-xs text-gray-500 font-bold mt-1">
-                                    {compareMode === 'jobs' ? 'JOB POSTINGS' : 'COMMUNITY POSTS'}
+                                    {compareMode === 'jobs' ? '채용 공고' : '커뮤니티'}
                                 </div>
                             </div>
                          </div>
 
-                         {/* Visual Bar */}
+                         {/* Visual Bar - Updated Logic: No text inside bar, gray if 0 */}
                          <div className="relative h-14 w-full rounded-xl overflow-hidden bg-gray-800 flex shadow-inner">
                             {/* Left Bar */}
                             <motion.div 
                                 initial={{ width: 0 }}
-                                animate={{ width: `${(getCount(leftStack) + getCount(rightStack)) === 0 ? 50 : (getCount(leftStack) / (getCount(leftStack) + getCount(rightStack))) * 100}%` }}
+                                animate={{ width: `${leftWidth}%` }}
                                 transition={{ duration: 1, ease: "easeOut" }}
-                                className="h-full bg-gradient-to-r from-blue-600 to-blue-400 relative flex items-center justify-start pl-4 group"
+                                className="h-full bg-gradient-to-r from-blue-600 to-blue-400 relative flex items-center justify-start"
                             >
-                                <span className="text-lg font-black text-white/90 z-10 drop-shadow-md">
-                                    {(getCount(leftStack) + getCount(rightStack)) === 0 ? 0 : Math.round((getCount(leftStack) / (getCount(leftStack) + getCount(rightStack))) * 100)}%
-                                </span>
+                                {/* 내부 텍스트 제거됨 */}
                                 <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
                             </motion.div>
 
                             {/* Right Bar */}
                             <motion.div 
                                 initial={{ width: 0 }}
-                                animate={{ width: `${(getCount(leftStack) + getCount(rightStack)) === 0 ? 50 : (getCount(rightStack) / (getCount(leftStack) + getCount(rightStack))) * 100}%` }}
+                                animate={{ width: `${rightWidth}%` }}
                                 transition={{ duration: 1, ease: "easeOut" }}
-                                className="h-full bg-gradient-to-l from-purple-600 to-purple-400 relative flex items-center justify-end pr-4 group"
+                                className="h-full bg-gradient-to-l from-purple-600 to-purple-400 relative flex items-center justify-end"
                             >
-                                <span className="text-lg font-black text-white/90 z-10 drop-shadow-md">
-                                    {(getCount(leftStack) + getCount(rightStack)) === 0 ? 0 : Math.round((getCount(rightStack) / (getCount(leftStack) + getCount(rightStack))) * 100)}%
-                                </span>
+                                {/* 내부 텍스트 제거됨 */}
                                 <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
                             </motion.div>
 
-                            {/* VS Divider */}
-                            <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gray-900/50 -translate-x-1/2 z-20 blur-[1px]"></div>
-                         </div>
-
-                         {/* Winner Badge */}
-                         <div className="mt-4 flex justify-center">
-                            {getCount(leftStack) !== getCount(rightStack) ? (
-                                <motion.div 
-                                    initial={{ scale: 0, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    transition={{ delay: 0.8, type: "spring" }}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-full border ${
-                                        getCount(leftStack) > getCount(rightStack) 
-                                        ? "bg-blue-500/10 border-blue-500/30 text-blue-400" 
-                                        : "bg-purple-500/10 border-purple-500/30 text-purple-400"
-                                    }`}
-                                >
-                                    <Trophy className="w-4 h-4 fill-current" />
-                                    <span className="text-sm font-bold">
-                                        WINNER: {getCount(leftStack) > getCount(rightStack) ? leftStack.name : rightStack.name}
-                                    </span>
-                                </motion.div>
-                            ) : (
-                                <span className="text-sm text-gray-500 font-medium">
-                                    {(getCount(leftStack) === 0 && getCount(rightStack) === 0) ? "데이터 없음" : "무승부"}
-                                </span>
+                            {/* 중앙 구분선: 데이터가 있을 때만 표시 */}
+                            {totalCount > 0 && (
+                                <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gray-900/50 -translate-x-1/2 z-20 blur-[1px]"></div>
                             )}
                          </div>
+
+                         
                     </div>
                 </div>
 
-                {/* Co-occurring Jobs */}
                 <div className="bg-[#1A1B1E] p-5 rounded-2xl border border-gray-800 shadow-sm">
                     <h4 className="text-gray-500 text-[18px] font-bold mb-4 uppercase tracking-wider flex items-center gap-2">
                         <LinkIcon className="w-6 h-6" /> 교집합 관련 채용 공고
@@ -487,11 +454,9 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
   );
 }
 
-// StackSlot
 function StackSlot({ side, stack, searchTerm, onSearchChange, onRemove, onSelect, suggestions, isSearching, favorites }: any) {
     const [isFocused, setIsFocused] = useState(false);
 
-    // 검색어 유무에 따라 보여줄 리스트 결정
     const displayList = searchTerm ? suggestions : favorites;
     const isShowingFavorites = !searchTerm && isFocused;
 
@@ -568,7 +533,8 @@ function StackSlot({ side, stack, searchTerm, onSearchChange, onRemove, onSelect
                                         <div className="w-6 h-6 relative grayscale hover:grayscale-0 shrink-0">
                                             <Image src={s.logo} alt={s.name} fill className="object-contain" unoptimized />
                                         </div>
-                                        <span className="text-sm text-gray-200 font-medium">{s.name}</span>
+                                        {/* ✅ [유지] 이름 표시 강화 */}
+                                        <span className="text-sm text-white font-bold">{s.name}</span>
                                     </button>
                                 ))
                             ) : (
