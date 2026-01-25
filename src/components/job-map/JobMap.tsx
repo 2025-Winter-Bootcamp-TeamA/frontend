@@ -136,9 +136,9 @@ export default function JobMap() {
     fetchAllData();
   }, []);
 
-  // 2. 상세 필터링 (디바운스된 값 사용)
+  // 2. 상세 필터링 (클라이언트 사이드 처리로 변경)
   useEffect(() => {
-    const filterCompanies = async () => {
+    const filterCompanies = () => {
       // 필터가 모두 비어있으면 전체 목록 복원
       if (!debouncedCareer && !debouncedJobSearch && !debouncedCity && !debouncedDistrict) {
         setCompanies(allCompanies);
@@ -146,34 +146,26 @@ export default function JobMap() {
       }
 
       setIsDataLoading(true);
-      try {
-        // [충돌 해결] 필터 파라미터 구성 (모든 필터가 AND 조건으로 적용됨)
-        const params: any = {};
-        if (debouncedCareer) params.career_year = parseInt(debouncedCareer);
-        if (debouncedJobSearch) params.search = debouncedJobSearch.trim();
-        if (debouncedCity) params.city = debouncedCity.trim();
-        if (debouncedDistrict) params.district = debouncedDistrict.trim();
+      
+      // ✅ [수정] 백엔드 API 대신 클라이언트 사이드 필터링 적용
+      // (백엔드에 전체 공고 검색 API가 없으므로 로컬 데이터 활용)
+      const filtered = allCompanies.filter(company => {
+          // 1. 시/도 필터 (주소 기반)
+          if (debouncedCity && !company.address?.includes(debouncedCity)) return false;
+          
+          // 2. 구/군 필터 (주소 기반)
+          if (debouncedDistrict && !company.address?.includes(debouncedDistrict)) return false;
 
-        // 조건에 맞는 '채용공고' 검색
-        const response = await api.get('/jobs/job-postings/', { params });
-        const rawJobs = Array.isArray(response.data) ? response.data : response.data.results || [];
-        
-        // 해당 공고를 가진 기업 ID 추출
-        const corpIds = new Set<number>();
-        rawJobs.forEach((job: any) => {
-          if (job.corp?.id) corpIds.add(job.corp.id);
-          else if (job.corp_id) corpIds.add(job.corp_id);
-        });
+          // 3. 직무 키워드 (공고 내용 검색 불가하므로 기업명 검색으로 대체)
+          if (debouncedJobSearch && !company.name.toLowerCase().includes(debouncedJobSearch.toLowerCase())) return false;
 
-        // 전체 기업 중 해당 ID를 가진 기업만 필터링
-        const filtered = allCompanies.filter(c => corpIds.has(c.id));
-        setCompanies(filtered);
-      } catch (e) {
-        console.error("필터링 에러:", e);
-        setCompanies([]);
-      } finally {
-        setIsDataLoading(false);
-      }
+          // 4. 경력 (데이터 없음 - 필터링 생략)
+          
+          return true;
+      });
+
+      setCompanies(filtered);
+      setIsDataLoading(false);
     };
 
     if (allCompanies.length > 0) {
@@ -182,7 +174,6 @@ export default function JobMap() {
   }, [debouncedCareer, debouncedJobSearch, debouncedCity, debouncedDistrict, allCompanies]);
 
   // 3. 최종 리스트 계산 (메모이제이션)
-  // [서버 필터 결과] -> [탭 필터] -> [클라이언트 검색어 필터]
   const finalCompanies = useMemo(() => {
     let result = companies;
 
@@ -193,7 +184,9 @@ export default function JobMap() {
 
     // 이름 검색 (클라이언트)
     if (searchQuery) {
-      result = result.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      result = result.filter(c => 
+        c.name && c.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
     }
 
     return result;
@@ -231,12 +224,7 @@ export default function JobMap() {
   const fetchCompanyJobs = async (corpId: number) => {
     setIsJobsLoading(true);
     try {
-      // 필터 조건이 있다면 기업 상세 공고 조회 시에도 적용 (선택 사항)
-      const params: any = {};
-      if (debouncedCareer) params.career_year = parseInt(debouncedCareer);
-      if (debouncedJobSearch) params.search = debouncedJobSearch;
-
-      const response = await api.get(`/jobs/corps/${corpId}/job-postings/`, { params });
+      const response = await api.get(`/jobs/corps/${corpId}/job-postings/`);
       const rawJobs = response.data.results || response.data || [];
       setCompanyJobs(rawJobs.map((j: any) => ({
         id: j.id,
@@ -260,15 +248,13 @@ export default function JobMap() {
   
   const hasActiveFilters = careerYear !== "" || jobSearch !== "" || city !== "" || district !== "";
 
-  // [충돌 해결] 메인 브랜치의 최신 로직(이벤트 발생, 토글 등) 적용 + 사이드바 열림 기능 통합
-
   // ✅ 기업 즐겨찾기 토글 함수 (백엔드 API 연동)
   const toggleCompanyFavorite = async (e: React.MouseEvent, corpId: number) => {
     e.stopPropagation();
     
     const { accessToken } = getAuthTokens();
     if (!accessToken) {
-      // 로그인 모달 표시 (필요시 추가)
+      // 로그인 모달 표시 로직 필요
       return;
     }
 
@@ -286,7 +272,6 @@ export default function JobMap() {
             await api.delete(`/jobs/corp-bookmarks/${bookmarkToDelete.corp_bookmark_id || bookmarkToDelete.id}/`);
             const nextFavs = favoriteCompanyIds.filter(id => id !== corpId);
             setFavoriteCompanyIds(nextFavs);
-            // 즐겨찾기 변경 이벤트 발생
             window.dispatchEvent(new CustomEvent('favoriteChanged', { detail: { type: 'company', action: 'removed', id: corpId } }));
           }
         } catch (error) {
@@ -298,7 +283,6 @@ export default function JobMap() {
           await api.post('/jobs/corp-bookmarks/', { corp_id: corpId });
           const nextFavs = [...favoriteCompanyIds, corpId];
           setFavoriteCompanyIds(nextFavs);
-          // 즐겨찾기 변경 이벤트 발생
           window.dispatchEvent(new CustomEvent('favoriteChanged', { detail: { type: 'company', action: 'added', id: corpId } }));
         } catch (error) {
           console.error('즐겨찾기 추가 실패:', error);
@@ -314,7 +298,7 @@ export default function JobMap() {
     setCenter({ lat: Number(company.latitude), lng: Number(company.longitude) });
     setLevel(3);
     fetchCompanyJobs(company.id);
-    if (!isSidebarOpen) setIsSidebarOpen(true); // [내 코드] 사이드바 열기 기능 유지
+    if (!isSidebarOpen) setIsSidebarOpen(true); 
   };
   
   const handleBackToList = () => {

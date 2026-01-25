@@ -7,6 +7,7 @@ import Image from "next/image";
 import { searchTechStacks, getExternalLogoUrl } from "@/services/trendService";
 import { TechStackData } from "@/types/trend";
 import { api } from "@/lib/api"; 
+import { getAuthTokens } from "@/lib/auth"; // ✅ [수정 1] getAuthTokens 임포트 추가
 import JobCard from "./JobCard"; 
 
 export interface StackData {
@@ -73,8 +74,17 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
     }
   }, []);
 
+  // ✅ [수정 2] 즐겨찾기 목록 로드 시 토큰 확인 로직 추가
   useEffect(() => {
     const fetchFavorites = async () => {
+        const { accessToken } = getAuthTokens();
+        
+        // 토큰이 없으면 API 호출 안 함 (비로그인 상태 유지)
+        if (!accessToken) {
+            setFavoriteStacks([]);
+            return;
+        }
+
         try {
             const response = await api.get('/trends/tech-bookmarks/'); 
             const bookmarks = response.data.results || response.data || [];
@@ -341,7 +351,7 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
                     </div>
 
                     <div className="bg-[#1A1B1E] p-6 rounded-2xl border border-gray-800 shadow-sm flex flex-col">
-                         <div className="flex items-center justify-between mb-6">
+                          <div className="flex items-center justify-between mb-6">
                              <h4 className="text-gray-500 text-[18px] font-bold uppercase tracking-wider flex items-center gap-2">
                                 <Building2 className="w-6 h-6" /> 언급량 대결
                              </h4>
@@ -359,29 +369,29 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
                                      <MessageSquare className="w-4 h-4" /> 커뮤니티
                                  </button>
                              </div>
-                         </div>
-                         
-                         <div className="flex justify-between items-end mb-4">
-                            <div className="text-left">
-                                <div className="text-3xl font-black text-blue-400">
-                                    {leftCount.toLocaleString()}
-                                </div>
-                                <div className="text-xs text-gray-500 font-bold mt-1">
-                                    {compareMode === 'jobs' ? '채용 공고' : '커뮤니티'}
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <div className="text-3xl font-black text-purple-400">
-                                    {rightCount.toLocaleString()}
-                                </div>
-                                <div className="text-xs text-gray-500 font-bold mt-1">
-                                    {compareMode === 'jobs' ? '채용 공고' : '커뮤니티'}
-                                </div>
-                            </div>
-                         </div>
+                          </div>
+                          
+                          <div className="flex justify-between items-end mb-4">
+                             <div className="text-left">
+                                 <div className="text-3xl font-black text-blue-400">
+                                     {leftCount.toLocaleString()}
+                                 </div>
+                                 <div className="text-xs text-gray-500 font-bold mt-1">
+                                     {compareMode === 'jobs' ? '채용 공고' : '커뮤니티'}
+                                 </div>
+                             </div>
+                             <div className="text-right">
+                                 <div className="text-3xl font-black text-purple-400">
+                                     {rightCount.toLocaleString()}
+                                 </div>
+                                 <div className="text-xs text-gray-500 font-bold mt-1">
+                                     {compareMode === 'jobs' ? '채용 공고' : '커뮤니티'}
+                                 </div>
+                             </div>
+                          </div>
 
-                         {/* Visual Bar - Updated Logic: No text inside bar, gray if 0 */}
-                         <div className="relative h-14 w-full rounded-xl overflow-hidden bg-gray-800 flex shadow-inner">
+                          {/* Visual Bar - Updated Logic: No text inside bar, gray if 0 */}
+                          <div className="relative h-14 w-full rounded-xl overflow-hidden bg-gray-800 flex shadow-inner">
                             {/* Left Bar */}
                             <motion.div 
                                 initial={{ width: 0 }}
@@ -408,9 +418,9 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
                             {totalCount > 0 && (
                                 <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gray-900/50 -translate-x-1/2 z-20 blur-[1px]"></div>
                             )}
-                         </div>
+                          </div>
 
-                         
+                          
                     </div>
                 </div>
 
@@ -515,6 +525,41 @@ function StackSlot({ side, stack, searchTerm, onSearchChange, onRemove, onSelect
                         />
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 w-3.5 h-3.5" />
                     </div>
+
+                    {(isFocused || searchTerm) && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-[#25262B] border border-gray-600 rounded-lg shadow-2xl z-[210] max-h-[200px] overflow-y-auto custom-scrollbar">
+                            {isShowingFavorites && (
+                                <div className="px-3 py-2 text-xs font-bold text-gray-500 bg-gray-800/50 border-b border-gray-700 flex items-center gap-1">
+                                    <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" /> 즐겨찾기
+                                </div>
+                            )}
+
+                            {isSearching ? (
+                                <div className="p-3 text-center text-xs text-gray-500">검색 중...</div>
+                            ) : displayList.length > 0 ? (
+                                displayList.map((s: StackData) => (
+                                    <button
+                                        key={s.id}
+                                        onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            onSelect(s);
+                                        }}
+                                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-700/50 text-left transition-colors border-b border-gray-700/50 last:border-0"
+                                    >
+                                        <div className="w-6 h-6 relative grayscale hover:grayscale-0 shrink-0">
+                                            <Image src={s.logo} alt={s.name} fill className="object-contain" unoptimized />
+                                        </div>
+                                        {/* ✅ [유지] 이름 표시 강화 */}
+                                        <span className="text-sm text-white font-bold">{s.name}</span>
+                                    </button>
+                                ))
+                            ) : (
+                                <div className="p-3 text-center text-xs text-gray-500">
+                                    {isShowingFavorites ? "즐겨찾기한 기술이 없습니다." : "검색 결과가 없습니다."}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </motion.div>
             )}
             </AnimatePresence>

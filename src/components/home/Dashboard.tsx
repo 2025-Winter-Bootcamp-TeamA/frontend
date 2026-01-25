@@ -112,7 +112,7 @@ export default function Dashboard() {
     }, []);
 
     const formatSearchResults = (apiResults: TechStackData[]): DashboardStackData[] => {
-        return apiResults.map((stack:any, index) => ({
+        return apiResults.map((stack: any, index) => ({
             id: stack.id,
             name: stack.name,
             postCount: Number(stack.article_stack_count) || Number(stack.count) || 0,
@@ -147,27 +147,42 @@ export default function Dashboard() {
                     }
                 }
 
-                // [충돌 해결] job_stack_count 기준 상위 5개만 1회 요청 (fetchTop5TechStacksByJobCount)
-                // 팀원 코드가 최적화된 API를 사용하므로 이를 채택합니다.
+                // (2) Top 5 데이터 로드 및 정렬 로직 수정
                 const top5Data = await fetchTop5TechStacksByJobCount();
-                const uniqueTop5 = Array.from(new Map(top5Data.map((s: any) => [s.id, s])).values()).slice(0, 5);
+                
+                // 중복 제거
+                const uniqueData = Array.from(new Map(top5Data.map((s: any) => [s.id, s])).values());
 
-                if (uniqueTop5.length > 0) {
-                    const formattedTop5 = uniqueTop5.map((stack: any, index: number) => ({
+                if (uniqueData.length > 0) {
+                    // 1. 먼저 데이터를 매핑하여 count 값을 숫자로 변환
+                    let mappedStacks = uniqueData.map((stack: any) => ({
                         id: stack.id,
                         name: stack.name,
-                        postCount: Number(stack.article_stack_count) || 0,
-                        jobCount: Number(stack.job_stack_count) || 0,
+                        postCount: Number(stack.article_stack_count) || Number(stack.count) || 0,
+                        jobCount: Number(stack.job_stack_count) || Number(stack.job_posting_count) || 0,
                         growth: 0,
-                        color: index % 2 === 0 ? "from-blue-500 to-indigo-500" : "from-green-500 to-emerald-500",
                         logo: stack.logo || getExternalLogoUrl(stack.name),
                         themeColor: "#3B82F6",
                         description: stack.description || "상세 설명이 없습니다.",
                         officialSite: stack.docs_url || "#",
-                        created_at: stack.created_at
+                        created_at: stack.created_at,
+                        color: "" // 나중에 할당
                     }));
-                    setTopStacks(formattedTop5);
-                    setActiveStack(formattedTop5[0]); 
+
+                    // 2. [핵심 수정] (채용공고 + 게시글) 합계 기준으로 내림차순 정렬
+                    mappedStacks.sort((a, b) => (b.postCount + b.jobCount) - (a.postCount + a.jobCount));
+
+                    // 3. 상위 5개만 자르기
+                    const top5Stacks = mappedStacks.slice(0, 5);
+
+                    // 4. 색상 할당 (순위에 따라 색상 지정)
+                    const finalTop5 = top5Stacks.map((stack, index) => ({
+                        ...stack,
+                        color: index % 2 === 0 ? "from-blue-500 to-indigo-500" : "from-green-500 to-emerald-500"
+                    }));
+
+                    setTopStacks(finalTop5);
+                    setActiveStack(finalTop5[0]);
                 } else {
                     setTopStacks([]);
                     setActiveStack(EMPTY_STACK);
@@ -237,7 +252,7 @@ export default function Dashboard() {
                 setIsSearching(true);
                 try {
                     const apiResults = await searchTechStacks(debouncedSearchQuery);
-                    // id 기준 중복 제거 (동일 key 40 등 React 경고 방지)
+                    // id 기준 중복 제거
                     const uniqueById = Array.from(new Map(apiResults.map((s) => [s.id, s])).values());
                     const formattedResults = formatSearchResults(uniqueById);
                     setFilteredStacks(formattedResults);
