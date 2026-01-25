@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from 'next/navigation';
 import { Search, Briefcase, Star, TrendingUp, RefreshCw } from 'lucide-react';
 import JobCard from './JobCard';
@@ -21,60 +21,71 @@ interface JobSectionProps {
     techStackName: string; 
 }
 
+// 디바운스 훅
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+    useEffect(() => {
+      const handler = setTimeout(() => setDebouncedValue(value), delay);
+      return () => clearTimeout(handler);
+    }, [value, delay]);
+    return debouncedValue;
+}
+
 export default function JobSection({ techStackId, techStackName }: JobSectionProps) {
     const router = useRouter();
+    
+    // 현재 화면에 보여줄 공고 리스트
     const [jobs, setJobs] = useState<JobPostingData[]>([]);
+    
+    // 원래 보여주던(추천/즐겨찾기/기술) 공고 리스트 (검색어 지웠을 때 복구용)
+    const [initialJobs, setInitialJobs] = useState<JobPostingData[]>([]);
+    
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
+    const debouncedSearchQuery = useDebounce(searchQuery, 300); 
     
-    // 현재 표시 모드: bookmark(즐겨찾기), recommend(추천), tech(기술검색)
-    const [mode, setMode] = useState<"bookmark" | "recommend" | "tech">("recommend");
+    const [mode, setMode] = useState<"bookmark" | "recommend" | "tech" | "search">("recommend");
+    const [prevMode, setPrevMode] = useState<"bookmark" | "recommend" | "tech">("recommend"); 
 
     const handleMoreClick = () => {
         router.push('/map');
     };
 
+    // 1. 초기 데이터 로드 (추천 / 즐겨찾기 / 기술별 공고)
     useEffect(() => {
         let isMounted = true;
 
-        const fetchJobs = async () => {
+        const fetchInitialJobs = async () => {
             setLoading(true);
-            setJobs([]); // 로딩 시작 시 기존 리스트 초기화
-
+            setSearchQuery(""); // 모드 변경 시 검색어 초기화
+            
             try {
                 let fetchedJobs: any[] = [];
+                let currentMode: "bookmark" | "recommend" | "tech" = "recommend";
 
-                // ========================================================
-                // CASE A: 기술 스택 선택됨 (검색 결과) -> 무조건 해당 기술 공고만 조회
-                // ========================================================
                 if (techStackId !== 0) {
-                    if(isMounted) setMode("tech");
+                    if(isMounted) {
+                        currentMode = "tech";
+                        setMode("tech");
+                        setPrevMode("tech");
+                    }
                     try {
-                        // urls.py에 정의된 /by-tech/<id>/ 엔드포인트 호출
                         const response = await api.get(`/jobs/by-tech/${techStackId}/`);
                         fetchedJobs = Array.isArray(response.data) ? response.data : response.data.results || [];
                     } catch (error) {
                         console.error(`기술 ID ${techStackId} 공고 로딩 실패:`, error);
                     }
-                } 
-                
-                // ========================================================
-                // CASE B: 초기 화면 (전체/랜딩) -> [즐겨찾기] 시도 후 없으면 [추천]
-                // ========================================================
-                else {
+                } else {
                     const { accessToken } = getAuthTokens();
                     let bookmarksFound = false;
 
-                    // (1) 즐겨찾기 시도
                     if (accessToken) {
                         try {
                             const bookmarksResponse = await api.get('/jobs/corp-bookmarks/');
                             const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
                             
                             if (bookmarks.length > 0) {
-                                // 즐겨찾기한 기업들의 공고 병렬 호출
                                 const promises = bookmarks.map((bookmark: any) => {
-                                    // corp 객체 또는 corp_id 숫자 모두 대응
                                     const corpId = bookmark.corp?.id || bookmark.corp_id || (typeof bookmark.corp === 'number' ? bookmark.corp : null);
                                     if (!corpId) return Promise.resolve([]);
                                     
@@ -89,23 +100,29 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
                                 if (bookmarkJobs.length > 0) {
                                     fetchedJobs = bookmarkJobs;
                                     bookmarksFound = true;
-                                    if(isMounted) setMode("bookmark");
+                                    if(isMounted) {
+                                        currentMode = "bookmark";
+                                        setMode("bookmark");
+                                        setPrevMode("bookmark");
+                                    }
                                 }
                             }
                         } catch (err) {
-                            console.error("즐겨찾기 조회 실패 (추천으로 넘어감):", err);
+                            console.error("즐겨찾기 조회 실패:", err);
                         }
                     }
 
-                    // (2) 즐겨찾기 실패 또는 데이터 없음 -> 추천(상위 기업) 공고 조회
                     if (!bookmarksFound) {
-                        if(isMounted) setMode("recommend");
+                        if(isMounted) {
+                            currentMode = "recommend";
+                            setMode("recommend");
+                            setPrevMode("recommend");
+                        }
                         try {
-                            // 기업 목록 조회
                             const corpsResponse = await api.get('/jobs/corps/');
                             const corpsList = Array.isArray(corpsResponse.data) ? corpsResponse.data : corpsResponse.data.results || [];
                             
-                            // 상위 5개 기업 공고 조회
+                            // 상위 5개 기업의 공고만 가져옴 (추천)
                             const targetCorps = corpsList.slice(0, 5);
                             const corpJobPromises = targetCorps.map((corp: any) => 
                                 api.get(`/jobs/corps/${corp.id}/job-postings/`)
@@ -122,32 +139,10 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
                     }
                 }
 
-                // ========================================================
-                // 데이터 정제 및 상태 업데이트
-                // ========================================================
                 if (isMounted) {
-                    const uniqueJobsMap = new Map();
-                    fetchedJobs.forEach((item: any) => {
-                        if (item && item.id && !uniqueJobsMap.has(item.id)) {
-                            uniqueJobsMap.set(item.id, {
-                                id: item.id,
-                                company_name: item.corp?.name || "기업명 확인 불가",
-                                title: item.title,
-                                url: item.url,
-                                deadline: item.expiry_date || null, 
-                                logo_url: item.corp?.logo_url 
-                            });
-                        }
-                    });
-                    
-                    // 마감일 있는 것 우선, 그 다음 최신순(ID 역순) 정렬
-                    const sortedJobs = Array.from(uniqueJobsMap.values()).sort((a: any, b: any) => {
-                        if (a.deadline && !b.deadline) return -1;
-                        if (!a.deadline && b.deadline) return 1;
-                        return b.id - a.id;
-                    });
-
-                    setJobs(sortedJobs as JobPostingData[]);
+                    const formattedJobs = formatJobs(fetchedJobs);
+                    setJobs(formattedJobs);
+                    setInitialJobs(formattedJobs); 
                 }
 
             } catch (error) {
@@ -158,28 +153,97 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
             }
         };
 
-        fetchJobs();
+        fetchInitialJobs();
 
         return () => {
             isMounted = false;
         };
-    }, [techStackId]); // techStackId가 바뀔 때마다 실행
+    }, [techStackId]); 
 
-    // 클라이언트 사이드 검색 필터 (기업명/제목)
-    const processedJobs = useMemo(() => {
-        let filtered = jobs;
-        if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase();
-            filtered = jobs.filter(job => 
-                job.company_name.toLowerCase().includes(query) || 
-                job.title.toLowerCase().includes(query)
-            );
-        }
-        return filtered;
-    }, [jobs, searchQuery]);
+    // 2. 검색어 변경 감지 및 전체 검색 실행 (우회 로직 적용)
+    useEffect(() => {
+        const performSearch = async () => {
+            // 검색어가 비어있으면 초기 상태로 복구
+            if (!debouncedSearchQuery.trim()) {
+                if (mode === "search") {
+                    setMode(prevMode);
+                    setJobs(initialJobs);
+                }
+                return;
+            }
+
+            setLoading(true);
+            setMode("search"); 
+
+            try {
+                // ✅ [수정] 백엔드에 전체 공고 API가 없으므로 프론트엔드에서 직접 찾기
+                // 1. 전체 기업 목록 가져오기 (page_size를 크게 설정)
+                const corpsResponse = await api.get('/jobs/corps/', { params: { page_size: 1000 } });
+                const corpsList = Array.isArray(corpsResponse.data) ? corpsResponse.data : corpsResponse.data.results || [];
+
+                // 2. 검색어에 맞는 기업 필터링 (기업명 검색)
+                const searchLower = debouncedSearchQuery.toLowerCase();
+                const matchedCorps = corpsList.filter((c: any) => c.name.toLowerCase().includes(searchLower));
+
+                // 3. 해당 기업들의 공고 가져오기 (병렬 호출)
+                if (matchedCorps.length > 0) {
+                    const promises = matchedCorps.map((corp: any) => 
+                        api.get(`/jobs/corps/${corp.id}/job-postings/`)
+                           .then(res => Array.isArray(res.data) ? res.data : res.data.results || [])
+                           .catch(() => [])
+                    );
+                    
+                    const results = await Promise.all(promises);
+                    const allFoundJobs = results.flat();
+                    setJobs(formatJobs(allFoundJobs));
+                } else {
+                    setJobs([]);
+                }
+
+            } catch (error) {
+                console.error("전체 검색 실패:", error);
+                setJobs([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        performSearch();
+    }, [debouncedSearchQuery, initialJobs, prevMode]);
+
+
+    // 데이터 포맷팅 유틸리티
+    const formatJobs = (rawJobs: any[]): JobPostingData[] => {
+        const uniqueJobsMap = new Map();
+        rawJobs.forEach((item: any) => {
+            if (item && item.id && !uniqueJobsMap.has(item.id)) {
+                uniqueJobsMap.set(item.id, {
+                    id: item.id,
+                    company_name: item.corp?.name || "기업명 확인 불가",
+                    title: item.title,
+                    url: item.url,
+                    deadline: item.expiry_date || null, 
+                    logo_url: item.corp?.logo_url 
+                });
+            }
+        });
+        
+        return Array.from(uniqueJobsMap.values()).sort((a: any, b: any) => {
+            if (a.deadline && !b.deadline) return -1;
+            if (!a.deadline && b.deadline) return 1;
+            return b.id - a.id;
+        }) as JobPostingData[];
+    };
 
     const renderHeader = () => {
-        if (mode === "bookmark") {
+        if (mode === "search") {
+            return (
+                <h1 className="font-bold text-white flex items-center gap-2 truncate text-xl lg:text-2xl">
+                    <Search className="text-white" size={24} />
+                    '{debouncedSearchQuery}' 검색 결과 ({jobs.length})
+                </h1>
+            );
+        } else if (mode === "bookmark") {
             return (
                 <h1 className="font-bold text-white flex items-center gap-2 truncate text-xl lg:text-2xl">
                     <Star className="text-yellow-400 fill-yellow-400" size={24} />
@@ -222,7 +286,7 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="리스트 내 검색..."
+                        placeholder="기업명으로 검색..."
                         className="w-full h-12 bg-[#1A1B1E] border border-white/10 rounded-xl pl-10 pr-4 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500/50 transition-colors shadow-inner"
                     />
                 </div>
@@ -234,8 +298,8 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
                         <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
                         <p>공고를 불러오는 중...</p>
                     </div>
-                ) : processedJobs.length > 0 ? (
-                    processedJobs.map((job) => (
+                ) : jobs.length > 0 ? (
+                    jobs.map((job) => (
                         <JobCard
                             key={job.id}
                             id={job.id}
@@ -250,9 +314,11 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
                     <div className="flex flex-col items-center justify-center h-full text-gray-500 text-sm py-10 gap-3 opacity-60">
                         <Briefcase size={40} strokeWidth={1.5} className="text-gray-600" />
                         <p className="text-center">
-                            {mode === "tech" 
-                                ? `'${techStackName}' 관련 공고가 없습니다.` 
-                                : "등록된 채용 공고가 없습니다."}
+                            {mode === "search"
+                                ? `'${searchQuery}' 검색 결과가 없습니다.`
+                                : mode === "tech" 
+                                    ? `'${techStackName}' 관련 공고가 없습니다.` 
+                                    : "등록된 채용 공고가 없습니다."}
                         </p>
                     </div>
                 )}

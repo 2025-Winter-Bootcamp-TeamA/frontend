@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Map as KakaoMap, CustomOverlayMap, useKakaoLoader } from "react-kakao-maps-sdk";
-import { Search, MapPin, RefreshCw, ArrowLeft, Building2, Star, Filter, X, List, Heart } from "lucide-react";
+import { Search, MapPin, RefreshCw, ArrowLeft, Building2, Star, Filter, X, List } from "lucide-react";
 import { api } from "@/lib/api";
 import { getAuthTokens } from "@/lib/auth";
 import JobCard from "../home/JobCard";
@@ -396,7 +396,7 @@ export default function JobMap() {
                         activeTab === "favorites" ? "border-yellow-500 text-white" : "border-transparent text-gray-500 hover:text-gray-300"
                     }`}
                 >
-                    <Heart size={16} fill={activeTab === "favorites" ? "currentColor" : "none"} />
+                    <Star size={16} fill={activeTab === "favorites" ? "currentColor" : "none"} />
                     즐겨찾기 ({favoriteCompanyIds.length})
                 </button>
             </div>
