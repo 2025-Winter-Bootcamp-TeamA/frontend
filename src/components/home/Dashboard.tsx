@@ -13,8 +13,9 @@ import { getAuthTokens } from "@/lib/auth";
 import LoginCheckModal from "@/components/LoginCheckModal";
 import LoginModal from "@/components/LoginModal";
 
-import { searchTechStacks, getTechStackRelations, getTechStackById, RelatedTechStackRelation, getExternalLogoUrl, fetchTop5TechStacksByJobCount } from "@/services/trendService";
+import { searchTechStacks, getTechStackRelations, getTechStackById, RelatedTechStackRelation, getExternalLogoUrl, fetchTop5TechStacksByJobCount, fetchTechTrends, TechTrendChartItem } from "@/services/trendService";
 import { TechStackData } from "@/types/trend";
+import type { ChartPeriod } from "./TrendChart";
 
 // 커스텀 노드 아이콘
 const NetworkIcon = ({ size = 20, className = "" }: { size?: number, className?: string }) => (
@@ -69,15 +70,6 @@ const EMPTY_STACK: DashboardStackData = {
     created_at: ""
 };
 
-const MOCK_CHART_DATA = [
-  { year: "2024.01", company: 45, community: 30 },
-  { year: "2024.02", company: 52, community: 35 },
-  { year: "2024.03", company: 48, community: 40 },
-  { year: "2024.04", company: 60, community: 45 },
-  { year: "2024.05", company: 65, community: 55 },
-  { year: "2024.06", company: 75, community: 60 },
-];
-
 export default function Dashboard() {
     const [isLanding, setIsLanding] = useState(true); 
     const [activeStack, setActiveStack] = useState<DashboardStackData>(EMPTY_STACK);
@@ -97,6 +89,11 @@ export default function Dashboard() {
     const [isLoadingRelations, setIsLoadingRelations] = useState(false);
 
     const [stackFavorites, setStackFavorites] = useState<number[]>([]);
+
+    // 트렌드 그래프: tech_trend 기반 job_mention_count, job_change_rate, 기간(7/30/90일)
+    const [chartPeriod, setChartPeriod] = useState<ChartPeriod>(30);
+    const [chartData, setChartData] = useState<TechTrendChartItem[]>([]);
+    const [chartDataLoading, setChartDataLoading] = useState(false);
     
     // 통계 데이터 상태
     const [stats, setStats] = useState({ corps: 0, jobs: 0, loading: true });
@@ -188,33 +185,14 @@ export default function Dashboard() {
                     setActiveStack(EMPTY_STACK);
                 }
 
-                // (3) 통계 데이터 로드
+                // (3) 통계 데이터 로드: /jobs/stats/ 한 번 호출로 기업 수·공고 수 조회
                 try {
-                    const corpsRes = await api.get('/jobs/corps/?page_size=1000'); 
-                    const corpsList = Array.isArray(corpsRes.data) ? corpsRes.data : corpsRes.data.results || [];
-                    
-                    const corpsCount = corpsRes.data.count || corpsList.length;
-
-                    const jobCountPromises = corpsList.map((corp: any) => 
-                        api.get(`/jobs/corps/${corp.id}/job-postings/`)
-                           .then(res => {
-                               if (Array.isArray(res.data)) return res.data.length;
-                               if (res.data.count) return res.data.count;
-                               if (res.data.results) return res.data.results.length;
-                               return 0;
-                           })
-                           .catch(() => 0)
-                    );
-
-                    const jobCounts = await Promise.all(jobCountPromises);
-                    const totalJobs = jobCounts.reduce((sum, current) => sum + current, 0);
-
+                    const statsRes = await api.get('/jobs/stats/');
                     setStats({
-                        corps: corpsCount,
-                        jobs: totalJobs,
+                        corps: statsRes.data.corps_count ?? 0,
+                        jobs: statsRes.data.job_postings_count ?? 0,
                         loading: false
                     });
-
                 } catch (statError) {
                     console.error("통계 데이터 계산 실패:", statError);
                     setStats(prev => ({ ...prev, loading: false }));
@@ -312,6 +290,27 @@ export default function Dashboard() {
         loadRelations();
     }, [activeStack?.id]);
 
+    // 트렌드 그래프 데이터: tech_trend API (job_mention_count, job_change_rate), 기간별
+    useEffect(() => {
+        if (isLanding || !activeStack?.id) {
+            setChartData([]);
+            return;
+        }
+        const load = async () => {
+            setChartDataLoading(true);
+            try {
+                const rows = await fetchTechTrends(activeStack.id, chartPeriod);
+                setChartData(rows);
+            } catch (e) {
+                console.error('트렌드 그래프 로드 실패:', e);
+                setChartData([]);
+            } finally {
+                setChartDataLoading(false);
+            }
+        };
+        load();
+    }, [isLanding, activeStack?.id, chartPeriod]);
+
     const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, name: string) => {
         const target = e.target as HTMLImageElement;
         target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&size=128&bold=true`;
@@ -405,12 +404,12 @@ export default function Dashboard() {
                                         <img 
                                             src={activeStack.logo || ""} 
                                             alt={activeStack.name} 
-                                            className="w-full h-full object-contain"
+                                            className="w-full h-full object-contain object-center"
                                             onError={(e) => handleImageError(e, activeStack.name)}
                                         />
                                     </div>
                                 </div>
-                                <div>
+                                <div className="pt-2">
                                     <div className="flex items-center gap-3 mb-1">
                                         <h2 className="text-3xl font-bold text-white tracking-tight">{activeStack.name}</h2>
                                         <button 
@@ -424,13 +423,13 @@ export default function Dashboard() {
                                             />
                                         </button>
                                     </div>
-                                    <div className="flex items-center gap-3 text-[#9FA0A8] text-sm mb-2">
-                                        <p className="text-sm text-gray-400 leading-relaxed line-clamp-2">
+                                    <div className="flex items-center gap-3 text-[#9FA0A8] text-base mb-2">
+                                        <p className="text-base text-gray-400 leading-relaxed line-clamp-2">
                                             {activeStack.description}
                                         </p>
                                         
                                         {(activeStack.postCount + activeStack.jobCount) > 0 && (
-                                            <span className="font-bold text-blue-400">
+                                            <span className="text-base font-bold text-blue-400">
                                                 총 언급량 {(activeStack.postCount + activeStack.jobCount).toLocaleString()}회
                                             </span>
                                         )}
@@ -443,7 +442,7 @@ export default function Dashboard() {
                                                     href={activeStack.officialSite} 
                                                     target="_blank" 
                                                     rel="noreferrer" 
-                                                    className="hover:text-blue-400 transition-colors flex items-center gap-1"
+                                                    className="text-base hover:text-blue-400 transition-colors flex items-center gap-1"
                                                 >
                                                     공식문서 연결 <ExternalLink size={14}/>
                                                 </a>
@@ -549,8 +548,8 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* ✅ 콘텐츠 영역: overflow-y-auto 추가 */}
-                <div className="flex-1 relative min-h-0 overflow-y-auto custom-scrollbar">
+                {/* ✅ 콘텐츠 영역: overflow-y-auto, 가로 스크롤 방지(overflow-x-hidden, min-w-0) */}
+                <div className="flex-1 relative min-h-0 min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
                     <AnimatePresence mode="wait">
                         <div className="w-full h-full">
 {isLanding ? (
@@ -611,8 +610,8 @@ export default function Dashboard() {
                                     <img src={topStacks[1].logo} alt="" className="w-full h-full object-contain drop-shadow-md" onError={(e) => handleImageError(e, topStacks[1].name)} />
                                 </div>
                                 <div className="text-center">
-                                    <h3 className="text-base font-bold text-white group-hover:text-blue-400 transition-colors">{topStacks[1].name}</h3>
-                                    <p className="text-xs text-blue-400 font-medium mt-1">{(topStacks[1].postCount + topStacks[1].jobCount).toLocaleString()} <span className="text-[10px] text-gray-500">언급량</span></p>
+                                    <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">{topStacks[1].name}</h3>
+                                    <p className="text-sm text-blue-400 font-medium mt-1">{(topStacks[1].postCount + topStacks[1].jobCount).toLocaleString()} <span className="text-xs text-gray-500">언급량</span></p>
                                 </div>
                             </div>
                         </motion.button>
@@ -637,10 +636,10 @@ export default function Dashboard() {
                                     <img src={topStacks[0].logo} alt="" className="w-full h-full object-contain drop-shadow-2xl" onError={(e) => handleImageError(e, topStacks[0].name)} />
                                 </div>
                                 <div className="text-center">
-                                    <h3 className="text-xl font-black text-white tracking-tight group-hover:text-yellow-400 transition-colors">{topStacks[0].name}</h3>
+                                    <h3 className="text-2xl font-black text-white tracking-tight group-hover:text-yellow-400 transition-colors">{topStacks[0].name}</h3>
                                     <div className="flex flex-col items-center gap-1 mt-2">
-                                        <span className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400">{(topStacks[0].postCount + topStacks[0].jobCount).toLocaleString()}</span>
-                                        <span className="text-[12px] text-gray-500 uppercase tracking-widest font-black">전체 언급량</span>
+                                        <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400">{(topStacks[0].postCount + topStacks[0].jobCount).toLocaleString()}</span>
+                                        <span className="text-sm text-gray-500 uppercase tracking-widest font-black">전체 언급량</span>
                                     </div>
                                 </div>
                                 <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden mt-2">
@@ -667,8 +666,8 @@ export default function Dashboard() {
                                     <img src={topStacks[2].logo} alt="" className="w-full h-full object-contain drop-shadow-md" onError={(e) => handleImageError(e, topStacks[2].name)} />
                                 </div>
                                 <div className="text-center">
-                                    <h3 className="text-base font-bold text-white group-hover:text-blue-400 transition-colors">{topStacks[2].name}</h3>
-                                    <p className="text-xs text-blue-400 font-medium mt-1">{(topStacks[2].postCount + topStacks[2].jobCount).toLocaleString()} <span className="text-[10px] text-gray-500">언급량</span></p>
+                                    <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">{topStacks[2].name}</h3>
+                                    <p className="text-sm text-blue-400 font-medium mt-1">{(topStacks[2].postCount + topStacks[2].jobCount).toLocaleString()} <span className="text-xs text-gray-500">언급량</span></p>
                                 </div>
                             </div>
                         </motion.button>
@@ -692,10 +691,10 @@ export default function Dashboard() {
                             </div>
                             <div className="flex-1 text-left min-w-0">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xm font-bold text-gray-500">{idx + 4}등</span>
-                                    <h4 className="text-base font-bold text-white truncate">{stack.name}</h4>
+                                    <span className="text-sm font-bold text-gray-500">{idx + 4}등</span>
+                                    <h4 className="text-lg font-bold text-white truncate">{stack.name}</h4>
                                 </div>
-                                <p className="text-xs text-gray-400 mt-0.5">{(stack.postCount + stack.jobCount).toLocaleString()} 언급량</p>
+                                <p className="text-sm text-gray-400 mt-0.5">{(stack.postCount + stack.jobCount).toLocaleString()} 언급량</p>
                             </div>
                             <ExternalLink size={14} className="text-gray-600 group-hover:text-blue-400 transition-colors" />
                         </motion.button>
@@ -737,8 +736,14 @@ export default function Dashboard() {
                                         </motion.div>
                                     )}
                                     {viewMode === "chart" && (
-                                        <motion.div key="trend-chart" className="absolute inset-0 pt-4 w-full h-full pb-10">
-                                            <TrendChart color={activeStack.themeColor} data={MOCK_CHART_DATA} />
+                                        <motion.div key="trend-chart" className="absolute inset-0 pt-4 w-full h-full pb-10 min-w-0">
+                                            <TrendChart
+                                                color={activeStack.themeColor}
+                                                data={chartData}
+                                                period={chartPeriod}
+                                                onPeriodChange={setChartPeriod}
+                                                isLoading={chartDataLoading}
+                                            />
                                         </motion.div>
                                     )}
                                 </>

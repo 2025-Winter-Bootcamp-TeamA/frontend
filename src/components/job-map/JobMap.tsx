@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Map as KakaoMap, CustomOverlayMap, useKakaoLoader } from "react-kakao-maps-sdk";
 import { Search, MapPin, RefreshCw, ArrowLeft, Building2, Star, Filter, X, List } from "lucide-react";
 import { api } from "@/lib/api";
 import { getAuthTokens } from "@/lib/auth";
 import JobCard from "../home/JobCard";
+
+// 서울 영등포구 — 채용 지도 첫 화면·리셋 시 고정
+const SEOUL_CENTER = { lat: 37.5172, lng: 126.9074 };
+const INITIAL_MAP_LEVEL = 8; // 한강·강남·서초·용산 등 넓은 서울 뷰 (레벨↑=축소)
 
 // --- 커스텀 훅: 디바운스 (입력 지연 처리) ---
 function useDebounce<T>(value: T, delay: number): T {
@@ -52,8 +56,8 @@ export default function JobMap() {
   const [visibleCompanies, setVisibleCompanies] = useState<Company[]>([]); // 화면에 렌더링할 데이터
   
   const [map, setMap] = useState<kakao.maps.Map | null>(null);
-  const [center, setCenter] = useState({ lat: 37.394776, lng: 127.11116 }); // 판교역
-  const [level, setLevel] = useState(8);
+  const [center, setCenter] = useState(SEOUL_CENTER);
+  const [level, setLevel] = useState(INITIAL_MAP_LEVEL);
 
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [companyJobs, setCompanyJobs] = useState<Job[]>([]); 
@@ -63,6 +67,7 @@ export default function JobMap() {
   
   const [activeTab, setActiveTab] = useState<"all" | "favorites">("all");
   const [favoriteCompanyIds, setFavoriteCompanyIds] = useState<number[]>([]);
+  const hasMapIdleFired = useRef(false);
 
   // --- 필터 상태 ---
   const [searchQuery, setSearchQuery] = useState(""); // 클라이언트 사이드 (기업명)
@@ -79,10 +84,10 @@ export default function JobMap() {
   const debouncedDistrict = useDebounce(district, 500);
 
   const cities = [
-    "서울특별시", "부산광역시", "대구광역시", "인천광역시", "광주광역시",
-    "대전광역시", "울산광역시", "세종특별자치시", "경기도", "강원도",
-    "충청북도", "충청남도", "전라북도", "전라남도", "경상북도", "경상남도", "제주특별자치도"
-  ]; 
+    "서울", "부산", "대구", "인천", "광주",
+    "대전", "울산", "세종", "경기", "강원",
+    "충북", "충남", "전북", "전남", "경북", "경남", "제주"
+    ];
 
   // 1. 초기 데이터 로드
   useEffect(() => {
@@ -102,27 +107,16 @@ export default function JobMap() {
           }
         }
 
-        // 전체 기업 목록 (최대 1000개)
-        const response = await api.get('/jobs/corps/?page_size=1000'); 
+        // 전체 기업 목록 (목록 API에 latitude/longitude 포함 → 상세 N회 호출 제거)
+        const response = await api.get('/jobs/corps/?page_size=1000');
         const rawCorps = Array.isArray(response.data) ? response.data : response.data.results || [];
-        
-        // 상세 좌표 정보 매핑 (필요 시)
-        const detailPromises = rawCorps.map((c: any) => 
-          api.get(`/jobs/corps/${c.id}/`).catch((err: any) => null)
-        );
-        
-        const details = await Promise.all(detailPromises);
-        const enriched = details
-          .filter(res => res !== null && res.data)
-          .map(res => {
-            const d = res?.data;
-            return {
-              ...d,
-              latitude: parseFloat(d.latitude || d.lat),
-              longitude: parseFloat(d.longitude || d.lng)
-            };
-          })
-          .filter((c: any) => !isNaN(c.latitude) && !isNaN(c.longitude) && c.latitude !== 0);
+        const enriched = rawCorps
+          .map((c: any) => ({
+            ...c,
+            latitude: parseFloat(c.latitude ?? c.lat ?? '0'),
+            longitude: parseFloat(c.longitude ?? c.lng ?? '0')
+          }))
+          .filter((c: any) => !isNaN(c.latitude) && !isNaN(c.longitude) && c.latitude !== 0 && c.longitude !== 0);
 
         setAllCompanies(enriched);
         setCompanies(enriched);
@@ -136,36 +130,37 @@ export default function JobMap() {
     fetchAllData();
   }, []);
 
-  // 2. 상세 필터링 (클라이언트 사이드 처리로 변경)
+  // 2. 상세 필터링: 경력·직무·지역을 한 번에 쿼리 → 백엔드가 AND 조건으로 교집합만 반환
+  //    (경력·직무·지역 모두 검색값이 있을 때, 세 조건을 **동시에** 만족하는 채용공고만 사용)
   useEffect(() => {
-    const filterCompanies = () => {
-      // 필터가 모두 비어있으면 전체 목록 복원
+    const filterCompanies = async () => {
       if (!debouncedCareer && !debouncedJobSearch && !debouncedCity && !debouncedDistrict) {
         setCompanies(allCompanies);
         return;
       }
 
       setIsDataLoading(true);
-      
-      // ✅ [수정] 백엔드 API 대신 클라이언트 사이드 필터링 적용
-      // (백엔드에 전체 공고 검색 API가 없으므로 로컬 데이터 활용)
-      const filtered = allCompanies.filter(company => {
-          // 1. 시/도 필터 (주소 기반)
-          if (debouncedCity && !company.address?.includes(debouncedCity)) return false;
-          
-          // 2. 구/군 필터 (주소 기반)
-          if (debouncedDistrict && !company.address?.includes(debouncedDistrict)) return false;
+      // 주어진 값만 params에 넣고, 한 요청으로 전달 → 백엔드에서 모두 만족(AND)하는 공고만 반환
+      const apiParams: Record<string, number | string> = {};
+      const year = parseInt(debouncedCareer, 10);
+      if (debouncedCareer !== "" && !isNaN(year) && year >= 0) apiParams.career_year = year;
+      if (debouncedJobSearch?.trim()) apiParams.job_title = debouncedJobSearch.trim();
+      if (debouncedCity?.trim()) apiParams.city = debouncedCity.trim();
+      if (debouncedDistrict?.trim()) apiParams.district = debouncedDistrict.trim();
+      apiParams.page_size = 5000; // AND 조건에 맞는 공고를 넉넉히 수집해 기업 목록 구성
 
-          // 3. 직무 키워드 (공고 내용 검색 불가하므로 기업명 검색으로 대체)
-          if (debouncedJobSearch && !company.name.toLowerCase().includes(debouncedJobSearch.toLowerCase())) return false;
-
-          // 4. 경력 (데이터 없음 - 필터링 생략)
-          
-          return true;
-      });
-
-      setCompanies(filtered);
-      setIsDataLoading(false);
+      try {
+        const res = await api.get("/jobs/job-postings/", { params: apiParams });
+        const raw = Array.isArray(res.data) ? res.data : res.data?.results || [];
+        const corpIds = new Set(raw.map((j: any) => j.corp?.id ?? j.corp_id).filter(Boolean).map(Number));
+        const filtered = allCompanies.filter((c) => corpIds.has(c.id));
+        setCompanies(filtered);
+      } catch (e) {
+        console.error("상세 필터 API 에러:", e);
+        setCompanies([]);
+      } finally {
+        setIsDataLoading(false);
+      }
     };
 
     if (allCompanies.length > 0) {
@@ -218,14 +213,44 @@ export default function JobMap() {
     updateVisibleCompanies();
   }, [finalCompanies, updateVisibleCompanies]);
 
+  // 선택한 기업이 현재 뷰 밖이어도 마커에 항상 포함 (클릭 시 위치 미표시 방지)
+  const companiesToShow = useMemo(() => {
+    if (!selectedCompany) return visibleCompanies;
+    const lat = Number(selectedCompany.latitude);
+    const lng = Number(selectedCompany.longitude);
+    const hasValidCoords = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+    if (!hasValidCoords) return visibleCompanies;
+    const alreadyIn = visibleCompanies.some((c) => c.id === selectedCompany.id);
+    return alreadyIn ? visibleCompanies : [selectedCompany, ...visibleCompanies];
+  }, [visibleCompanies, selectedCompany]);
+
+  // 선택 시 지도 중심·줌을 해당 기업 좌표로 이동 (state만으로는 미반영될 수 있어 map API 직접 호출)
+  useEffect(() => {
+    if (!map || !selectedCompany) return;
+    const lat = Number(selectedCompany.latitude);
+    const lng = Number(selectedCompany.longitude);
+    if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return;
+    const kakao = typeof window !== 'undefined' ? (window as any).kakao : null;
+    if (kakao?.maps?.LatLng) {
+      map.setCenter(new kakao.maps.LatLng(lat, lng));
+      map.setLevel(3);
+    }
+  }, [map, selectedCompany]);
 
   // --- 핸들러 함수들 ---
 
   const fetchCompanyJobs = async (corpId: number) => {
     setIsJobsLoading(true);
     try {
-      const response = await api.get(`/jobs/corps/${corpId}/job-postings/`);
-      const rawJobs = response.data.results || response.data || [];
+      const params: Record<string, number | string> = {};
+      const year = parseInt(careerYear, 10);
+      if (careerYear !== "" && !isNaN(year) && year >= 0) params.career_year = year;
+      if (jobSearch?.trim()) params.job_title = jobSearch.trim();
+      if (city?.trim()) params.city = city.trim();
+      if (district?.trim()) params.district = district.trim();
+
+      const response = await api.get(`/jobs/corps/${corpId}/job-postings/`, { params });
+      const rawJobs = response.data?.results || response.data || [];
       setCompanyJobs(rawJobs.map((j: any) => ({
         id: j.id,
         title: j.title,
@@ -321,9 +346,7 @@ export default function JobMap() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, companies]);
 
-  // ✅ Navbar에서 'resetJobMap' 이벤트 시 채용 지도 첫 화면으로 복귀
-  const DEFAULT_CENTER = { lat: 37.496, lng: 127.029 };
-  const DEFAULT_LEVEL = 8;
+  // ✅ Navbar에서 'resetJobMap' 이벤트 시 채용 지도 첫 화면(서울 중심)으로 복귀
   useEffect(() => {
     const handleReset = () => {
       setSelectedCompany(null);
@@ -331,8 +354,8 @@ export default function JobMap() {
       resetFilters();
       setSearchQuery("");
       setShowFilters(false);
-      setCenter(DEFAULT_CENTER);
-      setLevel(DEFAULT_LEVEL);
+      setCenter(SEOUL_CENTER);
+      setLevel(INITIAL_MAP_LEVEL);
     };
     window.addEventListener("resetJobMap", handleReset);
     return () => window.removeEventListener("resetJobMap", handleReset);
@@ -405,8 +428,8 @@ export default function JobMap() {
                                 <input type="number" min="0" value={careerYear} onChange={(e) => setCareerYear(e.target.value)} className="w-full bg-[#25262B] text-white px-2 py-1.5 rounded border border-white/10 text-sm focus:border-blue-500 outline-none" />
                             </div>
                             <div>
-                                <label className="block text-xs text-gray-400 mb-1">직무 키워드</label>
-                                <input type="text" value={jobSearch} onChange={(e) => setJobSearch(e.target.value)} className="w-full bg-[#25262B] text-white px-2 py-1.5 rounded border border-white/10 text-sm focus:border-blue-500 outline-none" />
+                                <label className="block text-xs text-gray-400 mb-1">직무 분야</label>
+                                <input type="text" value={jobSearch} onChange={(e) => setJobSearch(e.target.value)} placeholder="공고 제목 검색" className="w-full bg-[#25262B] text-white px-2 py-1.5 rounded border border-white/10 text-sm focus:border-blue-500 outline-none" />
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
@@ -469,12 +492,12 @@ export default function JobMap() {
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between">
-                                    <h2 className="text-lg font-bold text-white truncate">{selectedCompany.name}</h2>
+                                    <h2 className="text-base font-bold text-white truncate">{selectedCompany.name}</h2>
                                     <button onClick={(e) => toggleCompanyFavorite(e, selectedCompany.id)}>
                                         <Star size={20} fill={favoriteCompanyIds.includes(selectedCompany.id) ? "#EAB308" : "none"} className={favoriteCompanyIds.includes(selectedCompany.id) ? "text-yellow-500" : "text-gray-500"} />
                                     </button>
                                 </div>
-                                <p className="text-xs text-gray-400 mt-1 flex items-start gap-1 break-keep">
+                                <p className="text-[11px] text-gray-400 mt-1 flex items-start gap-1 break-keep">
                                     <MapPin size={12} className="shrink-0 mt-0.5" />
                                     {selectedCompany.address}
                                 </p>
@@ -491,7 +514,7 @@ export default function JobMap() {
                             </div>
                         ) : (
                             companyJobs.map(job => (
-                                <JobCard key={job.id} id={job.id} company={selectedCompany.name} logo={selectedCompany.logo_url} position={job.title} url={job.url} deadline={job.deadline} />
+                                <JobCard key={job.id} id={job.id} company={selectedCompany.name} logo={selectedCompany.logo_url} position={job.title} url={job.url} deadline={job.deadline} compact />
                             ))
                         )}
                     </div>
@@ -500,7 +523,7 @@ export default function JobMap() {
                 // (2) 기업 목록 (최종 리스트)
                 <div className="space-y-2">
                     <div className="flex items-center justify-between px-1 mb-4">
-                        <p className="text-[10px] font-bold text-gray-500 uppercase">
+                        <p className="text-xs font-bold text-gray-500 uppercase">
                             {/* 현재 보여지는 리스트의 개수 */}
                             {activeTab === "favorites" ? "즐겨찾기 기업" : "검색 결과"} ({finalCompanies.length})
                         </p>
@@ -525,8 +548,8 @@ export default function JobMap() {
                                     {company.logo_url ? <img src={company.logo_url} alt={company.name} className="w-full h-full object-contain" /> : <Building2 className="text-gray-400 w-5 h-5" />}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="font-bold text-white text-sm truncate group-hover:text-blue-400 transition-colors">{company.name}</h3>
-                                    <p className="text-[11px] text-gray-500 mt-0.5 truncate">{company.address}</p>
+                                    <h3 className="font-bold text-white text-base truncate group-hover:text-blue-400 transition-colors">{company.name}</h3>
+                                    <p className="text-xs text-gray-500 mt-0.5 truncate">{company.address}</p>
                                 </div>
                                 <button
                                     onClick={(e) => toggleCompanyFavorite(e, company.id)}
@@ -567,11 +590,16 @@ export default function JobMap() {
             zoomable={!isDataLoading}
             onZoomChanged={(map) => setLevel(map.getLevel())}
             onIdle={(map) => {
-                setCenter({ lat: map.getCenter().getLat(), lng: map.getCenter().getLng() });
+                // 첫 onIdle에서는 setCenter 생략 → 서울 중심 고정값이 SDK 기본값으로 덮이지 않음
+                if (hasMapIdleFired.current) {
+                    setCenter({ lat: map.getCenter().getLat(), lng: map.getCenter().getLng() });
+                } else {
+                    hasMapIdleFired.current = true;
+                }
                 updateVisibleCompanies(); // 화면 이동 시 마커 갱신
             }}
         >
-          {visibleCompanies.map((company) => (
+          {companiesToShow.map((company) => (
             <CustomOverlayMap 
                 key={company.id} 
                 position={{ lat: company.latitude, lng: company.longitude }} 

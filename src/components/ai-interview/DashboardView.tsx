@@ -87,6 +87,7 @@ export default function DashboardView({
             setIsLoadingCompanies(true);
             try {
                 let analyzedJobPostingIds = new Set<number>();
+                let analyzedCorpIds = new Set<number>();
                 if (resumeId) {
                     try {
                         const matchingsResponse = await api.get('/resumes/matchings/');
@@ -94,6 +95,7 @@ export default function DashboardView({
                         matchings.forEach((matching: any) => {
                             if (matching.resume === resumeId) {
                                 analyzedJobPostingIds.add(matching.job_posting);
+                                if (matching.job_posting_corp_id != null) analyzedCorpIds.add(matching.job_posting_corp_id);
                             }
                         });
                     } catch (error) {
@@ -103,62 +105,8 @@ export default function DashboardView({
 
                 const bookmarksResponse = await api.get('/jobs/corp-bookmarks/');
                 const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
-                const favoriteCorpIds = new Set(bookmarks.map((b: any) => b.corp.id));
-                
-                let analyzedCorpIds = new Set<number>();
-                if (analyzedJobPostingIds.size > 0) {
-                    try {
-                        const allCorpsResponse = await api.get('/jobs/corps/');
-                        const allCorps = allCorpsResponse.data || [];
-                        
-                        const corpChecks = await Promise.all(
-                            allCorps.map(async (corp: any) => {
-                                try {
-                                    let jobPostings: any[] = [];
-                                    let nextUrl: string | null = `/jobs/corps/${corp.id}/job-postings/`;
-                                    
-                                    while (nextUrl) {
-                                        try {
-                                            const jobsResponse: any = await api.get(nextUrl);
-                                            let pageJobPostings: any[] = [];
-                                            
-                                            if (Array.isArray(jobsResponse.data)) {
-                                                pageJobPostings = jobsResponse.data;
-                                                nextUrl = null;
-                                            } else if (jobsResponse.data?.results && Array.isArray(jobsResponse.data.results)) {
-                                                pageJobPostings = jobsResponse.data.results;
-                                                nextUrl = jobsResponse.data.next || null;
-                                                if (nextUrl && !nextUrl.startsWith('http')) {
-                                                    nextUrl = nextUrl.startsWith('/') ? nextUrl : `/${nextUrl}`;
-                                                }
-                                            } else {
-                                                nextUrl = null;
-                                            }
-                                            
-                                            jobPostings = [...jobPostings, ...pageJobPostings];
-                                            if (pageJobPostings.some((job: any) => analyzedJobPostingIds.has(job.id))) {
-                                                return corp.id;
-                                            }
-                                        } catch (error) {
-                                            nextUrl = null;
-                                        }
-                                    }
-                                    const hasAnalyzedJob = jobPostings.some((job: any) => analyzedJobPostingIds.has(job.id));
-                                    return hasAnalyzedJob ? corp.id : null;
-                                } catch (error) {
-                                    return null;
-                                }
-                            })
-                        );
-                        
-                        corpChecks.forEach((corpId) => {
-                            if (corpId !== null) analyzedCorpIds.add(corpId);
-                        });
-                    } catch (error) {
-                        console.log('기업 목록 확인 실패:', error);
-                    }
-                }
-                
+                const favoriteCorpIds = new Set(bookmarks.map((b: any) => b.corp?.id ?? b.corp_id).filter(Boolean));
+
                 const allCorpIds = new Set([...Array.from(favoriteCorpIds), ...Array.from(analyzedCorpIds)]);
                 
                 if (allCorpIds.size === 0) {
@@ -172,14 +120,14 @@ export default function DashboardView({
                         const corpIdNum = Number(corpId);
                         if (isNaN(corpIdNum)) return null;
                         try {
-                            let corp = bookmarks.find((b: any) => b.corp.id === corpIdNum)?.corp;
+                            let corp = bookmarks.find((b: any) => b.corp?.id === corpIdNum)?.corp;
                             if (!corp) {
                                 const corpResponse = await api.get(`/jobs/corps/${corpIdNum}/`);
                                 corp = corpResponse.data;
                             }
                             
                             let jobPostings: any[] = [];
-                            let nextUrl: string | null = `/jobs/corps/${corpIdNum}/job-postings/`;
+                            let nextUrl: string | null = `/jobs/corps/${corpIdNum}/job-postings/?page_size=500`;
                             
                             while (nextUrl) {
                                 const jobsResponse: any = await api.get(nextUrl);
@@ -269,7 +217,7 @@ export default function DashboardView({
                     corps.map(async (corp: any) => {
                         try {
                             let jobPostings: any[] = [];
-                            let nextUrl: string | null = `/jobs/corps/${corp.id}/job-postings/`;
+                            let nextUrl: string | null = `/jobs/corps/${corp.id}/job-postings/?page_size=500`;
                             while (nextUrl) {
                                 const jobsResponse: any = await api.get(nextUrl);
                                 let pageJobPostings: any[] = [];

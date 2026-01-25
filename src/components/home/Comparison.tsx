@@ -336,14 +336,14 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
                         </h4>
                         <div className="space-y-4">
                             <div>
-                                <span className="text-blue-400 font-bold text-xm mb-1 block">{leftStack.name}</span>
-                                <p className="text-sx text-gray-300 leading-relaxed line-clamp-6">
+                                <span className="text-blue-400 font-bold text-lg mb-1 block">{leftStack.name}</span>
+                                <p className="text-lg text-gray-300 leading-relaxed line-clamp-6">
                                     {leftStack.description || "설명 데이터가 없습니다."}
                                 </p>
                             </div>
                             <div className="border-t border-gray-800 pt-3">
-                                <span className="text-purple-400 font-bold text-xm mb-1 block">{rightStack.name}</span>
-                                <p className="text-sx text-gray-300 leading-relaxed line-clamp-6">
+                                <span className="text-purple-400 font-bold text-lg mb-1 block">{rightStack.name}</span>
+                                <p className="text-lg text-gray-300 leading-relaxed line-clamp-6">
                                     {rightStack.description || "설명 데이터가 없습니다."}
                                 </p>
                             </div>
