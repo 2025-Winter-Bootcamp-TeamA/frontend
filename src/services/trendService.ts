@@ -174,6 +174,37 @@ export interface TechStackRelationsResponse {
     created_at: string;
 }
 
+/** tech_trend 그래프용 항목 타입 */
+export interface TechTrendChartItem {
+  date: string;
+  job_mention_count: number;
+  job_change_rate: number;
+}
+
+/**
+ * 기술 트렌드 목록 조회 (꺾은선 그래프용)
+ * - tech_stack, days(7|30|90), ordering=reference_date 지원
+ * - 페이지네이션 results 사용, page_size=100 요청으로 기간 내 전체 반환
+ */
+export const fetchTechTrends = async (
+  techStackId: number,
+  days: 7 | 30 | 90
+): Promise<TechTrendChartItem[]> => {
+  try {
+    const url = `trends/?tech_stack=${techStackId}&days=${days}&ordering=reference_date&page_size=100`;
+    const response = await apiPublic.get<{ results?: Array<{ reference_date: string; job_mention_count: number; job_change_rate: number }> }>(url);
+    const raw = response.data?.results ?? (Array.isArray(response.data) ? response.data : []);
+    return raw.map((r: { reference_date: string; job_mention_count: number; job_change_rate: number }) => ({
+      date: r.reference_date,
+      job_mention_count: Number(r.job_mention_count) ?? 0,
+      job_change_rate: Number(r.job_change_rate) ?? 0,
+    }));
+  } catch (error) {
+    console.error('fetchTechTrends failed:', error);
+    return [];
+  }
+};
+
 /**
  * 기술 스택의 관련 기술 스택 조회
  */

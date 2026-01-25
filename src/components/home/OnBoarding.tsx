@@ -207,7 +207,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 />
             </motion.div>
 
-            {/* ✅ [수정] 분석 결과 뱃지 위치 조정 (오른쪽 하단) */}
+            {/* 분석 결과 뱃지 */}
             <motion.div 
                 className="absolute bottom-20 right-12 bg-[#25262B] border border-orange-500/30 p-3 rounded-xl shadow-2xl flex items-center gap-3 backdrop-blur-md"
                 initial={{ scale: 0, opacity: 0, y: 20 }}
@@ -223,7 +223,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 </div>
             </motion.div>
 
-            {/* ✅ [수정] 돋보기 아이콘 위치 및 디자인 조정 (왼쪽 상단에서 스캔하는 느낌) */}
+            {/* 돋보기 아이콘 */}
             <motion.div
                 className="absolute top-24 left-12 text-orange-400 opacity-90"
                 initial={{ scale: 0, opacity: 0 }}
@@ -236,7 +236,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 }}
             >
                 <div className="relative">
-                    {/* 돋보기 배경 글로우 추가 */}
+                    {/* 돋보기 배경 글로우 */}
                     <div className="absolute inset-0 bg-orange-500/20 blur-xl rounded-full" />
                     <Search size={56} strokeWidth={2.5} className="drop-shadow-[0_0_15px_rgba(251,146,60,0.6)] relative z-10" />
                 </div>
@@ -249,7 +249,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#0F1012] text-white overflow-hidden relative flex flex-col items-center justify-center">
+    // ✅ [수정 1] fixed inset-0으로 변경하여 네비바 영향 없이 화면 전체 덮기 (z-index 100)
+    <div className="fixed inset-0 z-[100] h-[100dvh] w-full bg-[#0F1012] text-white overflow-hidden flex flex-col items-center justify-center">
       
       <motion.div
         animate={{
@@ -262,9 +263,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         className="absolute inset-0 opacity-15 blur-[120px] transition-all duration-1000 pointer-events-none"
       />
 
-      <div className="w-full max-w-[1400px] relative z-10 flex flex-col lg:flex-row items-center justify-center p-6 lg:p-12 gap-12 lg:gap-24 h-full">
+      {/* ✅ [수정 2] max-h를 화면 높이에 맞춰 유동적으로 조절하여 넘침 방지 */}
+      <div className="w-full max-w-[1400px] relative z-10 flex flex-col lg:flex-row items-center justify-center p-6 lg:p-8 gap-8 lg:gap-16 h-full max-h-[min(800px,90vh)]">
         
-        <div className="relative w-full lg:w-1/2 max-w-[500px] aspect-square flex items-center justify-center">
+        <div className="relative w-full lg:w-1/2 max-w-[400px] lg:max-w-[450px] aspect-square flex items-center justify-center">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentStep}
@@ -298,9 +300,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.3 }}
-                className="mb-10 min-h-[140px]"
+                className="mb-6 min-h-[120px]"
               >
-                <h1 className={`text-3xl lg:text-5xl font-black mb-6 leading-tight whitespace-pre-wrap bg-clip-text text-transparent bg-gradient-to-r ${STEPS[currentStep].color}`}>
+                <h1 className={`text-3xl lg:text-5xl font-black mb-4 leading-tight whitespace-pre-wrap bg-clip-text text-transparent bg-gradient-to-r ${STEPS[currentStep].color}`}>
                   {STEPS[currentStep].title}
                 </h1>
                 <p className="text-base lg:text-lg text-gray-400 leading-relaxed whitespace-pre-wrap font-medium">

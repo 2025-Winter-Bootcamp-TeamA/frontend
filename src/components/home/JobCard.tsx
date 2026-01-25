@@ -10,6 +10,8 @@ interface JobCardProps {
     logo?: string;
     deadline: string | null; // null 허용 (상시채용 대응)
     url: string;
+    /** 채용 지도 등에서 카드 크기를 줄일 때 사용 */
+    compact?: boolean;
 }
 
 export default function JobCard({ 
@@ -18,7 +20,8 @@ export default function JobCard({
     position, 
     logo, 
     deadline, 
-    url
+    url,
+    compact = false
 }: JobCardProps) {
     
     // 마감일 배지 렌더링 로직
@@ -47,50 +50,52 @@ export default function JobCard({
         }
 
         return (
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded text-white flex-shrink-0 ${dDayColor}`}>
+            <span className={`${compact ? "text-xs" : "text-[14px]"} font-semibold px-2 py-0.5 rounded text-white flex-shrink-0 ${dDayColor}`}>
                 {dDayText}
             </span>
         );
     };
 
+    const iconSize = compact ? 18 : 24;
+
     return (
         <motion.div 
             whileHover={{ y: -3 }}
-            className="relative w-full min-w-[240px] rounded-xl p-4 cursor-pointer border transition-all duration-200 bg-[#25262B] border-white/5 hover:bg-[#2C2D33] hover:border-white/20"
+            className={`relative w-full rounded-xl cursor-pointer border transition-all duration-200 bg-[#25262B] border-white/5 hover:bg-[#2C2D33] hover:border-white/20 ${compact ? "min-w-0 p-3" : "min-w-[240px] p-4"}`}
         >
 
             {/* 카드 전체 링크 */}
             <a href={url} target="_blank" rel="noopener noreferrer" className="block">
-                <div className="flex items-center gap-3 mb-3">
+                <div className={`flex items-center gap-3 ${compact ? "gap-2 mb-2" : "mb-3"}`}>
                     {/* 로고 영역 */}
-                    <div className="w-12 h-12 bg-white rounded-lg overflow-hidden flex items-center justify-center p-1.5 flex-shrink-0">
+                    <div className={`${compact ? "w-10 h-10 p-1" : "w-16 h-16 p-1.5"} bg-white rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0`}>
                         {logo ? (
                             <img src={logo} alt={company} className="object-contain w-full h-full" />
                         ) : (
-                            <Building className="text-gray-400 w-6 h-6" />
+                            <Building className={`text-gray-400 ${compact ? "w-4 h-4" : "w-6 h-6"}`} />
                         )}
                     </div>
                     
                     {/* 텍스트 정보 */}
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                            <h4 className="text-white font-bold truncate text-sm">{company}</h4>
+                            <h4 className={`text-white font-bold truncate ${compact ? "text-base" : "text-xl"}`}>{company}</h4>
                             {/* 배지 표시 (마감일 없으면 안 뜸) */}
                             {renderBadge()}
                         </div>
-                        <p className="text-gray-400 text-xs truncate">{position}</p>
+                        <p className={`text-gray-400 truncate ${compact ? "text-xs" : "text-sm"}`}>{position}</p>
                     </div>
                 </div>
 
                 {/* 하단 정보 */}
-                <div className="flex items-center gap-3 text-[10px] text-gray-500 pt-2 border-t border-white/5">
+                <div className={`flex items-center gap-3 text-gray-500 pt-2 border-t border-white/5 ${compact ? "text-xs" : "text-[14px]"}`}>
                     <div className="flex items-center gap-1">
-                        <Calendar size={12} />
+                        <Calendar size={iconSize} />
                         {/* 마감일이 있으면 날짜, 없으면 상시채용 */}
                         <span>{deadline || "상시채용"}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                        <Briefcase size={12} />
+                        <Briefcase size={iconSize} />
                         <span>채용중</span>
                     </div>
                 </div>

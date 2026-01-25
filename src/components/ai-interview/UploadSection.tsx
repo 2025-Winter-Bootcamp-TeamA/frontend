@@ -19,33 +19,45 @@ export default function UploadSection({ onUploadClick, onMyPageClick }: UploadSe
             initial={{ opacity: 0, scale: 0.98 }} 
             animate={{ opacity: 1, scale: 1 }} 
             exit={{ opacity: 0, scale: 0.98 }}
-            // ✅ [수정] onClick 제거 및 cursor-pointer -> cursor-default로 변경 (배경 클릭 방지)
-            className="h-[600px] flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-[40px] bg-white/[0.01] hover:bg-white/[0.02] transition-all cursor-default group p-10"
+            // ✅ [수정 1] 높이 고정(h-[600px]) 제거 -> h-full로 부모 높이 채움
+            // ✅ [수정 2] 패딩 축소 (p-10 -> p-6) 및 반응형 적용 (큰 화면에선 p-10)
+            className="h-full w-full flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-[40px] bg-white/[0.01] hover:bg-white/[0.02] transition-all cursor-default group p-6 lg:p-10"
         >
-            <div className="w-32 h-32 rounded-full bg-blue-600/5 flex items-center justify-center mb-8 border border-blue-600/10 group-hover:scale-110 transition-transform duration-500">
-                <UploadCloud size={56} className="text-blue-500 opacity-60" />
-            </div>
-            <h2 className="text-4xl font-black mb-4 tracking-tighter text-white">분석할 이력서를 업로드하세요</h2>
-            
-            <p className="text-[#9FA0A8] max-w-md leading-relaxed mb-10 text-lg text-center">
-                <span className="text-blue-400 font-bold">{displayName}</span>님의 이력서를 바탕으로 <span className="text-blue-400 font-bold">최적의 기술 스택</span>과<br />
-                <span className="text-blue-400 font-bold">가장 적합한 기업</span>을 분석해 드립니다.
-            </p>
-            
-            <div className="flex gap-4">
-                <button 
-                    onClick={(e) => { e.stopPropagation(); onMyPageClick(); }} 
-                    className="px-8 py-4 bg-white/5 border border-white/10 text-white font-bold rounded-2xl hover:bg-white/10 transition-all flex items-center gap-2 cursor-pointer"
-                >
-                    <User size={20} /> 마이페이지 불러오기
-                </button>
-                {/* ✅ [수정] 이 버튼을 클릭했을 때만 업로드 창이 뜨도록 유지 */}
-                <button 
-                    onClick={(e) => { e.stopPropagation(); onUploadClick(); }}
-                    className="px-8 py-4 bg-white text-black font-black rounded-2xl shadow-xl hover:bg-gray-100 transition-all active:scale-95 flex items-center gap-2 cursor-pointer"
-                >
-                    <Monitor size={20} /> 내 컴퓨터에서 찾기
-                </button>
+            {/* ✅ [수정 3] Flex Gap을 사용하여 요소 간 간격 자동 조절 */}
+            <div className="flex flex-col items-center justify-center w-full max-w-3xl gap-6 lg:gap-10">
+                
+                {/* 아이콘: 작은 화면에선 작게, 큰 화면에선 크게 */}
+                <div className="w-24 h-24 lg:w-32 lg:h-32 rounded-full bg-blue-600/5 flex items-center justify-center border border-blue-600/10 group-hover:scale-110 transition-transform duration-500 shrink-0">
+                    <UploadCloud className="text-blue-500 opacity-60 w-10 h-10 lg:w-14 lg:h-14" />
+                </div>
+                
+                <div className="text-center space-y-2 lg:space-y-4">
+                    {/* 폰트 크기 반응형 조정 */}
+                    <h2 className="text-2xl lg:text-4xl font-black tracking-tighter text-white">
+                        분석할 이력서를 업로드하세요
+                    </h2>
+                    
+                    <p className="text-[#9FA0A8] text-sm lg:text-lg leading-relaxed max-w-lg mx-auto">
+                        <span className="text-blue-400 font-bold">{displayName}</span>님의 이력서를 바탕으로 <br className="block md:hidden" />
+                        <span className="text-blue-400 font-bold">최적의 기술 스택</span>과 <span className="text-blue-400 font-bold">가장 적합한 기업</span>을 분석해 드립니다.
+                    </p>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-3 lg:gap-4 w-full justify-center">
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onMyPageClick(); }} 
+                        className="px-6 py-3 lg:px-8 lg:py-4 bg-white/5 border border-white/10 text-white font-bold rounded-2xl hover:bg-white/10 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm lg:text-base shrink-0"
+                    >
+                        <User className="w-4 h-4 lg:w-5 lg:h-5" /> 마이페이지 불러오기
+                    </button>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onUploadClick(); }}
+                        className="px-6 py-3 lg:px-8 lg:py-4 bg-white text-black font-black rounded-2xl hover:bg-gray-200 transition-all flex items-center justify-center gap-2 shadow-[0_0_30px_-5px_rgba(255,255,255,0.3)] cursor-pointer text-sm lg:text-base shrink-0"
+                    >
+                        <Monitor className="w-4 h-4 lg:w-5 lg:h-5" /> PC에서 파일 선택
+                    </button>
+                </div>
+
             </div>
         </motion.div>
     );

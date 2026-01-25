@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, TrendingUp, Scale, ExternalLink, Star, Trophy, AlertCircle } from "lucide-react"; // ArrowLeft 제거
+import { Search, TrendingUp, Scale, ExternalLink, Star, Trophy, AlertCircle, Building2, FileText, RefreshCw } from "lucide-react"; 
 import TrendChart from "./TrendChart";
 import StackComparison, { StackData } from "./Comparison";
 import StackRelationAnalysis from "./RelationAnalysis";
@@ -13,8 +13,9 @@ import { getAuthTokens } from "@/lib/auth";
 import LoginCheckModal from "@/components/LoginCheckModal";
 import LoginModal from "@/components/LoginModal";
 
-import { searchTechStacks, getTechStackRelations, getTechStackById, RelatedTechStackRelation, getExternalLogoUrl, fetchTop5TechStacksByJobCount } from "@/services/trendService";
+import { searchTechStacks, getTechStackRelations, getTechStackById, RelatedTechStackRelation, getExternalLogoUrl, fetchTop5TechStacksByJobCount, fetchTechTrends, TechTrendChartItem } from "@/services/trendService";
 import { TechStackData } from "@/types/trend";
+import type { ChartPeriod } from "./TrendChart";
 
 // 커스텀 노드 아이콘
 const NetworkIcon = ({ size = 20, className = "" }: { size?: number, className?: string }) => (
@@ -55,25 +56,11 @@ interface DashboardStackData extends StackData {
   created_at?: string; 
 }
 
-interface TechTrendResponse {
-    id: number;
-    tech_stack: {
-        id: number;
-        name: string;
-        description: string;
-        logo: string | null;
-        docs_url: string | null;
-        created_at: string;
-    };
-    mention_count: number;
-    change_rate: number;
-    reference_date: string;
-}
-
 const EMPTY_STACK: DashboardStackData = {
     id: 0,
     name: "",
-    count: 0,
+    postCount: 0,
+    jobCount: 0,
     growth: 0,
     color: "",
     logo: "",
@@ -82,15 +69,6 @@ const EMPTY_STACK: DashboardStackData = {
     officialSite: "",
     created_at: ""
 };
-
-const MOCK_CHART_DATA = [
-  { year: "2024.01", company: 45, community: 30 },
-  { year: "2024.02", company: 52, community: 35 },
-  { year: "2024.03", company: 48, community: 40 },
-  { year: "2024.04", company: 60, community: 45 },
-  { year: "2024.05", company: 65, community: 55 },
-  { year: "2024.06", company: 75, community: 60 },
-];
 
 export default function Dashboard() {
     const [isLanding, setIsLanding] = useState(true); 
@@ -112,6 +90,14 @@ export default function Dashboard() {
 
     const [stackFavorites, setStackFavorites] = useState<number[]>([]);
 
+    // 트렌드 그래프: tech_trend 기반 job_mention_count, job_change_rate, 기간(7/30/90일)
+    const [chartPeriod, setChartPeriod] = useState<ChartPeriod>(30);
+    const [chartData, setChartData] = useState<TechTrendChartItem[]>([]);
+    const [chartDataLoading, setChartDataLoading] = useState(false);
+    
+    // 통계 데이터 상태
+    const [stats, setStats] = useState({ corps: 0, jobs: 0, loading: true });
+
     const [showLoginCheck, setShowLoginCheck] = useState(false);
     const [showLoginModal, setShowLoginModal] = useState(false);
 
@@ -123,10 +109,11 @@ export default function Dashboard() {
     }, []);
 
     const formatSearchResults = (apiResults: TechStackData[]): DashboardStackData[] => {
-        return apiResults.map((stack, index) => ({
+        return apiResults.map((stack: any, index) => ({
             id: stack.id,
             name: stack.name,
-            count: 0,
+            postCount: Number(stack.article_stack_count) || Number(stack.count) || 0,
+            jobCount: Number(stack.job_stack_count) || Number(stack.job_posting_count) || 0,
             growth: 0,
             color: index % 2 === 0 ? "from-blue-500 to-indigo-500" : "from-green-500 to-emerald-500",
             logo: stack.logo || getExternalLogoUrl(stack.name), 
@@ -137,27 +124,11 @@ export default function Dashboard() {
         }));
     };
 
-    const formatRankingData = (trends: TechTrendResponse[]): DashboardStackData[] => {
-        return trends.map((trend, index) => ({
-            id: trend.tech_stack.id,
-            name: trend.tech_stack.name,
-            count: trend.mention_count, 
-            growth: trend.change_rate,  
-            color: index % 2 === 0 ? "from-blue-500 to-indigo-500" : "from-green-500 to-emerald-500",
-            logo: trend.tech_stack.logo || getExternalLogoUrl(trend.tech_stack.name),
-            themeColor: "#3B82F6",
-            description: trend.tech_stack.description || "상세 설명이 없습니다.",
-            officialSite: trend.tech_stack.docs_url || "#",
-            created_at: trend.tech_stack.created_at
-        }));
-    };
-
-    // 초기 데이터 로드 (Top 5)
     useEffect(() => {
         const loadInitialData = async () => {
             setIsInitialLoading(true);
             try {
-                // ✅ 백엔드에서 즐겨찾기 목록 가져오기
+                // (1) 즐겨찾기 목록 로드
                 const { accessToken } = getAuthTokens();
                 if (accessToken) {
                     try {
@@ -173,29 +144,60 @@ export default function Dashboard() {
                     }
                 }
 
-                // ✅ job_stack_count 기준 상위 5개만 1회 요청 (fetchTop5TechStacksByJobCount)
+                // (2) Top 5 데이터 로드 및 정렬 로직 수정
                 const top5Data = await fetchTop5TechStacksByJobCount();
-                const uniqueTop5 = Array.from(new Map(top5Data.map((s: any) => [s.id, s])).values()).slice(0, 5);
+                
+                // 중복 제거
+                const uniqueData = Array.from(new Map(top5Data.map((s: any) => [s.id, s])).values());
 
-                if (uniqueTop5.length > 0) {
-                    const formattedTop5 = uniqueTop5.map((stack: any, index: number) => ({
+                if (uniqueData.length > 0) {
+                    // 1. 먼저 데이터를 매핑하여 count 값을 숫자로 변환
+                    let mappedStacks = uniqueData.map((stack: any) => ({
                         id: stack.id,
                         name: stack.name,
-                        count: Number(stack.job_stack_count) || 0, // job_stack_count(채용공고 스택 수) 사용
+                        postCount: Number(stack.article_stack_count) || Number(stack.count) || 0,
+                        jobCount: Number(stack.job_stack_count) || Number(stack.job_posting_count) || 0,
                         growth: 0,
-                        color: index % 2 === 0 ? "from-blue-500 to-indigo-500" : "from-green-500 to-emerald-500",
                         logo: stack.logo || getExternalLogoUrl(stack.name),
                         themeColor: "#3B82F6",
                         description: stack.description || "상세 설명이 없습니다.",
                         officialSite: stack.docs_url || "#",
-                        created_at: stack.created_at
+                        created_at: stack.created_at,
+                        color: "" // 나중에 할당
                     }));
-                    setTopStacks(formattedTop5);
-                    setActiveStack(formattedTop5[0]); 
+
+                    // 2. [핵심 수정] (채용공고 + 게시글) 합계 기준으로 내림차순 정렬
+                    mappedStacks.sort((a, b) => (b.postCount + b.jobCount) - (a.postCount + a.jobCount));
+
+                    // 3. 상위 5개만 자르기
+                    const top5Stacks = mappedStacks.slice(0, 5);
+
+                    // 4. 색상 할당 (순위에 따라 색상 지정)
+                    const finalTop5 = top5Stacks.map((stack, index) => ({
+                        ...stack,
+                        color: index % 2 === 0 ? "from-blue-500 to-indigo-500" : "from-green-500 to-emerald-500"
+                    }));
+
+                    setTopStacks(finalTop5);
+                    setActiveStack(finalTop5[0]);
                 } else {
                     setTopStacks([]);
                     setActiveStack(EMPTY_STACK);
                 }
+
+                // (3) 통계 데이터 로드: /jobs/stats/ 한 번 호출로 기업 수·공고 수 조회
+                try {
+                    const statsRes = await api.get('/jobs/stats/');
+                    setStats({
+                        corps: statsRes.data.corps_count ?? 0,
+                        jobs: statsRes.data.job_postings_count ?? 0,
+                        loading: false
+                    });
+                } catch (statError) {
+                    console.error("통계 데이터 계산 실패:", statError);
+                    setStats(prev => ({ ...prev, loading: false }));
+                }
+
             } catch (e) {
                 console.error("Initial load error:", e);
                 setTopStacks([]);
@@ -206,13 +208,11 @@ export default function Dashboard() {
         loadInitialData();
     }, []);
 
-    // ✅ [추가] Navbar에서 'resetDashboard' 이벤트 발생 시 Top 5 화면으로 복귀
     useEffect(() => {
         const handleReset = () => {
             setIsLanding(true);
             setSearchQuery("");
             setFilteredStacks([]);
-            // Top 5 중 1위를 배경으로 설정 (선택 사항)
             if (topStacks.length > 0) {
                 setActiveStack(topStacks[0]);
             }
@@ -222,7 +222,6 @@ export default function Dashboard() {
         return () => window.removeEventListener('resetDashboard', handleReset);
     }, [topStacks]);
 
-    // 검색 로직
     useEffect(() => {
         if (isInitialLoading) return;
 
@@ -231,7 +230,7 @@ export default function Dashboard() {
                 setIsSearching(true);
                 try {
                     const apiResults = await searchTechStacks(debouncedSearchQuery);
-                    // id 기준 중복 제거 (동일 key 40 등 React 경고 방지)
+                    // id 기준 중복 제거
                     const uniqueById = Array.from(new Map(apiResults.map((s) => [s.id, s])).values());
                     const formattedResults = formatSearchResults(uniqueById);
                     setFilteredStacks(formattedResults);
@@ -246,7 +245,6 @@ export default function Dashboard() {
         }
     }, [debouncedSearchQuery, isInitialLoading]);
 
-    // 연관 기술 스택 로드
     useEffect(() => {
         if (!activeStack?.id) {
             setRelatedStacks([]);
@@ -292,6 +290,27 @@ export default function Dashboard() {
         loadRelations();
     }, [activeStack?.id]);
 
+    // 트렌드 그래프 데이터: tech_trend API (job_mention_count, job_change_rate), 기간별
+    useEffect(() => {
+        if (isLanding || !activeStack?.id) {
+            setChartData([]);
+            return;
+        }
+        const load = async () => {
+            setChartDataLoading(true);
+            try {
+                const rows = await fetchTechTrends(activeStack.id, chartPeriod);
+                setChartData(rows);
+            } catch (e) {
+                console.error('트렌드 그래프 로드 실패:', e);
+                setChartData([]);
+            } finally {
+                setChartDataLoading(false);
+            }
+        };
+        load();
+    }, [isLanding, activeStack?.id, chartPeriod]);
+
     const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, name: string) => {
         const target = e.target as HTMLImageElement;
         target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&size=128&bold=true`;
@@ -309,9 +328,7 @@ export default function Dashboard() {
             const isFavorite = stackFavorites.includes(id);
             
             if (isFavorite) {
-                // 즐겨찾기 제거
                 try {
-                    // 즐겨찾기 ID 찾기
                     const bookmarksResponse = await api.get('/trends/tech-bookmarks/');
                     const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
                     const bookmarkToDelete = bookmarks.find((b: any) => {
@@ -323,19 +340,16 @@ export default function Dashboard() {
                         await api.delete(`/trends/tech-bookmarks/${bookmarkToDelete.tech_bookmark_id || bookmarkToDelete.id}/`);
                         const nextFavorites = stackFavorites.filter(favId => favId !== id);
                         setStackFavorites(nextFavorites);
-                        // 즐겨찾기 변경 이벤트 발생
                         window.dispatchEvent(new CustomEvent('favoriteChanged', { detail: { type: 'tech', action: 'removed', id } }));
                     }
                 } catch (error) {
                     console.error('즐겨찾기 제거 실패:', error);
                 }
             } else {
-                // 즐겨찾기 추가
                 try {
                     await api.post('/trends/tech-bookmarks/', { tech_id: id });
                     const nextFavorites = [...stackFavorites, id];
                     setStackFavorites(nextFavorites);
-                    // 즐겨찾기 변경 이벤트 발생
                     window.dispatchEvent(new CustomEvent('favoriteChanged', { detail: { type: 'tech', action: 'added', id } }));
                 } catch (error) {
                     console.error('즐겨찾기 추가 실패:', error);
@@ -367,6 +381,7 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 gap-6 h-full lg:grid-cols-12 min-h-0">
             
+            {/* 메인 패널: overflow-y-auto 추가로 내용 많을 때 스크롤 처리 */}
             <div className="h-[800px] lg:col-span-9 lg:h-full lg:min-h-0 flex flex-col gap-6 p-6 bg-[#212226] rounded-[32px] border border-white/5 relative overflow-hidden shadow-2xl">
                 
                 <div className={`flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 relative ${searchQuery.length > 0 && isSearchFocused ? 'z-[200]' : 'z-10'}`}>
@@ -377,26 +392,24 @@ export default function Dashboard() {
                                 <Trophy className="text-blue-400" size={48} />
                             </div>
                             <div>
-                                <h2 className="text-4xl font-bold text-white mb-2">전체 언급량 Top 5</h2>
-                                <p className="text-gray-400 text-xl">검색창으로 원하는 기술 스택을 검색해보세요.</p>
+                                <h2 className="text-3xl font-bold text-white mb-2">전체 언급량 Top 5</h2>
+                                <p className="text-gray-400 text-lg">검색창으로 원하는 기술 스택을 검색해보세요.</p>
                             </div>
                         </div>
                     ) : (
                         activeStack.id !== 0 ? (
                             <div className="flex items-start gap-4 max-w-2xl">
-                                {/* ✅ 뒤로가기 버튼 삭제됨 */}
-                                
                                 <div className={`w-20 h-20 shrink-0 rounded-2xl bg-gradient-to-br ${activeStack.color} p-[2px] shadow-lg`}>
                                     <div className="w-full h-full bg-[#2A2B30] rounded-2xl flex items-center justify-center p-3 overflow-hidden">
                                         <img 
                                             src={activeStack.logo || ""} 
                                             alt={activeStack.name} 
-                                            className="w-full h-full object-contain"
+                                            className="w-full h-full object-contain object-center"
                                             onError={(e) => handleImageError(e, activeStack.name)}
                                         />
                                     </div>
                                 </div>
-                                <div>
+                                <div className="pt-2">
                                     <div className="flex items-center gap-3 mb-1">
                                         <h2 className="text-3xl font-bold text-white tracking-tight">{activeStack.name}</h2>
                                         <button 
@@ -410,21 +423,26 @@ export default function Dashboard() {
                                             />
                                         </button>
                                     </div>
-                                    <div className="flex items-center gap-3 text-[#9FA0A8] text-sm mb-2">
-                                        <p className="text-sm text-gray-400 leading-relaxed line-clamp-2">
+                                    <div className="flex items-center gap-3 text-[#9FA0A8] text-base mb-2">
+                                        <p className="text-base text-gray-400 leading-relaxed line-clamp-2">
                                             {activeStack.description}
                                         </p>
-                                        {activeStack.count > 0 && <span>언급량 {activeStack.count?.toLocaleString()}회</span>}
+                                        
+                                        {(activeStack.postCount + activeStack.jobCount) > 0 && (
+                                            <span className="text-base font-bold text-blue-400">
+                                                총 언급량 {(activeStack.postCount + activeStack.jobCount).toLocaleString()}회
+                                            </span>
+                                        )}
                                         
                                         {activeStack.officialSite && activeStack.officialSite !== '#' && (
                                             <>
-                                                {activeStack.count > 0 && <span className="w-1 h-1 rounded-full bg-white/20" />}
+                                                {(activeStack.postCount + activeStack.jobCount) > 0 && <span className="w-1 h-1 rounded-full bg-white/20" />}
                                                 
                                                 <a 
                                                     href={activeStack.officialSite} 
                                                     target="_blank" 
                                                     rel="noreferrer" 
-                                                    className="hover:text-blue-400 transition-colors flex items-center gap-1"
+                                                    className="text-base hover:text-blue-400 transition-colors flex items-center gap-1"
                                                 >
                                                     공식문서 연결 <ExternalLink size={14}/>
                                                 </a>
@@ -444,7 +462,6 @@ export default function Dashboard() {
                         )
                     )}
 
-                    {/* 오른쪽: 검색창 및 토글 */}
                     <div className="flex items-center gap-4 w-full xl:w-auto">
                         <div className={`relative flex-1 group transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] w-full xl:w-72 focus-within:xl:w-[480px] ${searchQuery.length > 0 && isSearchFocused ? 'z-[210]' : ''}`}>
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-blue-400 transition-colors" size={20} />
@@ -531,7 +548,8 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                <div className="flex-1 relative min-h-0">
+                {/* ✅ 콘텐츠 영역: overflow-y-auto, 가로 스크롤 방지(overflow-x-hidden, min-w-0) */}
+                <div className="flex-1 relative min-h-0 min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
                     <AnimatePresence mode="wait">
                         <div className="w-full h-full">
 {isLanding ? (
@@ -540,7 +558,7 @@ export default function Dashboard() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="h-full flex flex-col justify-center items-center py-10 px-4"
+        className="h-full flex flex-col justify-center items-center py-2 px-4"
     >
         {topStacks.length === 0 ? (
             <div className="text-center text-gray-500 opacity-60">
@@ -548,9 +566,32 @@ export default function Dashboard() {
                 <p>데이터 분석 중...</p>
             </div>
         ) : (
-            <div className="flex flex-col gap-16 w-full max-w-7xl">
+            <div className="flex flex-col gap-6 w-full max-w-7xl">
+                
+                {/* 통계 배지 */}
+                <div className="flex justify-center gap-6 mb-8">
+                    <div className="flex items-center gap-2 bg-[#2A2B30] border border-white/5 px-5 py-2 rounded-full shadow-lg">
+                        <Building2 className="w-5 h-5 text-purple-400" />
+                        <span className="text-gray-300 font-medium">분석된 기업</span>
+                        {stats.loading ? (
+                            <RefreshCw className="w-4 h-4 animate-spin text-gray-500" />
+                        ) : (
+                            <span className="text-white font-bold text-lg">{stats.corps.toLocaleString()}개</span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2 bg-[#2A2B30] border border-white/5 px-5 py-2 rounded-full shadow-lg">
+                        <FileText className="w-5 h-5 text-blue-400" />
+                        <span className="text-gray-300 font-medium">수집된 공고</span>
+                        {stats.loading ? (
+                            <RefreshCw className="w-4 h-4 animate-spin text-gray-500" />
+                        ) : (
+                            <span className="text-white font-bold text-lg">{stats.jobs.toLocaleString()}건</span>
+                        )}
+                    </div>
+                </div>
+
                 {/* Top 3 Podium Section */}
-                <div className="flex flex-col md:flex-row items-end justify-center gap-6 md:gap-4 lg:gap-8">
+                <div className="flex flex-col md:flex-row items-end justify-center gap-4 md:gap-2 lg:gap-4">
                     
                     {/* Rank 2 */}
                     {topStacks[1] && (
@@ -560,17 +601,17 @@ export default function Dashboard() {
                             transition={{ delay: 0.2 }}
                             whileHover={{ y: -8, scale: 1.02 }}
                             onClick={() => handleTopStackClick(topStacks[1])}
-                            className="order-2 md:order-1 w-full md:w-64 group relative"
+                            className="order-2 md:order-1 w-full md:w-56 group relative"
                         >
                             <div className="absolute inset-0 bg-slate-400/10 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <div className="relative bg-[#2A2B30]/60 backdrop-blur-xl border border-white/5 rounded-[32px] p-8 flex flex-col items-center gap-4 hover:border-gray-400/30 transition-all shadow-2xl">
+                            <div className="relative bg-[#2A2B30]/60 backdrop-blur-xl border border-white/5 rounded-[32px] p-5 flex flex-col items-center gap-4 hover:border-gray-400/30 transition-all shadow-2xl">
                                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gray-400/20 border border-gray-400/50 px-4 py-1 rounded-full text-gray-300 text-sm font-bold shadow-lg">2등</div>
-                                <div className="w-20 h-20 bg-white/5 rounded-2xl p-4 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                                <div className="w-14 h-14 bg-white/5 rounded-2xl p-3 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
                                     <img src={topStacks[1].logo} alt="" className="w-full h-full object-contain drop-shadow-md" onError={(e) => handleImageError(e, topStacks[1].name)} />
                                 </div>
                                 <div className="text-center">
                                     <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">{topStacks[1].name}</h3>
-                                    <p className="text-sm text-blue-400 font-medium mt-1">{topStacks[1].count.toLocaleString()} <span className="text-[14px] text-gray-500">언급량</span></p>
+                                    <p className="text-sm text-blue-400 font-medium mt-1">{(topStacks[1].postCount + topStacks[1].jobCount).toLocaleString()} <span className="text-xs text-gray-500">언급량</span></p>
                                 </div>
                             </div>
                         </motion.button>
@@ -584,21 +625,21 @@ export default function Dashboard() {
                             transition={{ delay: 0.1 }}
                             whileHover={{ y: -12, scale: 1.05 }}
                             onClick={() => handleTopStackClick(topStacks[0])}
-                            className="order-1 md:order-2 w-full md:w-80 group relative mb-0 md:mb-12"
+                            className="order-1 md:order-2 w-full md:w-72 group relative mb-6"
                         >
                             <div className="absolute inset-0 bg-yellow-500/10 blur-[100px] opacity-20 group-hover:opacity-40 transition-opacity" />
-                            <div className="relative bg-[#2A2B30]/80 backdrop-blur-2xl border-2 border-yellow-500/20 rounded-[40px] p-10 flex flex-col items-center gap-6 hover:border-yellow-500/40 transition-all shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)]">
+                            <div className="relative bg-[#2A2B30]/80 backdrop-blur-2xl border-2 border-yellow-500/20 rounded-[40px] p-6 flex flex-col items-center gap-6 hover:border-yellow-500/40 transition-all shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)]">
                                 <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-gradient-to-r from-yellow-500 to-orange-500 px-6 py-2 rounded-full text-black font-black shadow-[0_10px_20px_-5px_rgba(234,179,8,0.4)] flex items-center gap-2">
-                                    <Trophy size={18} fill="yellow" /> 1등 언급 기술
+                                    <Trophy size={18} fill="yellow" /> 언급량 1등
                                 </div>
-                                <div className="w-28 h-28 bg-gradient-to-br from-yellow-500/10 to-orange-500/10 rounded-3xl p-5 flex items-center justify-center ring-1 ring-yellow-500/20 group-hover:scale-110 transition-transform duration-500">
+                                <div className="w-20 h-20 bg-gradient-to-br from-yellow-500/10 to-orange-500/10 rounded-3xl p-4 flex items-center justify-center ring-1 ring-yellow-500/20 group-hover:scale-110 transition-transform duration-500">
                                     <img src={topStacks[0].logo} alt="" className="w-full h-full object-contain drop-shadow-2xl" onError={(e) => handleImageError(e, topStacks[0].name)} />
                                 </div>
                                 <div className="text-center">
                                     <h3 className="text-2xl font-black text-white tracking-tight group-hover:text-yellow-400 transition-colors">{topStacks[0].name}</h3>
                                     <div className="flex flex-col items-center gap-1 mt-2">
-                                        <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400">{topStacks[0].count.toLocaleString()}</span>
-                                        <span className="text-[14px] text-gray-500 uppercase tracking-widest font-black">전체 언급량</span>
+                                        <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400">{(topStacks[0].postCount + topStacks[0].jobCount).toLocaleString()}</span>
+                                        <span className="text-sm text-gray-500 uppercase tracking-widest font-black">전체 언급량</span>
                                     </div>
                                 </div>
                                 <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden mt-2">
@@ -616,17 +657,17 @@ export default function Dashboard() {
                             transition={{ delay: 0.3 }}
                             whileHover={{ y: -8, scale: 1.02 }}
                             onClick={() => handleTopStackClick(topStacks[2])}
-                            className="order-3 w-full md:w-64 group relative"
+                            className="order-3 w-full md:w-56 group relative"
                         >
                             <div className="absolute inset-0 bg-orange-700/10 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <div className="relative bg-[#2A2B30]/60 backdrop-blur-xl border border-white/5 rounded-[32px] p-8 flex flex-col items-center gap-4 hover:border-orange-700/30 transition-all shadow-2xl">
+                            <div className="relative bg-[#2A2B30]/60 backdrop-blur-xl border border-white/5 rounded-[32px] p-5 flex flex-col items-center gap-4 hover:border-orange-700/30 transition-all shadow-2xl">
                                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-orange-700/20 border border-orange-700/50 px-4 py-1 rounded-full text-orange-400 text-xm font-bold shadow-lg">3등</div>
-                                <div className="w-20 h-20 bg-white/5 rounded-2xl p-4 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                                <div className="w-14 h-14 bg-white/5 rounded-2xl p-3 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
                                     <img src={topStacks[2].logo} alt="" className="w-full h-full object-contain drop-shadow-md" onError={(e) => handleImageError(e, topStacks[2].name)} />
                                 </div>
                                 <div className="text-center">
                                     <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">{topStacks[2].name}</h3>
-                                    <p className="text-sm text-blue-400 font-medium mt-1">{topStacks[2].count.toLocaleString()} <span className="text-[14px] text-gray-500">언급량</span></p>
+                                    <p className="text-sm text-blue-400 font-medium mt-1">{(topStacks[2].postCount + topStacks[2].jobCount).toLocaleString()} <span className="text-xs text-gray-500">언급량</span></p>
                                 </div>
                             </div>
                         </motion.button>
@@ -634,7 +675,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* Rank 4 & 5 Mini Cards */}
-                <div className="flex flex-wrap justify-center gap-6">
+                <div className="flex flex-wrap justify-center gap-4">
                     {topStacks.slice(3, 5).map((stack, idx) => (
                         <motion.button
                             key={stack.id}
@@ -643,17 +684,17 @@ export default function Dashboard() {
                             transition={{ delay: 0.5 + idx * 0.1 }}
                             whileHover={{ scale: 1.05, backgroundColor: "rgba(255,255,255,0.05)" }}
                             onClick={() => handleTopStackClick(stack)}
-                            className="w-full md:w-80 bg-white/5 border border-white/10 rounded-2xl p-5 flex items-center gap-4 transition-all group"
+                            className="w-full md:w-72 bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center gap-4 transition-all group"
                         >
-                            <div className="w-12 h-12 bg-white/10 rounded-xl p-2.5 flex items-center justify-center shrink-0 group-hover:bg-blue-500/20 transition-colors">
+                            <div className="w-10 h-10 bg-white/10 rounded-xl p-2 flex items-center justify-center shrink-0 group-hover:bg-blue-500/20 transition-colors">
                                 <img src={stack.logo} alt="" className="w-full h-full object-contain" onError={(e) => handleImageError(e, stack.name)} />
                             </div>
                             <div className="flex-1 text-left min-w-0">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xm font-bold text-gray-500">{idx + 4}등</span>
-                                    <h4 className="text-base font-bold text-white truncate">{stack.name}</h4>
+                                    <span className="text-sm font-bold text-gray-500">{idx + 4}등</span>
+                                    <h4 className="text-lg font-bold text-white truncate">{stack.name}</h4>
                                 </div>
-                                <p className="text-sm text-gray-400 mt-0.5">{stack.count.toLocaleString()} 언급량</p>
+                                <p className="text-sm text-gray-400 mt-0.5">{(stack.postCount + stack.jobCount).toLocaleString()} 언급량</p>
                             </div>
                             <ExternalLink size={14} className="text-gray-600 group-hover:text-blue-400 transition-colors" />
                         </motion.button>
@@ -695,8 +736,14 @@ export default function Dashboard() {
                                         </motion.div>
                                     )}
                                     {viewMode === "chart" && (
-                                        <motion.div key="trend-chart" className="absolute inset-0 pt-4 w-full h-full pb-10">
-                                            <TrendChart color={activeStack.themeColor} data={MOCK_CHART_DATA} />
+                                        <motion.div key="trend-chart" className="absolute inset-0 pt-4 w-full h-full pb-10 min-w-0">
+                                            <TrendChart
+                                                color={activeStack.themeColor}
+                                                data={chartData}
+                                                period={chartPeriod}
+                                                onPeriodChange={setChartPeriod}
+                                                isLoading={chartDataLoading}
+                                            />
                                         </motion.div>
                                     )}
                                 </>
@@ -706,7 +753,7 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            <div className="lg:col-span-3 h-full min-h-[400px]">
+            <div className="lg:col-span-3 h-full min-h-[400px] flex flex-col bg-[#212226] rounded-[32px] border border-white/5 overflow-hidden shadow-2xl relative">
                 <JobSection 
                     techStackId={isLanding ? 0 : activeStack.id} 
                     techStackName={isLanding ? "전체" : activeStack.name} 
