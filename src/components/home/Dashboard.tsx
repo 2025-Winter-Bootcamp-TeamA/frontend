@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, TrendingUp, Scale, ExternalLink, Star, Trophy, AlertCircle, Building2, FileText, RefreshCw } from "lucide-react"; 
 import TrendChart from "./TrendChart";
@@ -13,7 +13,7 @@ import { getAuthTokens } from "@/lib/auth";
 import LoginCheckModal from "@/components/LoginCheckModal";
 import LoginModal from "@/components/LoginModal";
 
-import { searchTechStacks, getTechStackRelations, RelatedTechStackRelation, getExternalLogoUrl, fetchAllTechStacks } from "@/services/trendService";
+import { searchTechStacks, getTechStackRelations, getTechStackById, RelatedTechStackRelation, getExternalLogoUrl, fetchTop5TechStacksByJobCount } from "@/services/trendService";
 import { TechStackData } from "@/types/trend";
 
 // 커스텀 노드 아이콘
@@ -85,6 +85,8 @@ export default function Dashboard() {
     
     const [searchQuery, setSearchQuery] = useState("");
     const debouncedSearchQuery = useDebounce(searchQuery, 300);
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const searchBlurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     
     const [filteredStacks, setFilteredStacks] = useState<DashboardStackData[]>([]); 
     const [topStacks, setTopStacks] = useState<DashboardStackData[]>([]); 
@@ -102,9 +104,15 @@ export default function Dashboard() {
     const [showLoginCheck, setShowLoginCheck] = useState(false);
     const [showLoginModal, setShowLoginModal] = useState(false);
 
-    // 검색 결과 매핑
-    const formatSearchResults = (apiResults: any[]): DashboardStackData[] => {
-        return apiResults.map((stack, index) => ({
+    // 검색창 blur 시 드롭다운 닫기용 timeout 정리
+    useEffect(() => {
+        return () => {
+            if (searchBlurTimeoutRef.current) clearTimeout(searchBlurTimeoutRef.current);
+        };
+    }, []);
+
+    const formatSearchResults = (apiResults: TechStackData[]): DashboardStackData[] => {
+        return apiResults.map((stack:any, index) => ({
             id: stack.id,
             name: stack.name,
             postCount: Number(stack.article_stack_count) || Number(stack.count) || 0,
@@ -139,29 +147,17 @@ export default function Dashboard() {
                     }
                 }
 
-                // (2) 전체 스택 데이터 로드 (Top 5)
-                const allStacksData = await fetchAllTechStacks();
+                // [충돌 해결] job_stack_count 기준 상위 5개만 1회 요청 (fetchTop5TechStacksByJobCount)
+                // 팀원 코드가 최적화된 API를 사용하므로 이를 채택합니다.
+                const top5Data = await fetchTop5TechStacksByJobCount();
+                const uniqueTop5 = Array.from(new Map(top5Data.map((s: any) => [s.id, s])).values()).slice(0, 5);
 
-                if (allStacksData && allStacksData.length > 0) {
-                    const sortedStacks = [...allStacksData].sort((a: any, b: any) => {
-                        const countA_Post = Number(a.article_stack_count) || 0;
-                        const countA_Job = Number(a.job_stack_count) || Number(a.job_posting_count) || 0;
-                        const totalA = countA_Post + countA_Job;
-
-                        const countB_Post = Number(b.article_stack_count) || 0;
-                        const countB_Job = Number(b.job_stack_count) || Number(b.job_posting_count) || 0;
-                        const totalB = countB_Post + countB_Job;
-                        
-                        return totalB - totalA; 
-                    });
-                    
-                    const top5Stacks = sortedStacks.slice(0, 5);
-                    
-                    const formattedTop5: DashboardStackData[] = top5Stacks.map((stack: any, index: number) => ({
+                if (uniqueTop5.length > 0) {
+                    const formattedTop5 = uniqueTop5.map((stack: any, index: number) => ({
                         id: stack.id,
                         name: stack.name,
                         postCount: Number(stack.article_stack_count) || 0,
-                        jobCount: Number(stack.job_stack_count) || Number(stack.job_posting_count) || 0,
+                        jobCount: Number(stack.job_stack_count) || 0,
                         growth: 0,
                         color: index % 2 === 0 ? "from-blue-500 to-indigo-500" : "from-green-500 to-emerald-500",
                         logo: stack.logo || getExternalLogoUrl(stack.name),
@@ -241,7 +237,9 @@ export default function Dashboard() {
                 setIsSearching(true);
                 try {
                     const apiResults = await searchTechStacks(debouncedSearchQuery);
-                    const formattedResults = formatSearchResults(apiResults);
+                    // id 기준 중복 제거 (동일 key 40 등 React 경고 방지)
+                    const uniqueById = Array.from(new Map(apiResults.map((s) => [s.id, s])).values());
+                    const formattedResults = formatSearchResults(uniqueById);
                     setFilteredStacks(formattedResults);
                 } catch (error) {
                     console.error("Stack search failed:", error);
@@ -372,7 +370,7 @@ export default function Dashboard() {
             {/* 메인 패널: overflow-y-auto 추가로 내용 많을 때 스크롤 처리 */}
             <div className="h-[800px] lg:col-span-9 lg:h-full lg:min-h-0 flex flex-col gap-6 p-6 bg-[#212226] rounded-[32px] border border-white/5 relative overflow-hidden shadow-2xl">
                 
-                <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 relative z-10">
+                <div className={`flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 relative ${searchQuery.length > 0 && isSearchFocused ? 'z-[200]' : 'z-10'}`}>
                     
                     {isLanding ? (
                         <div className="flex items-center gap-3">
@@ -451,35 +449,50 @@ export default function Dashboard() {
                     )}
 
                     <div className="flex items-center gap-4 w-full xl:w-auto">
-                        <div className="relative flex-1 group transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] w-full xl:w-72 focus-within:xl:w-[480px]">
+                        <div className={`relative flex-1 group transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] w-full xl:w-72 focus-within:xl:w-[480px] ${searchQuery.length > 0 && isSearchFocused ? 'z-[210]' : ''}`}>
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-blue-400 transition-colors" size={20} />
                             <input 
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
+                                autoComplete="off"
+                                spellCheck={false}
+                                autoCorrect="off"
+                                autoCapitalize="off"
+                                onFocus={() => {
+                                    if (searchBlurTimeoutRef.current) { clearTimeout(searchBlurTimeoutRef.current); searchBlurTimeoutRef.current = null; }
+                                    setIsSearchFocused(true);
+                                }}
+                                onBlur={() => {
+                                    searchBlurTimeoutRef.current = setTimeout(() => {
+                                        setIsSearchFocused(false);
+                                        searchBlurTimeoutRef.current = null;
+                                    }, 200);
+                                }}
                                 placeholder="기술 스택 검색..."
                                 className="w-full h-16 bg-white/5 border border-white/10 rounded-xl pl-11 pr-4 text-xl text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50 focus:bg-white/[0.08] transition-all shadow-inner"
                             />
                             
                             <AnimatePresence>
-                                {(searchQuery.length > 0) && (
+                                {(searchQuery.length > 0 && isSearchFocused) && (
                                     <motion.div 
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: 10 }}
-                                        className="absolute top-full left-0 right-0 mt-2 bg-[#2A2B30] border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 max-h-60 overflow-y-auto"
+                                        className="absolute top-full left-0 right-0 mt-2 bg-[#2A2B30] border border-white/10 rounded-xl shadow-xl overflow-hidden z-[110] max-h-60 overflow-y-auto"
                                     >
                                         {isSearching ? (
                                             <div className="p-4 text-center text-white/40 text-xl">DB 검색 중...</div>
                                         ) : filteredStacks.length > 0 ? (
-                                            filteredStacks.map(stack => (
+                                            filteredStacks.map((stack, idx) => (
                                                 <button
-                                                    key={stack.id}
+                                                    key={`search-${stack.id}-${idx}`}
                                                     onClick={() => {
                                                         setActiveStack(stack);
                                                         setIsLanding(false); 
                                                         setSearchQuery(""); 
-                                                        setFilteredStacks([]); 
+                                                        setFilteredStacks([]);
+                                                        setViewMode("chart");
                                                     }}
                                                     className="w-full flex items-center gap-3 p-3 hover:bg-white/5 transition-colors text-left"
                                                 >
@@ -679,7 +692,7 @@ export default function Dashboard() {
                             ) : (
                                 <>
                                     {viewMode === "compare" && (
-                                        <motion.div key="compare" className="absolute inset-0 pb-4 pr-2">
+                                        <motion.div key="compare" className="absolute inset-0 pb-4 pr-2 overflow-visible">
                                             <StackComparison initialBaseStack={activeStack} allStacks={topStacks} onBack={() => setViewMode("chart")} />
                                         </motion.div>
                                     )}
@@ -691,22 +704,19 @@ export default function Dashboard() {
                                                 mainStackDescription={activeStack.description} 
                                                 relatedStacks={relatedStacks}
                                                 onClose={() => setViewMode("chart")}
-                                                onStackSelect={(stackId: number) => {
-                                                    (async () => {
-                                                        try {
-                                                            const allData = await searchTechStacks("");
-                                                            const targetStack = allData.find(s => s.id === stackId);
-                                                            if (targetStack) {
-                                                                const formatted = formatSearchResults([targetStack]);
-                                                                if (formatted.length > 0) {
-                                                                    setActiveStack(formatted[0]);
-                                                                    setViewMode("chart"); 
-                                                                }
+                                                onStackSelect={async (stackId: number) => {
+                                                    try {
+                                                        const targetStack = await getTechStackById(stackId);
+                                                        if (targetStack) {
+                                                            const formatted = formatSearchResults([targetStack]);
+                                                            if (formatted.length > 0) {
+                                                                setActiveStack(formatted[0]);
+                                                                setViewMode("chart"); 
                                                             }
-                                                        } catch (error) {
-                                                            console.error("Failed to load tech stack:", error);
                                                         }
-                                                    })();
+                                                    } catch (error) {
+                                                        console.error("Failed to load tech stack:", error);
+                                                    }
                                                 }}
                                             />
                                         </motion.div>

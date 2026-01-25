@@ -147,6 +147,7 @@ export default function JobMap() {
 
       setIsDataLoading(true);
       try {
+        // [충돌 해결] 필터 파라미터 구성 (모든 필터가 AND 조건으로 적용됨)
         const params: any = {};
         if (debouncedCareer) params.career_year = parseInt(debouncedCareer);
         if (debouncedJobSearch) params.search = debouncedJobSearch.trim();
@@ -227,15 +228,6 @@ export default function JobMap() {
 
   // --- 핸들러 함수들 ---
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (finalCompanies.length > 0) {
-      handleSelectCompany(finalCompanies[0]);
-    } else {
-      alert("조건에 맞는 기업이 없습니다.");
-    }
-  };
-
   const fetchCompanyJobs = async (corpId: number) => {
     setIsJobsLoading(true);
     try {
@@ -259,38 +251,6 @@ export default function JobMap() {
     }
   };
 
-  const handleSelectCompany = (company: Company) => {
-    setSelectedCompany(company);
-    setCenter({ lat: Number(company.latitude), lng: Number(company.longitude) });
-    setLevel(3);
-    fetchCompanyJobs(company.id);
-    if (!isSidebarOpen) setIsSidebarOpen(true);
-  };
-
-  const toggleCompanyFavorite = async (e: React.MouseEvent, corpId: number) => {
-    e.stopPropagation();
-    const { accessToken } = getAuthTokens();
-    if (!accessToken) return; // 혹은 로그인 모달 띄우기
-
-    try {
-      const isFavorite = favoriteCompanyIds.includes(corpId);
-      if (isFavorite) {
-        const bookmarksResponse = await api.get('/jobs/corp-bookmarks/');
-        const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
-        const target = bookmarks.find((b: any) => b.corp?.id === corpId || b.corp_id === corpId);
-        if (target) {
-          await api.delete(`/jobs/corp-bookmarks/${target.corp_bookmark_id || target.id}/`);
-          setFavoriteCompanyIds(prev => prev.filter(id => id !== corpId));
-        }
-      } else {
-        await api.post('/jobs/corp-bookmarks/', { corp_id: corpId });
-        setFavoriteCompanyIds(prev => [...prev, corpId]);
-      }
-    } catch (error) {
-      console.error('즐겨찾기 토글 실패:', error);
-    }
-  };
-
   const resetFilters = () => {
     setCareerYear("");
     setJobSearch("");
@@ -300,7 +260,110 @@ export default function JobMap() {
   
   const hasActiveFilters = careerYear !== "" || jobSearch !== "" || city !== "" || district !== "";
 
-  if (loading) return <div className="w-full h-full bg-[#1A1B1E] flex items-center justify-center text-white">지도를 로드 중...</div>;
+  // [충돌 해결] 메인 브랜치의 최신 로직(이벤트 발생, 토글 등) 적용 + 사이드바 열림 기능 통합
+
+  // ✅ 기업 즐겨찾기 토글 함수 (백엔드 API 연동)
+  const toggleCompanyFavorite = async (e: React.MouseEvent, corpId: number) => {
+    e.stopPropagation();
+    
+    const { accessToken } = getAuthTokens();
+    if (!accessToken) {
+      // 로그인 모달 표시 (필요시 추가)
+      return;
+    }
+
+    try {
+      const isFavorite = favoriteCompanyIds.includes(corpId);
+      
+      if (isFavorite) {
+        // 즐겨찾기 제거
+        try {
+          const bookmarksResponse = await api.get('/jobs/corp-bookmarks/');
+          const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
+          const bookmarkToDelete = bookmarks.find((b: any) => b.corp?.id === corpId || b.corp_id === corpId);
+          
+          if (bookmarkToDelete) {
+            await api.delete(`/jobs/corp-bookmarks/${bookmarkToDelete.corp_bookmark_id || bookmarkToDelete.id}/`);
+            const nextFavs = favoriteCompanyIds.filter(id => id !== corpId);
+            setFavoriteCompanyIds(nextFavs);
+            // 즐겨찾기 변경 이벤트 발생
+            window.dispatchEvent(new CustomEvent('favoriteChanged', { detail: { type: 'company', action: 'removed', id: corpId } }));
+          }
+        } catch (error) {
+          console.error('즐겨찾기 제거 실패:', error);
+        }
+      } else {
+        // 즐겨찾기 추가
+        try {
+          await api.post('/jobs/corp-bookmarks/', { corp_id: corpId });
+          const nextFavs = [...favoriteCompanyIds, corpId];
+          setFavoriteCompanyIds(nextFavs);
+          // 즐겨찾기 변경 이벤트 발생
+          window.dispatchEvent(new CustomEvent('favoriteChanged', { detail: { type: 'company', action: 'added', id: corpId } }));
+        } catch (error) {
+          console.error('즐겨찾기 추가 실패:', error);
+        }
+      }
+    } catch (error) {
+      console.error('즐겨찾기 토글 실패:', error);
+    }
+  };
+
+  const handleSelectCompany = (company: Company) => {
+    setSelectedCompany(company);
+    setCenter({ lat: Number(company.latitude), lng: Number(company.longitude) });
+    setLevel(3);
+    fetchCompanyJobs(company.id);
+    if (!isSidebarOpen) setIsSidebarOpen(true); // [내 코드] 사이드바 열기 기능 유지
+  };
+  
+  const handleBackToList = () => {
+    setSelectedCompany(null);
+    resetFilters();
+  };
+
+  // ✅ URL 파라미터에서 기업 ID를 받아서 해당 기업을 자동 선택
+  useEffect(() => {
+    const corpIdParam = searchParams?.get('corpId');
+    if (corpIdParam && companies.length > 0) {
+      const corpId = parseInt(corpIdParam, 10);
+      if (!isNaN(corpId)) {
+        const company = companies.find(c => c.id === corpId);
+        if (company && (!selectedCompany || selectedCompany.id !== corpId)) {
+          handleSelectCompany(company);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, companies]);
+
+  // ✅ Navbar에서 'resetJobMap' 이벤트 시 채용 지도 첫 화면으로 복귀
+  const DEFAULT_CENTER = { lat: 37.496, lng: 127.029 };
+  const DEFAULT_LEVEL = 8;
+  useEffect(() => {
+    const handleReset = () => {
+      setSelectedCompany(null);
+      setCompanyJobs([]);
+      resetFilters();
+      setSearchQuery("");
+      setShowFilters(false);
+      setCenter(DEFAULT_CENTER);
+      setLevel(DEFAULT_LEVEL);
+    };
+    window.addEventListener("resetJobMap", handleReset);
+    return () => window.removeEventListener("resetJobMap", handleReset);
+  }, []);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (finalCompanies.length > 0) {
+      handleSelectCompany(finalCompanies[0]);
+    } else {
+      alert("검색 결과가 없습니다.");
+    }
+  };
+
+  if (loading) return <div className="w-full h-screen bg-[#1A1B1E] flex items-center justify-center text-white">지도를 로드 중...</div>;
 
   return (
     <div className="flex flex-col lg:flex-row w-full h-full bg-[#1A1B1E] rounded-[32px] overflow-hidden border border-white/10 shadow-2xl relative">
@@ -544,13 +607,15 @@ export default function JobMap() {
 
                         {/* 마커 디자인 */}
                         {level >= 6 ? (
-                            <div className={`w-3 h-3 rounded-full border-2 border-white shadow-lg transition-all ${favoriteCompanyIds.includes(company.id) ? "bg-yellow-500 scale-125 z-10" : "bg-blue-600"}`} />
+                            /* 줌아웃 시: 파란색/노란색 점 (테두리 없음) */
+                            <div className={`w-3 h-3 rounded-full shadow-lg transition-all ${favoriteCompanyIds.includes(company.id) ? "bg-yellow-500 scale-125" : "bg-blue-600"}`} />
                         ) : (
+                            /* 줌인 시: 로고 마커 (줌아웃 점과 동일한 파란색 테두리) */
                             <>
-                                <div className={`w-10 h-10 rounded-full border-4 shadow-xl flex items-center justify-center bg-white transition-all duration-300 ${selectedCompany?.id === company.id ? "border-blue-500 scale-125 ring-4 ring-blue-500/30 z-10" : "border-white"}`}>
+                                <div className={`w-10 h-10 rounded-full border-2 border-blue-600 shadow-xl flex items-center justify-center bg-white transition-all duration-300 ${selectedCompany?.id === company.id ? "!border-blue-500 scale-125 ring-4 ring-blue-500/20" : ""}`}>
                                     {company.logo_url ? <img src={company.logo_url} alt={company.name} className="w-full h-full object-contain rounded-full p-1.5" /> : <Building2 size={16} className="text-gray-400" />}
                                 </div>
-                                <div className={`w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] -mt-0.5 transition-colors ${selectedCompany?.id === company.id ? "border-t-blue-500" : "border-t-white"}`} />
+                                <div className={`w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] -mt-0.5 transition-colors ${selectedCompany?.id === company.id ? "border-t-blue-500" : "border-t-blue-600"}`} />
                             </>
                         )}
                     </div>

@@ -103,10 +103,10 @@ export default function Navbar() {
                                 <Link
                                     href={item.href}
                                     onClick={() => {
-                                        // ✅ 대시보드 메뉴 클릭 시 초기화 이벤트 발생
-                                        if (item.href === '/') {
-                                            window.dispatchEvent(new Event('resetDashboard'));
-                                        }
+                                        // 각 페이지의 첫 화면으로 이동하기 위한 초기화 이벤트
+                                        if (item.href === '/') window.dispatchEvent(new Event('resetDashboard'));
+                                        else if (item.href === '/map') window.dispatchEvent(new Event('resetJobMap'));
+                                        else if (item.href === '/ai-interview') window.dispatchEvent(new Event('resetAIInterview'));
                                     }}
                                     className={`text-[18px] transition-all duration-300 hover:text-white py-1 ${
                                         pathname === item.href 
@@ -134,7 +134,7 @@ export default function Navbar() {
                             >
                                 로그아웃
                             </button>
-                            <Link href="/mypage">
+                            <Link href="/mypage" onClick={() => window.dispatchEvent(new Event('resetMyPage'))}>
                                 <div className="w-[40px] h-[40px] overflow-hidden hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer shadow-lg bg-gray-700 flex items-center justify-center"
                                      style={{ borderRadius: '10px' }}>
                                     {profileImage ? (
@@ -195,9 +195,9 @@ export default function Navbar() {
                                     key={item.name}
                                     href={item.href}
                                     onClick={() => {
-                                        if (item.href === '/') {
-                                            window.dispatchEvent(new Event('resetDashboard'));
-                                        }
+                                        if (item.href === '/') window.dispatchEvent(new Event('resetDashboard'));
+                                        else if (item.href === '/map') window.dispatchEvent(new Event('resetJobMap'));
+                                        else if (item.href === '/ai-interview') window.dispatchEvent(new Event('resetAIInterview'));
                                         setIsOpen(false);
                                     }}
                                     className={`block text-[18px] transition-colors duration-300 hover:text-white ${

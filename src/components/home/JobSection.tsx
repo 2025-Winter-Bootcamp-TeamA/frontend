@@ -63,7 +63,14 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
                 let fetchedJobs: any[] = [];
                 let currentMode: "bookmark" | "recommend" | "tech" = "recommend";
 
+                // ----------------------------------------------------------------
+                // [충돌 해결 1] 로직 병합
+                // 1. 특정 기술 스택을 선택했을 때 -> 내 코드(HEAD) 사용
+                // 2. 대시보드(0)일 때 -> 팀원 코드(Main)의 "기술+기업 즐겨찾기 병합" 로직 사용
+                // ----------------------------------------------------------------
+                
                 if (techStackId !== 0) {
+                    // [CASE 1] 특정 기술 스택 관련 공고
                     if(isMounted) {
                         currentMode = "tech";
                         setMode("tech");
@@ -76,49 +83,56 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
                         console.error(`기술 ID ${techStackId} 공고 로딩 실패:`, error);
                     }
                 } else {
-                    const { accessToken } = getAuthTokens();
-                    let bookmarksFound = false;
+                    // [CASE 2] 대시보드 (팀원 코드 적용 - 즐겨찾기 기술 + 즐겨찾기 기업)
+                    try {
+                        const { accessToken } = getAuthTokens();
+                        let allJobs: any[] = []; // 팀원 로직을 위한 임시 배열
 
-                    if (accessToken) {
-                        try {
-                            const bookmarksResponse = await api.get('/jobs/corp-bookmarks/');
-                            const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
+                        if (accessToken) {
+                            // 1) 즐겨찾기 기술의 채용공고
+                            const techBookmarksRes = await api.get('/trends/tech-bookmarks/').catch(() => ({ data: [] }));
+                            const techBookmarks = Array.isArray(techBookmarksRes.data) 
+                                ? techBookmarksRes.data 
+                                : techBookmarksRes.data?.results || [];
                             
-                            if (bookmarks.length > 0) {
-                                const promises = bookmarks.map((bookmark: any) => {
-                                    const corpId = bookmark.corp?.id || bookmark.corp_id || (typeof bookmark.corp === 'number' ? bookmark.corp : null);
-                                    if (!corpId) return Promise.resolve([]);
-                                    
-                                    return api.get(`/jobs/corps/${corpId}/job-postings/`)
-                                        .then(res => (Array.isArray(res.data) ? res.data : res.data.results || []))
-                                        .catch(() => []);
-                                });
-                                
-                                const results = await Promise.all(promises);
-                                const bookmarkJobs = results.flat();
-                                
-                                if (bookmarkJobs.length > 0) {
-                                    fetchedJobs = bookmarkJobs;
-                                    bookmarksFound = true;
-                                    if(isMounted) {
-                                        currentMode = "bookmark";
-                                        setMode("bookmark");
-                                        setPrevMode("bookmark");
-                                    }
-                                }
-                            }
-                        } catch (err) {
-                            console.error("즐겨찾기 조회 실패:", err);
-                        }
-                    }
+                            const techIds = techBookmarks.map((b: any) => b.tech_stack?.id ?? b.tech_stack_id).filter(Boolean);
+                            
+                            const techPromises = techIds.map((tid: number) =>
+                                api.get(`/jobs/by-tech/${tid}/`).then(res => Array.isArray(res.data) ? res.data : res.data?.results || []).catch(() => [])
+                            );
+                            const techJobArrays = await Promise.all(techPromises);
+                            techJobArrays.forEach(arr => { allJobs = [...allJobs, ...arr]; });
 
-                    if (!bookmarksFound) {
-                        if(isMounted) {
-                            currentMode = "recommend";
-                            setMode("recommend");
-                            setPrevMode("recommend");
+                            // 2) 즐겨찾기 기업의 채용공고
+                            const corpBookmarksRes = await api.get('/jobs/corp-bookmarks/').catch(() => ({ data: { results: [] } }));
+                            const corpBookmarks = corpBookmarksRes.data?.results || corpBookmarksRes.data || [];
+                            
+                            const corpPromises = (corpBookmarks as any[]).map((b: any) => {
+                                const corpId = b.corp?.id ?? b.corp_id;
+                                if (!corpId) return Promise.resolve([]);
+                                return api.get(`/jobs/corps/${corpId}/job-postings/`)
+                                    .then(res => Array.isArray(res.data) ? res.data : res.data?.results || [])
+                                    .catch(() => []);
+                            });
+                            const corpJobArrays = await Promise.all(corpPromises);
+                            corpJobArrays.forEach(arr => { allJobs = [...allJobs, ...arr]; });
+
+                            fetchedJobs = allJobs;
                         }
-                        try {
+
+                        // 즐겨찾기가 하나도 없으면 추천 공고 로드
+                        if (fetchedJobs.length > 0) {
+                             if(isMounted) {
+                                currentMode = "bookmark";
+                                setMode("bookmark");
+                                setPrevMode("bookmark");
+                            }
+                        } else {
+                            if(isMounted) {
+                                currentMode = "recommend";
+                                setMode("recommend");
+                                setPrevMode("recommend");
+                            }
                             const corpsResponse = await api.get('/jobs/corps/');
                             const corpsList = Array.isArray(corpsResponse.data) ? corpsResponse.data : corpsResponse.data.results || [];
                             
@@ -132,10 +146,9 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
 
                             const corpJobsResults = await Promise.all(corpJobPromises);
                             fetchedJobs = corpJobsResults.flat();
-
-                        } catch (e) {
-                            console.error("추천 기업 공고 조회 실패:", e);
                         }
+                    } catch (err) {
+                        console.error("공고 수집 중 오류:", err);
                     }
                 }
 
@@ -247,7 +260,7 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
             return (
                 <h1 className="font-bold text-white flex items-center gap-2 truncate text-xl lg:text-2xl">
                     <Star className="text-yellow-400 fill-yellow-400" size={24} />
-                    즐겨찾기 기업 공고
+                    즐겨찾기 공고
                 </h1>
             );
         } else if (mode === "tech") {
@@ -271,6 +284,7 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
         <section className="w-full h-full flex flex-col bg-[#25262B] rounded-[32px] border border-white/5 overflow-hidden relative shadow-lg">
             <div className="p-5 border-b border-white/5 flex flex-col gap-4 bg-[#2C2E33]/50 flex-shrink-0">
                 <div className="flex justify-between items-center">
+                    {/* [충돌 해결 2] 내 코드(renderHeader) 유지 - 아이콘/상태별 제목 표시 */}
                     {renderHeader()}
                     <span 
                         onClick={handleMoreClick}
@@ -282,12 +296,17 @@ export default function JobSection({ techStackId, techStackName }: JobSectionPro
 
                 <div className="relative w-full group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-400 transition-colors" size={16} />
+                    {/* [충돌 해결 3] 팀원 코드(input attributes) 적용 - autoComplete 등 속성 개선 */}
                     <input 
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="기업명으로 검색..."
-                        className="w-full h-12 bg-[#1A1B1E] border border-white/10 rounded-xl pl-10 pr-4 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500/50 transition-colors shadow-inner"
+                        autoComplete="off"
+                        spellCheck={false}
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        placeholder="기업명, 공고 제목으로 검색..."
+                        className="w-full h-14 bg-[#1A1B1E] border border-white/10 rounded-xl pl-9 pr-4 text-xm text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500/50 transition-colors shadow-inner"
                     />
                 </div>
             </div>

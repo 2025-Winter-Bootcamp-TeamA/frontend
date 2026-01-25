@@ -1,4 +1,4 @@
-import api from '@/lib/api';
+import api, { apiPublic } from '@/lib/api';
 import { AxiosResponse } from 'axios';
 import { CategoryDetail, TechStackData } from '@/types/trend';
 
@@ -50,7 +50,8 @@ const fetchAllPages = async (initialUrl: string): Promise<TechStackData[]> => {
     try {
         while (nextUrl) {
             // nextUrl이 http로 시작하면 baseURL 무시됨 (정상 동작)
-            const response: AxiosResponse<PaginatedResponse<TechStackData>> = await api.get(nextUrl);
+            // apiPublic: AllowAny 엔드포인트, preflight 제거
+            const response: AxiosResponse<PaginatedResponse<TechStackData>> = await apiPublic.get(nextUrl);
             const data = response.data;
 
             if (data.results && Array.isArray(data.results)) {
@@ -118,6 +119,40 @@ export const fetchAllTechStacks = async (): Promise<TechStackData[]> => {
 };
 
 /**
+ * 대시보드 첫 화면용: job_stack_count 기준 상위 5개만 1회 요청
+ */
+export const fetchTop5TechStacksByJobCount = async (): Promise<TechStackData[]> => {
+    try {
+        const response = await apiPublic.get<PaginatedResponse<TechStackData>>(
+            '/trends/tech-stacks/?ordering=-job_stack_count&page=1'
+        );
+        const results = response.data?.results ?? [];
+        const top5 = results.slice(0, 5).map(s => ({
+            ...s,
+            logo: s.logo || getExternalLogoUrl(s.name),
+        }));
+        return top5;
+    } catch (error) {
+        console.error("fetchTop5TechStacksByJobCount failed:", error);
+        return [];
+    }
+};
+
+/**
+ * 기술 스택 ID로 단일 조회 (연관 기술 탭에서 노드 선택 시 사용, fetchAllPages 회피)
+ */
+export const getTechStackById = async (id: number): Promise<TechStackData | null> => {
+    try {
+        const response = await apiPublic.get<TechStackData>(`/trends/tech-stacks/${id}/`);
+        const s = response.data;
+        return { ...s, logo: s.logo || getExternalLogoUrl(s.name) };
+    } catch (error) {
+        console.error("getTechStackById failed:", error);
+        return null;
+    }
+};
+
+/**
  * 관련 기술 스택 관계 타입
  */
 export interface RelatedTechStackRelation {
@@ -144,7 +179,7 @@ export interface TechStackRelationsResponse {
  */
 export const getTechStackRelations = async (techStackId: number): Promise<TechStackRelationsResponse> => {
     try {
-        const response = await api.get<TechStackRelationsResponse>(`/trends/tech-stacks/${techStackId}/relations/`);
+        const response = await apiPublic.get<TechStackRelationsResponse>(`/trends/tech-stacks/${techStackId}/relations/`);
         
         // 백엔드에서 이미 DB의 파일 주소를 S3 URL로 변환해서 반환하므로 그대로 사용
         // 로고가 없을 때만 외부 CDN URL 생성

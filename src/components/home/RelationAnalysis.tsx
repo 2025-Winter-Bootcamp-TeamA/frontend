@@ -128,7 +128,7 @@ export default function StackRelationAnalysis({
 
                 return (
                     <motion.div
-                        key={`node-${stack.id}`}
+                        key={`node-${stack.id}-${index}`}
                         className="absolute z-20"
                         initial={{ x: 0, y: 0, opacity: 0 }}
                         animate={{ 

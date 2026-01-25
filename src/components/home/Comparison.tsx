@@ -266,7 +266,7 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
   const rightWidth = totalCount === 0 ? 0 : (rightCount / totalCount) * 100;
 
   return (
-    <div className="w-full h-full min-h-[500px] relative flex flex-col bg-[#25262B]/50 rounded-[32px]">
+    <div className="w-full h-full min-h-[500px] relative flex flex-col overflow-visible bg-[#25262B]/50 rounded-[32px]">
       
       <div className="flex items-center justify-between p-1 mt-3 ml-3">
         <h3 className="text-xl font-bold text-white flex items-center gap-2">
@@ -278,7 +278,8 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
         </button>
       </div>
 
-      <div className="flex items-start justify-center gap-4 md:gap-16 mb-8 relative pt-6">
+      {/* Stack Selectors & VS - overflow-visible로 검색 드롭다운이 잘리지 않도록 */}
+      <div className="flex items-start justify-center gap-4 md:gap-16 mb-8 relative pt-6 overflow-visible">
         <StackSlot 
             side="left"
             stack={leftStack}
@@ -456,12 +457,13 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
 
 function StackSlot({ side, stack, searchTerm, onSearchChange, onRemove, onSelect, suggestions, isSearching, favorites }: any) {
     const [isFocused, setIsFocused] = useState(false);
+    const isDropdownOpen = !stack && isFocused; // 포커스 있을 때만 드롭다운(블러 시 닫힘)
 
     const displayList = searchTerm ? suggestions : favorites;
     const isShowingFavorites = !searchTerm && isFocused;
 
     return (
-        <div className="flex flex-col items-center gap-2 w-[140px] md:w-[180px] relative z-20">
+        <div className={`flex flex-col items-center gap-2 w-[140px] md:w-[180px] relative overflow-visible ${isDropdownOpen ? 'z-[200]' : 'z-20'}`}>
             <AnimatePresence mode="wait">
             {stack ? (
                 <motion.div 
@@ -502,6 +504,10 @@ function StackSlot({ side, stack, searchTerm, onSearchChange, onRemove, onSelect
                             placeholder={side === 'left' ? "기준 기술 검색" : "비교 기술 검색"}
                             value={searchTerm}
                             onChange={(e) => onSearchChange(e.target.value)}
+                            autoComplete="off"
+                            spellCheck={false}
+                            autoCorrect="off"
+                            autoCapitalize="off"
                             onFocus={() => setIsFocused(true)} 
                             onBlur={() => setTimeout(() => setIsFocused(false), 200)} 
                             autoFocus
@@ -509,41 +515,6 @@ function StackSlot({ side, stack, searchTerm, onSearchChange, onRemove, onSelect
                         />
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 w-3.5 h-3.5" />
                     </div>
-
-                    {(isFocused || searchTerm) && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-[#25262B] border border-gray-600 rounded-lg shadow-2xl z-50 max-h-[200px] overflow-y-auto custom-scrollbar">
-                            {isShowingFavorites && (
-                                <div className="px-3 py-2 text-xs font-bold text-gray-500 bg-gray-800/50 border-b border-gray-700 flex items-center gap-1">
-                                    <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" /> 즐겨찾기
-                                </div>
-                            )}
-
-                            {isSearching ? (
-                                <div className="p-3 text-center text-xs text-gray-500">검색 중...</div>
-                            ) : displayList.length > 0 ? (
-                                displayList.map((s: StackData) => (
-                                    <button
-                                        key={s.id}
-                                        onMouseDown={(e) => {
-                                            e.preventDefault();
-                                            onSelect(s);
-                                        }}
-                                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-700/50 text-left transition-colors border-b border-gray-700/50 last:border-0"
-                                    >
-                                        <div className="w-6 h-6 relative grayscale hover:grayscale-0 shrink-0">
-                                            <Image src={s.logo} alt={s.name} fill className="object-contain" unoptimized />
-                                        </div>
-                                        {/* ✅ [유지] 이름 표시 강화 */}
-                                        <span className="text-sm text-white font-bold">{s.name}</span>
-                                    </button>
-                                ))
-                            ) : (
-                                <div className="p-3 text-center text-xs text-gray-500">
-                                    {isShowingFavorites ? "즐겨찾기한 기술이 없습니다." : "검색 결과가 없습니다."}
-                                </div>
-                            )}
-                        </div>
-                    )}
                 </motion.div>
             )}
             </AnimatePresence>

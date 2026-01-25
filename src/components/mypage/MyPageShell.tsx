@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import SideNav from "./SideNav";
 import FavoritesSection from "./FavoritesSection";
 import ResumesSection from "./ResumesSection";
@@ -9,6 +9,13 @@ type TabKey = "resume" | "favorites" | "settings";
 
 export default function MyPageShell() {
   const [tab, setTab] = useState<TabKey>("resume");
+
+  // Navbar에서 'resetMyPage' 이벤트 시 마이페이지 첫 화면(이력서 관리)으로 복귀
+  useEffect(() => {
+    const handleReset = () => setTab("resume");
+    window.addEventListener("resetMyPage", handleReset);
+    return () => window.removeEventListener("resetMyPage", handleReset);
+  }, []);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#1A1B1E] text-white">
