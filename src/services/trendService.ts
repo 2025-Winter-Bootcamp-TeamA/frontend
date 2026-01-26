@@ -179,6 +179,8 @@ export interface TechTrendChartItem {
   date: string;
   job_mention_count: number;
   job_change_rate: number;
+  article_mention_count: number;
+  article_change_rate: number;
 }
 
 /**
@@ -192,12 +194,14 @@ export const fetchTechTrends = async (
 ): Promise<TechTrendChartItem[]> => {
   try {
     const url = `trends/?tech_stack=${techStackId}&days=${days}&ordering=reference_date&page_size=100`;
-    const response = await apiPublic.get<{ results?: Array<{ reference_date: string; job_mention_count: number; job_change_rate: number }> }>(url);
+    const response = await apiPublic.get<{ results?: Array<{ reference_date: string; job_mention_count: number; job_change_rate: number; article_mention_count: number; article_change_rate: number }> }>(url);
     const raw = response.data?.results ?? (Array.isArray(response.data) ? response.data : []);
-    return raw.map((r: { reference_date: string; job_mention_count: number; job_change_rate: number }) => ({
+    return raw.map((r: { reference_date: string; job_mention_count: number; job_change_rate: number; article_mention_count?: number; article_change_rate?: number }) => ({
       date: r.reference_date,
       job_mention_count: Number(r.job_mention_count) ?? 0,
       job_change_rate: Number(r.job_change_rate) ?? 0,
+      article_mention_count: Number(r.article_mention_count) ?? 0,
+      article_change_rate: Number(r.article_change_rate) ?? 0,
     }));
   } catch (error) {
     console.error('fetchTechTrends failed:', error);
