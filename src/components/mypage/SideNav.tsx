@@ -1,7 +1,7 @@
 "use client";
 
-// 탭 타입 정의 (MyPageShell과 동일하게 맞춤)
-type TabKey = "resume" | "favorites" | "settings";
+// 탭 타입 정의 (설정 제거됨)
+type TabKey = "resume" | "favorites";
 
 interface SideNavProps {
   active: TabKey;
@@ -16,7 +16,7 @@ export default function SideNav({ active, onChange }: SideNavProps) {
       className={[
         "w-full rounded-xl px-4 py-3 text-left text-sm transition-all duration-200",
         active === id
-          ? "bg-white/10 text-white font-bold shadow-sm" // 활성화 상태
+          ? "bg-white/10 text-white font-bold shadow-sm ring-1 ring-white/10" // 활성화 스타일 강화
           : "bg-transparent text-zinc-400 hover:bg-white/5 hover:text-zinc-100", // 비활성화 상태
       ].join(" ")}
     >
@@ -25,11 +25,10 @@ export default function SideNav({ active, onChange }: SideNavProps) {
   );
 
   return (
-    <nav className="h-fit rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
+    <nav className="h-fit rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 backdrop-blur-sm">
       <div className="space-y-2">
         <NavItem id="resume" label="이력서 관리" />
         <NavItem id="favorites" label="즐겨찾기 목록" />
-        <NavItem id="settings" label="설정" />
       </div>
     </nav>
   );

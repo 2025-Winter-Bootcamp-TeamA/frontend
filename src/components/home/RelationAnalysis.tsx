@@ -193,18 +193,18 @@ export default function StackRelationAnalysis({
                             />
                         </div>
                         <div>
-                            <h3 className="text-xl font-bold text-white">{activeDetail.name}</h3>
-                            <span className="text-xs text-blue-400 font-medium px-2 py-0.5 bg-blue-900/30 rounded-md">{activeDetail.role}</span>
+                            <h3 className="text-2xl font-bold text-white">{activeDetail.name}</h3>
+                            <span className="text-xm text-blue-400 font-medium px-2 py-0.5 bg-blue-900/30 rounded-md">{activeDetail.role}</span>
                         </div>
                     </div>
                     <div className="mb-6">
-                        <h4 className="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wider mb-2"><Info className="w-3.5 h-3.5" /> 기술 설명</h4>
-                        <p className="text-sm text-gray-300 leading-relaxed bg-gray-800/50 p-3 rounded-lg border border-gray-700/50">{activeDetail.description}</p>
+                        <h4 className="flex items-center gap-2 text-gray-500 text-xm font-bold uppercase tracking-wider mb-2"><Info className="w-3.5 h-3.5" /> 기술 설명</h4>
+                        <p className="text-xm text-gray-300 leading-relaxed bg-gray-800/50 p-3 rounded-lg border border-gray-700/50">{activeDetail.description}</p>
                     </div>
                     <div className="mb-6 flex-1">
-                        <h4 className="flex items-center gap-2 text-gray-500 text-xs font-bold uppercase tracking-wider mb-2"><Share2 className="w-3.5 h-3.5" /> 기술과의 관계</h4>
+                        <h4 className="flex items-center gap-2 text-gray-500 text-xm font-bold uppercase tracking-wider mb-2"><Share2 className="w-3.5 h-3.5" /> 기술과의 관계</h4>
                         <div className="bg-gradient-to-b from-blue-900/10 to-transparent p-4 rounded-xl border border-blue-500/20">
-                            <p className="text-sm text-gray-200 leading-relaxed font-medium">"{activeDetail.relationReason}"</p>
+                            <p className="text-xm text-gray-200 leading-relaxed">"{activeDetail.relationReason}"</p>
                         </div>
                     </div>
                     <button 
@@ -213,10 +213,10 @@ export default function StackRelationAnalysis({
                                 onStackSelect(activeDetail.id);
                             }
                         }}
-                        className="mt-auto w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 text-sm"
+                        className="mt-auto w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 text-xm"
                     >
                         <span>{activeDetail.name} 분석 화면으로 이동</span>
-                        <ArrowRightCircle className="w-4 h-4" />
+                        <ArrowRightCircle className="w-6 h-6" />
                     </button>
                 </motion.div>
             ) : (

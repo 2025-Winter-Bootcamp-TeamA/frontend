@@ -5,9 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, ArrowRightLeft, Info, Plus, Building2, Link as LinkIcon, AlertCircle, Trophy, Star, MessageSquare, Briefcase } from "lucide-react";
 import Image from "next/image";
 import { searchTechStacks, getExternalLogoUrl } from "@/services/trendService";
-import { TechStackData } from "@/types/trend";
 import { api } from "@/lib/api"; 
-import { getAuthTokens } from "@/lib/auth"; // ✅ [수정 1] getAuthTokens 임포트 추가
+import { getAuthTokens } from "@/lib/auth";
 import JobCard from "./JobCard"; 
 
 export interface StackData {
@@ -74,12 +73,11 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
     }
   }, []);
 
-  // ✅ [수정 2] 즐겨찾기 목록 로드 시 토큰 확인 로직 추가
+  // ✅ [수정] 즐겨찾기 데이터 매핑 로직 수정 (tech_name 필드 추가 확인)
   useEffect(() => {
     const fetchFavorites = async () => {
         const { accessToken } = getAuthTokens();
         
-        // 토큰이 없으면 API 호출 안 함 (비로그인 상태 유지)
         if (!accessToken) {
             setFavoriteStacks([]);
             return;
@@ -91,14 +89,17 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
             
             const formattedFavorites = bookmarks.map((item: any) => {
                 const tech = item.tech_stack || item;
+                // ✅ 수정된 부분: tech_name 우선 확인 (FavoritesSection과 동일하게 맞춤)
+                const techName = tech.tech_name || tech.name || tech.tech_stack_name || "Unknown";
+
                 return {
                     id: tech.id || tech.tech_stack_id,
-                    name: tech.name,
+                    name: techName, 
                     postCount: Number(tech.article_stack_count) || 0,
                     jobCount: Number(tech.job_stack_count) || 0,
                     growth: 0,
                     color: "from-gray-500 to-gray-700",
-                    logo: tech.logo || getExternalLogoUrl(tech.name),
+                    logo: tech.logo || getExternalLogoUrl(techName),
                     themeColor: "#ffffff",
                     description: tech.description,
                 };
@@ -266,12 +267,10 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
       return compareMode === 'jobs' ? stack.jobCount : stack.postCount;
   };
 
-  // ✅ 그래프 계산 로직 수정
   const leftCount = getCount(leftStack);
   const rightCount = getCount(rightStack);
   const totalCount = leftCount + rightCount;
 
-  // Total이 0이면 너비도 0% (색상 표시 안 함 -> 회색 배경만 보임)
   const leftWidth = totalCount === 0 ? 0 : (leftCount / totalCount) * 100;
   const rightWidth = totalCount === 0 ? 0 : (rightCount / totalCount) * 100;
 
@@ -288,7 +287,6 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
         </button>
       </div>
 
-      {/* Stack Selectors & VS - overflow-visible로 검색 드롭다운이 잘리지 않도록 */}
       <div className="flex items-start justify-center gap-4 md:gap-16 mb-8 relative pt-6 overflow-visible">
         <StackSlot 
             side="left"
@@ -390,37 +388,29 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
                              </div>
                           </div>
 
-                          {/* Visual Bar - Updated Logic: No text inside bar, gray if 0 */}
                           <div className="relative h-14 w-full rounded-xl overflow-hidden bg-gray-800 flex shadow-inner">
-                            {/* Left Bar */}
                             <motion.div 
                                 initial={{ width: 0 }}
                                 animate={{ width: `${leftWidth}%` }}
                                 transition={{ duration: 1, ease: "easeOut" }}
                                 className="h-full bg-gradient-to-r from-blue-600 to-blue-400 relative flex items-center justify-start"
                             >
-                                {/* 내부 텍스트 제거됨 */}
                                 <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
                             </motion.div>
 
-                            {/* Right Bar */}
                             <motion.div 
                                 initial={{ width: 0 }}
                                 animate={{ width: `${rightWidth}%` }}
                                 transition={{ duration: 1, ease: "easeOut" }}
                                 className="h-full bg-gradient-to-l from-purple-600 to-purple-400 relative flex items-center justify-end"
                             >
-                                {/* 내부 텍스트 제거됨 */}
                                 <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
                             </motion.div>
 
-                            {/* 중앙 구분선: 데이터가 있을 때만 표시 */}
                             {totalCount > 0 && (
                                 <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gray-900/50 -translate-x-1/2 z-20 blur-[1px]"></div>
                             )}
                           </div>
-
-                          
                     </div>
                 </div>
 
@@ -467,7 +457,7 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
 
 function StackSlot({ side, stack, searchTerm, onSearchChange, onRemove, onSelect, suggestions, isSearching, favorites }: any) {
     const [isFocused, setIsFocused] = useState(false);
-    const isDropdownOpen = !stack && isFocused; // 포커스 있을 때만 드롭다운(블러 시 닫힘)
+    const isDropdownOpen = !stack && isFocused; 
 
     const displayList = searchTerm ? suggestions : favorites;
     const isShowingFavorites = !searchTerm && isFocused;
@@ -549,8 +539,7 @@ function StackSlot({ side, stack, searchTerm, onSearchChange, onRemove, onSelect
                                         <div className="w-6 h-6 relative grayscale hover:grayscale-0 shrink-0">
                                             <Image src={s.logo} alt={s.name} fill className="object-contain" unoptimized />
                                         </div>
-                                        {/* ✅ [유지] 이름 표시 강화 */}
-                                        <span className="text-sm text-white font-bold">{s.name}</span>
+                                        <span className="text-sm text-white font-bold truncate">{s.name}</span>
                                     </button>
                                 ))
                             ) : (
