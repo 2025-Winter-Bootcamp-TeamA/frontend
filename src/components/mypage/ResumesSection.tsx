@@ -1,25 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { getAuthTokens } from "@/lib/auth";
 
-// 백엔드 응답 구조를 그대로 사용
 interface TechStack {
   id: number;
   name: string;
 }
 
-// 백엔드 시리얼라이저 응답 구조 (ResumeSerializer)
 interface Resume {
   resume_id: number;
   resume_title: string;
   resume_url: string;
-  tech_stacks: { tech_stack: TechStack }[]; // 백엔드 구조: [{tech_stack: {id, name, ...}}]
+  tech_stacks: { tech_stack: TechStack }[];
   created_at: string;
   updated_at: string;
 }
+
+const PAGE_SIZE = 4; // 4개씩 보여주기
 
 export default function ResumesSection() {
   const router = useRouter();
@@ -27,28 +27,23 @@ export default function ResumesSection() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // 페이지 상태 추가
+  const [page, setPage] = useState(1);
 
-  // 이력서 목록 불러오기
   const fetchResumes = async () => {
     try {
       setLoading(true);
       setError(null);
       const response = await api.get("/resumes/");
-      
-      // 페이지네이션 응답 처리 (results가 있으면 results 사용, 없으면 직접 배열)
       const data = response.data.results || response.data;
       
-      // 배열이 아닌 경우 빈 배열로 처리
       if (!Array.isArray(data)) {
-        console.error("예상치 못한 응답 형식:", data);
         setResumes([]);
         return;
       }
-      
-      // 백엔드 응답을 그대로 사용 (변환 없이)
       setResumes(data as Resume[]);
     } catch (err: any) {
-      console.error("이력서 목록 불러오기 실패:", err);
       setError(err.response?.data?.error || "이력서 목록을 불러올 수 없습니다.");
     } finally {
       setLoading(false);
@@ -65,7 +60,23 @@ export default function ResumesSection() {
     }
   }, []);
 
-  // 이력서 업로드
+  // --- 페이징 로직 ---
+  const sortedResumes = useMemo(() => {
+    // 최신순 정렬
+    return [...resumes].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [resumes]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedResumes.length / PAGE_SIZE));
+  const pagedResumes = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return sortedResumes.slice(start, start + PAGE_SIZE);
+  }, [sortedResumes, page]);
+
+  // 페이지 이동 시 맨 위로 스크롤 방지 등을 위해 간단히 page set만
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+  };
+
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -82,21 +93,19 @@ export default function ResumesSection() {
     try {
       setUploading(true);
       setError(null);
-      // multipart/form-data는 Content-Type을 명시하지 않아야 axios가 자동으로 boundary를 설정합니다
       await api.post("/resumes/", formData);
       alert("이력서가 업로드되었습니다!");
       fetchResumes();
+      setPage(1); // 업로드 후 첫 페이지로 이동
     } catch (err: any) {
-      console.error("이력서 업로드 실패:", err);
       const errorMessage = err.response?.data?.error || err.response?.data?.detail || "이력서 업로드에 실패했습니다.";
       setError(errorMessage);
     } finally {
       setUploading(false);
-      event.target.value = ""; // input 초기화
+      event.target.value = ""; 
     }
   };
 
-  // 이력서 삭제
   const handleDelete = async (id: number, title: string) => {
     if (!confirm(`"${title}" 이력서를 삭제하시겠습니까?`)) return;
 
@@ -106,19 +115,17 @@ export default function ResumesSection() {
       alert("이력서가 삭제되었습니다.");
       fetchResumes();
     } catch (err: any) {
-      console.error("이력서 삭제 실패:", err);
       setError(err.response?.data?.error || "이력서 삭제에 실패했습니다.");
     }
   };
 
-  // AI 통합 리포트 페이지로 이동 (기존 AI 면접 페이지)
   const handleGoToAnalysis = (id: number) => {
     router.push(`/ai-interview?resumeId=${id}`);
   };
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-10 text-center">
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-10 text-center backdrop-blur-sm">
         <div className="flex items-center justify-center gap-3">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
           <p className="text-zinc-400">이력서 목록을 불러오는 중...</p>
@@ -128,12 +135,18 @@ export default function ResumesSection() {
   }
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 backdrop-blur-sm">
       <header className="mb-6 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-zinc-50">이력서 관리</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-bold text-zinc-50">이력서 관리</h2>
+          <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-medium text-zinc-400">
+            {resumes.length} / 10
+          </span>
+        </div>
         
-        {/* 업로드 버튼 */}
-        <label className="cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-blue-700 active:scale-95">
+        <label className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-white transition-all active:scale-95 ${
+          uploading ? "bg-zinc-700 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+        }`}>
           {uploading ? "업로드 중..." : "+ 이력서 업로드"}
           <input
             type="file"
@@ -145,72 +158,69 @@ export default function ResumesSection() {
         </label>
       </header>
 
-      {/* 에러 메시지 */}
       {error && (
-        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">
+        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400 animate-pulse">
           ⚠️ {error}
         </div>
       )}
 
-      {/* 이력서 목록 */}
       {resumes.length === 0 ? (
-        <div className="flex h-40 flex-col items-center justify-center rounded-xl bg-white/5 text-zinc-400 text-sm">
+        <div className="flex h-60 flex-col items-center justify-center rounded-xl border border-dashed border-zinc-800 bg-zinc-950/30 text-zinc-400 text-sm">
+          <svg className="mb-4 h-10 w-10 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
           <p>업로드된 이력서가 없습니다.</p>
-          <p className="mt-2 text-xs text-zinc-500">PDF 파일을 업로드하여 AI 분석을 시작하세요.</p>
+          <p className="mt-1 text-xs text-zinc-500">PDF 파일을 업로드하여 AI 분석을 시작하세요.</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {resumes.map((resume) => (
+          {pagedResumes.map((resume) => (
             <div
               key={resume.resume_id}
-              className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-950/50 p-5 transition-all hover:border-zinc-700"
+              className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-950/50 p-5 transition-all hover:border-zinc-700 hover:bg-zinc-900"
             >
               <div className="flex-1">
-                <div className="flex items-center gap-3">
-                  {/* PDF 아이콘 */}
-                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-red-500/10 text-red-400">
-                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-red-500/10 text-red-400 shrink-0">
+                    <span className="text-xs font-bold">PDF</span>
                   </div>
 
-                  <div className="flex-1">
-                    <h3 className="font-bold text-white">{resume.resume_title}</h3>
-                    <p className="text-xs text-zinc-500">
-                      {new Date(resume.created_at).toLocaleDateString("ko-KR")} 업로드
-                    </p>
-                    
-                    {/* 기술 스택 태그 */}
-                    {resume.tech_stacks && resume.tech_stacks.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {resume.tech_stacks.map((ts) => (
-                          <span
-                            key={ts.tech_stack.id}
-                            className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-400"
-                          >
-                            {ts.tech_stack.name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                  <div className="min-w-0">
+                    <h3 className="truncate font-bold text-zinc-100">{resume.resume_title}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="text-xs text-zinc-500">
+                        {new Date(resume.created_at).toLocaleDateString("ko-KR")}
+                      </p>
+                      {resume.tech_stacks?.length > 0 && (
+                        <>
+                          <span className="h-3 w-[1px] bg-zinc-700"></span>
+                          <div className="flex gap-1.5 overflow-hidden">
+                            {resume.tech_stacks.slice(0, 3).map((ts) => (
+                              <span key={ts.tech_stack.id} className="text-[10px] text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded">
+                                {ts.tech_stack.name}
+                              </span>
+                            ))}
+                            {resume.tech_stacks.length > 3 && (
+                              <span className="text-[10px] text-zinc-500">+{resume.tech_stacks.length - 3}</span>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* 액션 버튼들 */}
-              <div className="flex items-center gap-2">
-                {/* AI 통합 리포트 */}
+              <div className="flex items-center gap-2 pl-4">
                 <button
                   onClick={() => handleGoToAnalysis(resume.resume_id)}
-                  className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white transition-all hover:bg-blue-700 active:scale-95"
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-blue-500 hover:shadow-lg hover:shadow-blue-900/20 active:scale-95 whitespace-nowrap"
                 >
-                  AI 통합 리포트
+                  AI 분석 결과
                 </button>
-
-                {/* 삭제 */}
                 <button
                   onClick={() => handleDelete(resume.resume_id, resume.resume_title)}
-                  className="rounded-lg bg-red-500/10 px-3 py-2 text-xs font-medium text-red-400 transition-all hover:bg-red-500/20 active:scale-95"
+                  className="rounded-lg bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-400 transition-all hover:bg-red-500/10 hover:text-red-400 active:scale-95"
                 >
                   삭제
                 </button>
@@ -220,12 +230,38 @@ export default function ResumesSection() {
         </div>
       )}
 
+      {/* 페이지네이션 버튼 */}
+      {totalPages > 1 && (
+        <div className="mt-8 flex justify-center gap-2">
+          
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <button
+              key={p}
+              onClick={() => handlePageChange(p)}
+              className={`min-w-[32px] rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
+                p === page 
+                  ? "bg-zinc-100 text-zinc-900" 
+                  : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
+              }`}
+            >
+              {p}
+            </button>
+          ))}
+
+        </div>
+      )}
+
       {/* 안내 문구 */}
-      <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 text-xs text-zinc-400">
-        <p className="font-semibold text-zinc-300">💡 사용 팁</p>
-        <ul className="mt-2 ml-4 space-y-1 list-disc">
-          <li>PDF 형식의 이력서만 업로드 가능합니다.</li>
-          <li><strong>AI 통합 리포트</strong> 버튼을 클릭하면 AI 면접 페이지에서 상세한 분석 결과를 확인할 수 있습니다.</li>
+      <div className="mt-8 rounded-xl bg-blue-900/10 p-4 text-xs text-blue-200/80 border border-blue-500/10">
+        <p className="font-semibold mb-1 flex items-center gap-2">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Tip
+        </p>
+        <ul className="ml-6 list-disc space-y-1 text-zinc-400">
+          <li>'AI 분석 결과'를 클릭하면 면접 질문 예측과 역량 분석 리포트를 확인할 수 있습니다.</li>
+          <li>최대 10개까지 이력서를 저장할 수 있습니다. 오래된 이력서는 주기적으로 정리해주세요.</li>
         </ul>
       </div>
     </div>

@@ -3,14 +3,37 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Map as KakaoMap, CustomOverlayMap, useKakaoLoader } from "react-kakao-maps-sdk";
-import { Search, MapPin, RefreshCw, ArrowLeft, Building2, Star, Filter, X, List } from "lucide-react";
+import { Search, MapPin, RefreshCw, ArrowLeft, Building2, Star, Filter, X, List, ChevronDown } from "lucide-react";
 import { api } from "@/lib/api";
 import { getAuthTokens } from "@/lib/auth";
 import JobCard from "../home/JobCard";
 
 // 서울 영등포구 — 채용 지도 첫 화면·리셋 시 고정
 const SEOUL_CENTER = { lat: 37.5172, lng: 126.9074 };
-const INITIAL_MAP_LEVEL = 8; // 한강·강남·서초·용산 등 넓은 서울 뷰 (레벨↑=축소)
+
+// 초기 줌 레벨 변경 (8 -> 5: 더 확대되어 영등포구 위주로 보이게 설정)
+const INITIAL_MAP_LEVEL = 5; 
+
+// --- 행정구역 데이터 (시/도 -> 군/구) ---
+const KOREA_DISTRICTS: Record<string, string[]> = {
+  "서울": ["강남구", "강동구", "강북구", "강서구", "관악구", "광진구", "구로구", "금천구", "노원구", "도봉구", "동대문구", "동작구", "마포구", "서대문구", "서초구", "성동구", "성북구", "송파구", "양천구", "영등포구", "용산구", "은평구", "종로구", "중구", "중랑구"],
+  "경기": ["가평군", "고양시", "과천시", "광명시", "광주시", "구리시", "군포시", "김포시", "남양주시", "동두천시", "부천시", "성남시", "수원시", "시흥시", "안산시", "안성시", "안양시", "양주시", "양평군", "여주시", "연천군", "오산시", "용인시", "의왕시", "의정부시", "이천시", "파주시", "평택시", "포천시", "하남시", "화성시"],
+  "인천": ["강화군", "계양구", "남동구", "동구", "미추홀구", "부평구", "서구", "연수구", "옹진군", "중구"],
+  "부산": ["강서구", "금정구", "기장군", "남구", "동구", "동래구", "부산진구", "북구", "사상구", "사하구", "서구", "수영구", "연제구", "영도구", "중구", "해운대구"],
+  "대구": ["군위군", "남구", "달서구", "달성군", "동구", "북구", "서구", "수성구", "중구"],
+  "광주": ["광산구", "남구", "동구", "북구", "서구"],
+  "대전": ["대덕구", "동구", "서구", "유성구", "중구"],
+  "울산": ["남구", "동구", "북구", "울주군", "중구"],
+  "세종": ["세종시"],
+  "강원": ["강릉시", "고성군", "동해시", "삼척시", "속초시", "양구군", "양양군", "영월군", "원주시", "인제군", "정선군", "철원군", "춘천시", "태백시", "평창군", "홍천군", "화천군", "횡성군"],
+  "충북": ["괴산군", "단양군", "보은군", "영동군", "옥천군", "음성군", "제천시", "증평군", "진천군", "청주시", "충주시"],
+  "충남": ["계룡시", "공주시", "금산군", "논산시", "당진시", "보령시", "부여군", "서산시", "서천군", "아산시", "연기군", "예산군", "천안시", "청양군", "태안군", "홍성군"],
+  "전북": ["고창군", "군산시", "김제시", "남원시", "무주군", "부안군", "순창군", "완주군", "익산시", "임실군", "장수군", "전주시", "정읍시", "진안군"],
+  "전남": ["강진군", "고흥군", "곡성군", "광양시", "구례군", "나주시", "담양군", "목포시", "무안군", "보성군", "순천시", "신안군", "여수시", "영광군", "영암군", "완도군", "장성군", "장흥군", "진도군", "함평군", "해남군", "화순군"],
+  "경북": ["경산시", "경주시", "고령군", "구미시", "김천시", "문경시", "봉화군", "상주시", "성주군", "안동시", "영덕군", "영양군", "영주시", "영천시", "예천군", "울릉군", "울진군", "의성군", "청도군", "청송군", "칠곡군", "포항시"],
+  "경남": ["거제시", "거창군", "고성군", "김해시", "남해군", "밀양시", "사천시", "산청군", "양산시", "의령군", "진주시", "창녕군", "창원시", "통영시", "하동군", "함안군", "함양군", "합천군"],
+  "제주": ["서귀포시", "제주시"]
+};
 
 // --- 커스텀 훅: 디바운스 (입력 지연 처리) ---
 function useDebounce<T>(value: T, delay: number): T {
@@ -51,9 +74,9 @@ export default function JobMap() {
   });
 
   // --- 상태 관리 ---
-  const [allCompanies, setAllCompanies] = useState<Company[]>([]); // 원본 전체 데이터
-  const [companies, setCompanies] = useState<Company[]>([]); // 서버 필터링된 데이터
-  const [visibleCompanies, setVisibleCompanies] = useState<Company[]>([]); // 화면에 렌더링할 데이터
+  const [allCompanies, setAllCompanies] = useState<Company[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [visibleCompanies, setVisibleCompanies] = useState<Company[]>([]);
   
   const [map, setMap] = useState<kakao.maps.Map | null>(null);
   const [center, setCenter] = useState(SEOUL_CENTER);
@@ -70,31 +93,23 @@ export default function JobMap() {
   const hasMapIdleFired = useRef(false);
 
   // --- 필터 상태 ---
-  const [searchQuery, setSearchQuery] = useState(""); // 클라이언트 사이드 (기업명)
-  const [careerYear, setCareerYear] = useState<string>(""); // 서버 사이드
-  const [jobSearch, setJobSearch] = useState<string>(""); // 서버 사이드
-  const [city, setCity] = useState<string>(""); // 서버 사이드
-  const [district, setDistrict] = useState<string>(""); // 서버 사이드
+  const [searchQuery, setSearchQuery] = useState("");
+  const [careerYear, setCareerYear] = useState<string>("");
+  const [jobSearch, setJobSearch] = useState<string>("");
+  const [city, setCity] = useState<string>("");
+  const [district, setDistrict] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
 
-  // ✅ 디바운스 적용된 필터 값 (API 요청 최적화용)
   const debouncedCareer = useDebounce(careerYear, 500);
   const debouncedJobSearch = useDebounce(jobSearch, 500);
   const debouncedCity = useDebounce(city, 500);
   const debouncedDistrict = useDebounce(district, 500);
-
-  const cities = [
-    "서울", "부산", "대구", "인천", "광주",
-    "대전", "울산", "세종", "경기", "강원",
-    "충북", "충남", "전북", "전남", "경북", "경남", "제주"
-    ];
 
   // 1. 초기 데이터 로드
   useEffect(() => {
     const fetchAllData = async () => {
       setIsDataLoading(true);
       try {
-        // 즐겨찾기 목록
         const { accessToken } = getAuthTokens();
         if (accessToken) {
           try {
@@ -107,7 +122,6 @@ export default function JobMap() {
           }
         }
 
-        // 전체 기업 목록 (목록 API에 latitude/longitude 포함 → 상세 N회 호출 제거)
         const response = await api.get('/jobs/corps/?page_size=1000');
         const rawCorps = Array.isArray(response.data) ? response.data : response.data.results || [];
         const enriched = rawCorps
@@ -130,8 +144,7 @@ export default function JobMap() {
     fetchAllData();
   }, []);
 
-  // 2. 상세 필터링: 경력·직무·지역을 한 번에 쿼리 → 백엔드가 AND 조건으로 교집합만 반환
-  //    (경력·직무·지역 모두 검색값이 있을 때, 세 조건을 **동시에** 만족하는 채용공고만 사용)
+  // 2. 상세 필터링
   useEffect(() => {
     const filterCompanies = async () => {
       if (!debouncedCareer && !debouncedJobSearch && !debouncedCity && !debouncedDistrict) {
@@ -140,14 +153,13 @@ export default function JobMap() {
       }
 
       setIsDataLoading(true);
-      // 주어진 값만 params에 넣고, 한 요청으로 전달 → 백엔드에서 모두 만족(AND)하는 공고만 반환
       const apiParams: Record<string, number | string> = {};
       const year = parseInt(debouncedCareer, 10);
       if (debouncedCareer !== "" && !isNaN(year) && year >= 0) apiParams.career_year = year;
       if (debouncedJobSearch?.trim()) apiParams.job_title = debouncedJobSearch.trim();
       if (debouncedCity?.trim()) apiParams.city = debouncedCity.trim();
       if (debouncedDistrict?.trim()) apiParams.district = debouncedDistrict.trim();
-      apiParams.page_size = 5000; // AND 조건에 맞는 공고를 넉넉히 수집해 기업 목록 구성
+      apiParams.page_size = 5000;
 
       try {
         const res = await api.get("/jobs/job-postings/", { params: apiParams });
@@ -168,34 +180,26 @@ export default function JobMap() {
     }
   }, [debouncedCareer, debouncedJobSearch, debouncedCity, debouncedDistrict, allCompanies]);
 
-  // 3. 최종 리스트 계산 (메모이제이션)
+  // 3. 최종 리스트 계산
   const finalCompanies = useMemo(() => {
     let result = companies;
-
-    // 탭 필터 (즐겨찾기)
     if (activeTab === "favorites") {
       result = result.filter(c => favoriteCompanyIds.includes(c.id));
     }
-
-    // 이름 검색 (클라이언트)
     if (searchQuery) {
       result = result.filter(c => 
         c.name && c.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-
     return result;
   }, [companies, activeTab, favoriteCompanyIds, searchQuery]);
 
-  // 4. 지도 뷰포트 내 마커 필터링 (렌더링 최적화)
+  // 4. 지도 뷰포트 내 마커 필터링
   const updateVisibleCompanies = useCallback(() => {
     if (!map) return;
-
     const bounds = map.getBounds();
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
-
-    // 최종 리스트 중에서 화면 안에 있는 것만 추출
     const visible = finalCompanies.filter((company) => {
       return (
         company.latitude >= sw.getLat() &&
@@ -204,16 +208,13 @@ export default function JobMap() {
         company.longitude <= ne.getLng()
       );
     });
-
     setVisibleCompanies(visible);
   }, [map, finalCompanies]);
 
-  // 리스트나 맵 변경 시 마커 갱신
   useEffect(() => {
     updateVisibleCompanies();
   }, [finalCompanies, updateVisibleCompanies]);
 
-  // 선택한 기업이 현재 뷰 밖이어도 마커에 항상 포함 (클릭 시 위치 미표시 방지)
   const companiesToShow = useMemo(() => {
     if (!selectedCompany) return visibleCompanies;
     const lat = Number(selectedCompany.latitude);
@@ -224,18 +225,51 @@ export default function JobMap() {
     return alreadyIn ? visibleCompanies : [selectedCompany, ...visibleCompanies];
   }, [visibleCompanies, selectedCompany]);
 
-  // 선택 시 지도 중심·줌을 해당 기업 좌표로 이동 (state만으로는 미반영될 수 있어 map API 직접 호출)
+  // --- 지도 중심 이동 및 보정 로직 (부드러운 이동 적용) ---
   useEffect(() => {
     if (!map || !selectedCompany) return;
     const lat = Number(selectedCompany.latitude);
     const lng = Number(selectedCompany.longitude);
     if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return;
+
     const kakao = typeof window !== 'undefined' ? (window as any).kakao : null;
-    if (kakao?.maps?.LatLng) {
-      map.setCenter(new kakao.maps.LatLng(lat, lng));
-      map.setLevel(3);
-    }
-  }, [map, selectedCompany]);
+    if (!kakao?.maps?.LatLng) return;
+
+    // 1. 줌 레벨 설정 (레벨 3으로 확대)
+    map.setLevel(3);
+
+    // 2. 부드러운 중심 이동 (panTo)
+    const moveWithOffset = () => {
+        const projection = map.getProjection();
+        const markerPosition = new kakao.maps.LatLng(lat, lng);
+
+        if (!projection) {
+            // 투영법 계산 불가 시 일반 이동
+            map.panTo(markerPosition);
+            return;
+        }
+
+        // 데스크탑 화면(1024px 이상)이고 사이드바가 열려있을 때 오프셋 적용
+        if (isSidebarOpen && window.innerWidth >= 1024) {
+            const markerPoint = projection.pointFromCoords(markerPosition);
+            
+            // 사이드바 너비(400px)의 절반인 200px만큼 '지도 중심'을 왼쪽으로 이동
+            // 이렇게 하면 마커는 화면 중앙보다 200px 오른쪽(보이는 영역의 중심)에 위치하게 됨
+            const newCenterPoint = new kakao.maps.Point(markerPoint.x - 200, markerPoint.y);
+            const newCenter = projection.coordsFromPoint(newCenterPoint);
+            
+            // panTo: 부드럽게 이동
+            map.panTo(newCenter);
+        } else {
+            // 모바일이거나 사이드바 닫힘 -> 그냥 중앙으로 부드럽게 이동
+            map.panTo(markerPosition);
+        }
+    };
+
+    // 약간의 지연 후 이동 실행
+    setTimeout(moveWithOffset, 100);
+
+  }, [map, selectedCompany, isSidebarOpen]);
 
   // --- 핸들러 함수들 ---
 
@@ -273,65 +307,49 @@ export default function JobMap() {
   
   const hasActiveFilters = careerYear !== "" || jobSearch !== "" || city !== "" || district !== "";
 
-  // ✅ 기업 즐겨찾기 토글 함수 (백엔드 API 연동)
+  // 시/도 변경 핸들러
+  const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setCity(e.target.value);
+    setDistrict(""); 
+  };
+
   const toggleCompanyFavorite = async (e: React.MouseEvent, corpId: number) => {
     e.stopPropagation();
-    
     const { accessToken } = getAuthTokens();
-    if (!accessToken) {
-      // 로그인 모달 표시 로직 필요
-      return;
-    }
+    if (!accessToken) return;
 
     try {
       const isFavorite = favoriteCompanyIds.includes(corpId);
-      
       if (isFavorite) {
-        // 즐겨찾기 제거
         try {
           const bookmarksResponse = await api.get('/jobs/corp-bookmarks/');
           const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
           const bookmarkToDelete = bookmarks.find((b: any) => b.corp?.id === corpId || b.corp_id === corpId);
-          
           if (bookmarkToDelete) {
             await api.delete(`/jobs/corp-bookmarks/${bookmarkToDelete.corp_bookmark_id || bookmarkToDelete.id}/`);
-            const nextFavs = favoriteCompanyIds.filter(id => id !== corpId);
-            setFavoriteCompanyIds(nextFavs);
+            setFavoriteCompanyIds(prev => prev.filter(id => id !== corpId));
             window.dispatchEvent(new CustomEvent('favoriteChanged', { detail: { type: 'company', action: 'removed', id: corpId } }));
           }
-        } catch (error) {
-          console.error('즐겨찾기 제거 실패:', error);
-        }
+        } catch (error) { console.error(error); }
       } else {
-        // 즐겨찾기 추가
         try {
           await api.post('/jobs/corp-bookmarks/', { corp_id: corpId });
-          const nextFavs = [...favoriteCompanyIds, corpId];
-          setFavoriteCompanyIds(nextFavs);
+          setFavoriteCompanyIds(prev => [...prev, corpId]);
           window.dispatchEvent(new CustomEvent('favoriteChanged', { detail: { type: 'company', action: 'added', id: corpId } }));
-        } catch (error) {
-          console.error('즐겨찾기 추가 실패:', error);
-        }
+        } catch (error) { console.error(error); }
       }
-    } catch (error) {
-      console.error('즐겨찾기 토글 실패:', error);
-    }
+    } catch (error) { console.error(error); }
   };
 
   const handleSelectCompany = (company: Company) => {
     setSelectedCompany(company);
-    setCenter({ lat: Number(company.latitude), lng: Number(company.longitude) });
+    // setCenter는 여기서 호출하지 않고 useEffect의 panTo에 맡김
+    // setCenter({ lat: Number(company.latitude), lng: Number(company.longitude) }); 
     setLevel(3);
     fetchCompanyJobs(company.id);
     if (!isSidebarOpen) setIsSidebarOpen(true); 
   };
-  
-  const handleBackToList = () => {
-    setSelectedCompany(null);
-    resetFilters();
-  };
 
-  // ✅ URL 파라미터에서 기업 ID를 받아서 해당 기업을 자동 선택
   useEffect(() => {
     const corpIdParam = searchParams?.get('corpId');
     if (corpIdParam && companies.length > 0) {
@@ -346,7 +364,6 @@ export default function JobMap() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, companies]);
 
-  // ✅ Navbar에서 'resetJobMap' 이벤트 시 채용 지도 첫 화면(서울 중심)으로 복귀
   useEffect(() => {
     const handleReset = () => {
       setSelectedCompany(null);
@@ -381,99 +398,143 @@ export default function JobMap() {
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="bg-[#2C2E33] flex-shrink-0">
+        <div className="bg-[#2C2E33] flex-shrink-0 relative z-20">
             {/* 헤더 */}
             <div className="p-5 border-b border-white/5 flex justify-between items-center">
-                <h2 className="text-xl font-black text-white">채용 지도</h2>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-black text-white">채용 지도</h2>
+                  <button
+                      onClick={() => setShowFilters(!showFilters)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                          showFilters 
+                              ? "bg-blue-600/20 text-blue-400 border-blue-500/50" 
+                              : "bg-[#1A1B1E] text-gray-400 border-white/10 hover:border-white/30 hover:text-white"
+                      }`}
+                  >
+                      <Filter size={14} className={showFilters ? "fill-blue-400" : ""} />
+                      상세 필터
+                      <ChevronDown size={14} className={`transition-transform duration-300 ${showFilters ? "rotate-180" : ""}`} />
+                  </button>
+                </div>
+                
                 <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-2 text-gray-400">
                     <X size={20} />
                 </button>
             </div>
 
-            {/* 검색 및 필터 패널 */}
-            <div className="p-4 pb-0">
-                <form onSubmit={handleSearchSubmit} className="relative mb-3">
+            {/* 필터 애니메이션 컨테이너 */}
+            <div 
+                className={`overflow-hidden transition-all duration-300 ease-in-out bg-[#1A1B1E] border-b border-white/5 ${
+                    showFilters ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                }`}
+            >
+                <div className="p-4 space-y-4">
+                    {/* 필터 입력 폼 */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-[10px] text-gray-400 mb-1.5 uppercase font-bold tracking-wider">경력(년)</label>
+                            <input 
+                              type="number" 
+                              min="0" 
+                              placeholder="0" 
+                              value={careerYear} 
+                              onChange={(e) => setCareerYear(e.target.value)} 
+                              className="w-full bg-[#25262B] text-white px-3 py-2 rounded-lg border border-white/10 text-xs focus:border-blue-500 outline-none transition-colors appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" 
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] text-gray-400 mb-1.5 uppercase font-bold tracking-wider">직무 분야</label>
+                            <input type="text" value={jobSearch} onChange={(e) => setJobSearch(e.target.value)} placeholder="제목 검색" className="w-full bg-[#25262B] text-white px-3 py-2 rounded-lg border border-white/10 text-xs focus:border-blue-500 outline-none transition-colors" />
+                        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-[10px] text-gray-400 mb-1.5 uppercase font-bold tracking-wider">시/도</label>
+                            <div className="relative">
+                                <select value={city} onChange={handleCityChange} className="w-full bg-[#25262B] text-white pl-3 pr-8 py-2 rounded-lg border border-white/10 text-xs focus:border-blue-500 outline-none appearance-none transition-colors cursor-pointer">
+                                    <option value="">전체 지역</option>
+                                    {Object.keys(KOREA_DISTRICTS).map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={14} />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] text-gray-400 mb-1.5 uppercase font-bold tracking-wider">군/구</label>
+                            <div className="relative">
+                                <select 
+                                    value={district} 
+                                    onChange={(e) => setDistrict(e.target.value)} 
+                                    disabled={!city}
+                                    className={`w-full bg-[#25262B] text-white pl-3 pr-8 py-2 rounded-lg border border-white/10 text-xs focus:border-blue-500 outline-none appearance-none transition-colors ${!city ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                                >
+                                    <option value="">
+                                        {city ? "전체" : "시/도 선택 필요"}
+                                    </option>
+                                    {city && KOREA_DISTRICTS[city]?.map(d => (
+                                        <option key={d} value={d}>{d}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={14} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 필터 하단 정보 및 초기화 */}
+                    {hasActiveFilters && (
+                        <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                             <div className="flex items-center gap-1.5 text-[10px] text-blue-400">
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                                </span>
+                                필터 적용 중
+                             </div>
+                             <button onClick={resetFilters} className="text-[10px] text-gray-400 hover:text-white flex items-center gap-1 transition-colors">
+                                <X size={10} /> 조건 초기화
+                             </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* 검색 및 탭 패널 */}
+            <div className="p-4 pb-0 bg-[#2C2E33]">
+                <form onSubmit={handleSearchSubmit} className="relative mb-4">
                     <input 
                         type="text" placeholder="기업명 검색..." 
                         value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-[#1A1B1E] text-white pl-10 pr-4 py-3 rounded-xl border border-white/10 outline-none text-sm focus:border-blue-500 transition-colors"
+                        className="w-full bg-[#1A1B1E] text-white pl-10 pr-4 py-3 rounded-xl border border-white/10 outline-none text-sm focus:border-blue-500 transition-colors placeholder:text-gray-500"
                     />
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
                 </form>
-                
-                <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={`w-full flex items-center justify-between p-3 border border-white/10 rounded-xl transition-all mb-4 ${showFilters ? "bg-[#1A1B1E] border-blue-500/50" : "bg-[#1A1B1E] hover:border-white/30"}`}
-                >
-                    <div className="flex items-center gap-2">
-                        <Filter size={16} className={showFilters ? "text-blue-400" : "text-gray-400"} />
-                        <span className="text-sm font-medium text-white">상세 필터</span>
-                        {hasActiveFilters && (
-                            <span className="px-2 py-0.5 bg-blue-500 text-white text-[10px] rounded-full">ON</span>
-                        )}
-                    </div>
-                    {hasActiveFilters && (
-                        <div onClick={(e) => { e.stopPropagation(); resetFilters(); }} className="text-xs text-gray-400 hover:text-white flex items-center gap-1 cursor-pointer">
-                            <X size={12} /> 초기화
-                        </div>
-                    )}
-                </button>
 
-                {/* 상세 필터 입력 폼 */}
-                {showFilters && (
-                    <div className="p-4 bg-[#1A1B1E] border border-white/10 rounded-xl space-y-3 mb-4 animate-in slide-in-from-top-2 duration-200">
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-xs text-gray-400 mb-1">경력(년)</label>
-                                <input type="number" min="0" value={careerYear} onChange={(e) => setCareerYear(e.target.value)} className="w-full bg-[#25262B] text-white px-2 py-1.5 rounded border border-white/10 text-sm focus:border-blue-500 outline-none" />
-                            </div>
-                            <div>
-                                <label className="block text-xs text-gray-400 mb-1">직무 분야</label>
-                                <input type="text" value={jobSearch} onChange={(e) => setJobSearch(e.target.value)} placeholder="공고 제목 검색" className="w-full bg-[#25262B] text-white px-2 py-1.5 rounded border border-white/10 text-sm focus:border-blue-500 outline-none" />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-xs text-gray-400 mb-1">시/도</label>
-                                <select value={city} onChange={(e) => setCity(e.target.value)} className="w-full bg-[#25262B] text-white px-2 py-1.5 rounded border border-white/10 text-sm focus:border-blue-500 outline-none">
-                                    <option value="">전체</option>
-                                    {cities.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs text-gray-400 mb-1">구/군</label>
-                                <input type="text" value={district} onChange={(e) => setDistrict(e.target.value)} className="w-full bg-[#25262B] text-white px-2 py-1.5 rounded border border-white/10 text-sm focus:border-blue-500 outline-none" />
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* 탭 (전체 / 즐겨찾기) */}
-            <div className="flex border-b border-white/10 px-4">
-                <button
-                    onClick={() => { setActiveTab("all"); setSelectedCompany(null); }}
-                    className={`flex-1 pb-3 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors ${
-                        activeTab === "all" ? "border-blue-500 text-white" : "border-transparent text-gray-500 hover:text-gray-300"
-                    }`}
-                >
-                    <List size={16} />
-                    전체 ({companies.length})
-                </button>
-                <button
-                    onClick={() => { setActiveTab("favorites"); setSelectedCompany(null); }}
-                    className={`flex-1 pb-3 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors ${
-                        activeTab === "favorites" ? "border-yellow-500 text-white" : "border-transparent text-gray-500 hover:text-gray-300"
-                    }`}
-                >
-                    <Star size={16} fill={activeTab === "favorites" ? "currentColor" : "none"} />
-                    즐겨찾기 ({favoriteCompanyIds.length})
-                </button>
+                {/* 탭 (전체 / 즐겨찾기) */}
+                <div className="flex border-b border-white/10 px-2">
+                    <button
+                        onClick={() => { setActiveTab("all"); setSelectedCompany(null); }}
+                        className={`flex-1 pb-3 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors ${
+                            activeTab === "all" ? "border-blue-500 text-white" : "border-transparent text-gray-500 hover:text-gray-300"
+                        }`}
+                    >
+                        <List size={16} />
+                        전체 ({companies.length})
+                    </button>
+                    <button
+                        onClick={() => { setActiveTab("favorites"); setSelectedCompany(null); }}
+                        className={`flex-1 pb-3 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors ${
+                            activeTab === "favorites" ? "border-yellow-500 text-white" : "border-transparent text-gray-500 hover:text-gray-300"
+                        }`}
+                    >
+                        <Star size={16} fill={activeTab === "favorites" ? "currentColor" : "none"} />
+                        즐겨찾기 ({favoriteCompanyIds.length})
+                    </button>
+                </div>
             </div>
         </div>
 
         {/* 리스트 영역 */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 bg-[#1e1f23]">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 bg-[#1e1f23] relative z-10">
             {isDataLoading ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-3">
                     <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
@@ -524,7 +585,6 @@ export default function JobMap() {
                 <div className="space-y-2">
                     <div className="flex items-center justify-between px-1 mb-4">
                         <p className="text-xs font-bold text-gray-500 uppercase">
-                            {/* 현재 보여지는 리스트의 개수 */}
                             {activeTab === "favorites" ? "즐겨찾기 기업" : "검색 결과"} ({finalCompanies.length})
                         </p>
                     </div>
@@ -537,7 +597,6 @@ export default function JobMap() {
                             </p>
                         </div>
                     ) : (
-                        // 부하 방지를 위해 상위 100개만 렌더링
                         finalCompanies.slice(0, 100).map(company => (
                             <div 
                                 key={company.id} 
@@ -585,18 +644,16 @@ export default function JobMap() {
             style={{ width: "100%", height: "100%" }} 
             level={level} 
             onCreate={setMap}
-            // 데이터 로딩 중 지도 조작 방지
             draggable={!isDataLoading}
             zoomable={!isDataLoading}
             onZoomChanged={(map) => setLevel(map.getLevel())}
             onIdle={(map) => {
-                // 첫 onIdle에서는 setCenter 생략 → 서울 중심 고정값이 SDK 기본값으로 덮이지 않음
                 if (hasMapIdleFired.current) {
                     setCenter({ lat: map.getCenter().getLat(), lng: map.getCenter().getLng() });
                 } else {
                     hasMapIdleFired.current = true;
                 }
-                updateVisibleCompanies(); // 화면 이동 시 마커 갱신
+                updateVisibleCompanies(); 
             }}
         >
           {companiesToShow.map((company) => (
@@ -611,18 +668,13 @@ export default function JobMap() {
                     className="relative cursor-pointer group"
                 >
                     <div className="flex flex-col items-center">
-                        {/* 기업명 툴팁 */}
                         <div className={`px-2 py-1 bg-gray-900 text-white text-[10px] font-bold rounded mb-1.5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-white/20 flex items-center gap-1 shadow-md ${selectedCompany?.id === company.id ? "opacity-100 bg-blue-600 border-blue-400" : ""}`}>
                             {favoriteCompanyIds.includes(company.id) && <Star size={10} fill="#EAB308" className="text-yellow-500" />}
                             {company.name}
                         </div>
-
-                        {/* 마커 디자인 */}
                         {level >= 6 ? (
-                            /* 줌아웃 시: 파란색/노란색 점 (테두리 없음) */
                             <div className={`w-3 h-3 rounded-full shadow-lg transition-all ${favoriteCompanyIds.includes(company.id) ? "bg-yellow-500 scale-125" : "bg-blue-600"}`} />
                         ) : (
-                            /* 줌인 시: 로고 마커 (줌아웃 점과 동일한 파란색 테두리) */
                             <>
                                 <div className={`w-10 h-10 rounded-full border-2 border-blue-600 shadow-xl flex items-center justify-center bg-white transition-all duration-300 ${selectedCompany?.id === company.id ? "!border-blue-500 scale-125 ring-4 ring-blue-500/20" : ""}`}>
                                     {company.logo_url ? <img src={company.logo_url} alt={company.name} className="w-full h-full object-contain rounded-full p-1.5" /> : <Building2 size={16} className="text-gray-400" />}
