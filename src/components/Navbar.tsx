@@ -8,6 +8,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import LoginModal from './LoginModal';
 import { getAuthTokens, clearAuthTokens } from '@/lib/auth';
 import api from '@/lib/api'; 
+import { Check, Loader2 } from 'lucide-react'; 
+import { useInterviewStore } from '@/store/interviewStore'; // ✅ 스토어 임포트
 
 export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
@@ -15,6 +17,10 @@ export default function Navbar() {
     const [profileImage, setProfileImage] = useState<string | null>(null);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false); 
     const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+    
+    // ✅ [수정] 전역 스토어에서 상태 가져오기
+    const { navStatus, navMessage, resetProcess } = useInterviewStore();
+
     const pathname = usePathname();
     const router = useRouter();
 
@@ -57,7 +63,7 @@ export default function Navbar() {
         const handleAuthSuccess = () => {
             checkAuth();
         };
-        
+
         window.addEventListener('storage', handleStorageChange);
         window.addEventListener('authSuccess', handleAuthSuccess);
         
@@ -80,6 +86,8 @@ export default function Navbar() {
         setIsLoggedIn(false);
         setProfileImage(null);
         setIsLogoutModalOpen(false);
+        // 로그아웃 시 진행 중인 분석 상태도 초기화
+        resetProcess(); 
         router.push('/');
     };
 
@@ -87,7 +95,6 @@ export default function Navbar() {
         <nav className="bg-[#1A1B1E] sticky top-0 z-50 border-b border-white/5 w-full">
             <div className="flex justify-between items-center h-[70px] px-6"> 
                 
-                {/* ✅ 로고 클릭 시 초기화 이벤트 발생 */}
                 <div className="flex items-center gap-10"> 
                     <Link 
                         href="/" 
@@ -103,10 +110,9 @@ export default function Navbar() {
                                 <Link
                                     href={item.href}
                                     onClick={() => {
-                                        // 각 페이지의 첫 화면으로 이동하기 위한 초기화 이벤트
                                         if (item.href === '/') window.dispatchEvent(new Event('resetDashboard'));
                                         else if (item.href === '/map') window.dispatchEvent(new Event('resetJobMap'));
-                                        else if (item.href === '/ai-interview') window.dispatchEvent(new Event('resetAIInterview'));
+                                        // ai-interview는 resetProcess를 별도로 관리하므로 여기서는 이벤트 제거 가능
                                     }}
                                     className={`text-[18px] transition-all duration-300 hover:text-white py-1 ${
                                         pathname === item.href 
@@ -121,6 +127,29 @@ export default function Navbar() {
                                 )}
                             </div>
                         ))}
+
+                        {/* ✅ [수정] 스토어 상태 기반 로딩/완료 표시 */}
+                        <AnimatePresence mode="wait">
+                            {navStatus !== 'idle' && (
+                                <motion.div 
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -10 }}
+                                    className="flex items-center gap-2"
+                                >
+                                    {navStatus === 'loading' ? (
+                                        <Loader2 size={16} className="text-blue-400 animate-spin" />
+                                    ) : (
+                                        <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                                            <Check size={10} className="text-white font-bold" />
+                                        </div>
+                                    )}
+                                    <span className={`text-sm font-bold ${navStatus === 'loading' ? 'text-blue-400' : 'text-green-400'}`}>
+                                        {navMessage}
+                                    </span>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </div>
 
@@ -197,7 +226,6 @@ export default function Navbar() {
                                     onClick={() => {
                                         if (item.href === '/') window.dispatchEvent(new Event('resetDashboard'));
                                         else if (item.href === '/map') window.dispatchEvent(new Event('resetJobMap'));
-                                        else if (item.href === '/ai-interview') window.dispatchEvent(new Event('resetAIInterview'));
                                         setIsOpen(false);
                                     }}
                                     className={`block text-[18px] transition-colors duration-300 hover:text-white ${

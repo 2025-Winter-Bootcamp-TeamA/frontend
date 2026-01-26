@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Monitor, ArrowRightLeft, FileText } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import axios from 'axios'; // 취소 토큰 확인용으로 유지
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,8 @@ import DashboardView from '@/components/ai-interview/DashboardView';
 
 import { useSimulation } from '@/hooks/useSimulation';
 import type { Resume } from '@/types';
-import { api } from '@/lib/api';
+import { api } from '@/lib/api'; // ✅ 이미 설정된 api 인스턴스 사용
+import { useInterviewStore } from '@/store/interviewStore';
 
 function DropdownButton({ onClick, icon, text, hasBorder = false }: any) {
     return (
@@ -42,18 +44,24 @@ function AIInterviewContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    // 파일 업로드 취소용 AbortController Ref
+    const abortControllerRef = useRef<AbortController | null>(null);
 
-    const [step, setStep] = useState<'empty' | 'analyzing' | 'result'>('empty');
+    const { 
+        step, setStep, 
+        taskId, analyzingResumeId, setAnalysisInfo, 
+        startProcess, completeProcess, resetProcess,
+        setProgress 
+    } = useInterviewStore();
+
     const [showDropdown, setShowDropdown] = useState(false);
     const [isResumePickerOpen, setIsResumePickerOpen] = useState(false);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false); 
     const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
     const [resumes, setResumes] = useState<Resume[]>([]);
     const [isLoadingResumes, setIsLoadingResumes] = useState(false);
-
-    const [taskId, setTaskId] = useState<string | null>(null);
     const [analysisError, setAnalysisError] = useState<string | null>(null);
-    const [analyzingResumeId, setAnalyzingResumeId] = useState<number | null>(null);
 
     const [reportData, setReportData] = useState<{
         feedbacks: any[];
@@ -63,6 +71,7 @@ function AIInterviewContent() {
 
     const simulationData = useSimulation();
 
+    // 이력서 상세 정보 가져오기
     const fetchResumeDetails = async (resumeId: number): Promise<Resume> => {
         const response = await api.get(`/resumes/${resumeId}/`);
         const resumeData = response.data;
@@ -85,10 +94,34 @@ function AIInterviewContent() {
         };
     };
 
+    // 상태 복구 로직
+    useEffect(() => {
+        const restoreState = async () => {
+            if (step === 'result' && analyzingResumeId && !selectedResume) {
+                try {
+                    const detailedResume = await fetchResumeDetails(analyzingResumeId);
+                    setSelectedResume(detailedResume);
+                } catch (e) {
+                    console.error("이력서 복구 실패", e);
+                    setStep('empty');
+                }
+            }
+        };
+        restoreState();
+    }, [step, analyzingResumeId, selectedResume, setStep]);
+
+    // 분석 상태 폴링
     const { data: analysisData, error: pollingError } = useQuery({
         queryKey: ['analysisStatus', taskId],
         queryFn: async () => {
             if (!taskId) return null;
+            
+            // 폴링 시 진행률 시뮬레이션
+            const currentProgress = useInterviewStore.getState().progress;
+            if (currentProgress < 90) {
+                useInterviewStore.getState().setProgress(currentProgress + (Math.random() * 3));
+            }
+
             const { data } = await api.get(`/resumes/analyze/status/${taskId}/`);
             return data;
         },
@@ -96,18 +129,19 @@ function AIInterviewContent() {
         refetchInterval: 2000,
     });
 
+    // 분석 완료/실패 처리
     useEffect(() => {
         if (!analysisData || step !== 'analyzing') return;
 
         if (analysisData.status === 'SUCCESS') {
             const finishAnalysis = async () => {
-                setTaskId(null);
-                const resumeIdToFetch = analyzingResumeId;
+                setProgress(100);
+                setAnalysisInfo(null, analyzingResumeId);
                 
+                const resumeIdToFetch = analyzingResumeId;
                 if (!resumeIdToFetch) {
                     setAnalysisError('분석된 이력서 ID 오류');
                     setStep('empty');
-                    setAnalyzingResumeId(null);
                     return;
                 }
                 
@@ -115,30 +149,30 @@ function AIInterviewContent() {
                     const detailedResume = await fetchResumeDetails(resumeIdToFetch);
                     setSelectedResume(detailedResume);
                     setStep('result');
+                    completeProcess(); 
                 } catch (error) {
                     setAnalysisError('분석 결과 로드 실패');
                     setStep('empty');
-                } finally {
-                    setAnalyzingResumeId(null);
                 }
             };
             finishAnalysis();
         } else if (analysisData.status === 'FAILURE') {
-            setTaskId(null);
+            setAnalysisInfo(null, null);
             setAnalysisError(analysisData.result || '분석 실패');
             setStep('empty');
-            setAnalyzingResumeId(null);
+            setProgress(0);
         }
-    }, [analysisData, step, analyzingResumeId]);
+    }, [analysisData, step, analyzingResumeId, setAnalysisInfo, setStep, completeProcess, setProgress]);
 
+    // 폴링 에러 처리
     useEffect(() => {
         if (pollingError) {
-            setTaskId(null);
+            setAnalysisInfo(null, null);
             setAnalysisError('분석 상태 확인 오류');
             setStep('empty');
-            setAnalyzingResumeId(null);
+            setProgress(0);
         }
-    }, [pollingError]);
+    }, [pollingError, setAnalysisInfo, setStep, setProgress]);
 
    const resumeKeywords = useMemo(() => {
         if (!selectedResume) return [];
@@ -184,6 +218,7 @@ function AIInterviewContent() {
         }
     };
 
+    // 파라미터나 선택 이벤트로 인한 이력서 로드
     useEffect(() => {
         const resumeIdParam = searchParams?.get('resumeId');
         if (resumeIdParam && !taskId && step !== 'result') {
@@ -194,6 +229,7 @@ function AIInterviewContent() {
                     if ((detailedResume.techStacks && detailedResume.techStacks.length > 0) || detailedResume.extractedText) {
                         setSelectedResume(detailedResume);
                         setStep('result');
+                        setAnalysisInfo(null, rid); 
                         return;
                     }
                 } catch (e) {}
@@ -209,49 +245,69 @@ function AIInterviewContent() {
         if (isResumePickerOpen) fetchResumes();
     }, [isResumePickerOpen]);
 
+    // 초기화 및 취소 이벤트 리스너
     useEffect(() => {
         const handleReset = () => {
-            setStep('empty');
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+                abortControllerRef.current = null;
+            }
+            
+            resetProcess();
             setSelectedResume(null);
             setShowDropdown(false);
-            setTaskId(null);
             setAnalysisError(null);
-            setAnalyzingResumeId(null);
             router.replace('/ai-interview');
         };
-        window.addEventListener('resetAIInterview', handleReset);
-        return () => window.removeEventListener('resetAIInterview', handleReset);
-    }, [router]);
 
+        const handleCancelAnalysis = () => {
+            handleReset();
+        };
+
+        window.addEventListener('resetAIInterview', handleReset);
+        window.addEventListener('cancelAnalysis', handleCancelAnalysis);
+        return () => {
+            window.removeEventListener('resetAIInterview', handleReset);
+            window.removeEventListener('cancelAnalysis', handleCancelAnalysis);
+        };
+    }, [router, resetProcess]);
+
+    // 분석 시작 (백엔드 요청)
     const handleStartAnalysis = async (resumeId: number) => {
+        if (useInterviewStore.getState().step === 'empty') return;
+
         setAnalysisError(null);
         setStep('analyzing');
-        setAnalyzingResumeId(resumeId);
+        setAnalysisInfo(null, resumeId);
+        startProcess('AI 정밀 분석 중...'); 
+        setProgress(35);
         setShowDropdown(false);
         setIsResumePickerOpen(false);
 
         try {
             const response = await api.post(`/resumes/${resumeId}/analyze/`);
-            setTaskId(response.data.task_id);
+            if (useInterviewStore.getState().step === 'empty') return; // 취소 확인
+
+            setAnalysisInfo(response.data.task_id, resumeId);
+            setProgress(40);
         } catch (error: any) {
+            if (useInterviewStore.getState().step === 'empty') return;
             const message = error.response?.data?.error || "이력서 분석 실패";
             setAnalysisError(message);
             setStep('empty');
-            setAnalyzingResumeId(null);
+            setProgress(0);
         }
     };
     
+    // 이력서 선택 핸들러
     const handleSelectResume = async (resume: Resume) => {
         setIsResumePickerOpen(false);
-        setStep('analyzing');
-        setAnalyzingResumeId(resume.id);
-
         try {
             const detailedResume = await fetchResumeDetails(resume.id);
             if ((detailedResume.techStacks && detailedResume.techStacks.length > 0) || detailedResume.extractedText) {
                 setSelectedResume(detailedResume);
                 setStep('result');
-                setAnalyzingResumeId(null);
+                setAnalysisInfo(null, resume.id);
                 return;
             }
         } catch (error) { console.error(error); }
@@ -259,30 +315,68 @@ function AIInterviewContent() {
         handleStartAnalysis(resume.id);
     };
 
+    // ✅ [수정] 파일 업로드 핸들러 (404 오류 해결: api 인스턴스 사용)
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
+        // 1. 같은 파일 재선택 가능하도록 초기화
+        e.target.value = '';
+
         setStep('analyzing');
         setAnalysisError(null);
-        setAnalyzingResumeId(null);
+        startProcess('이력서 업로드 중...');
+        setProgress(0);
+
+        abortControllerRef.current = new AbortController();
 
         try {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('title', file.name.replace(/\.[^/.]+$/, "")); 
             
-            const uploadResponse = await api.post('/resumes/', formData);
+            // ✅ Axios 직접 사용 대신, 설정된 api 인스턴스 사용
+            // 이렇게 하면 Base URL과 토큰이 자동으로 처리됩니다.
+            const uploadResponse = await api.post('/resumes/', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+                signal: abortControllerRef.current.signal,
+                onUploadProgress: (progressEvent) => {
+                    if (progressEvent.total) {
+                        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                        const scaledProgress = Math.round(percentCompleted * 0.3);
+                        setProgress(scaledProgress);
+                    }
+                }
+            });
+
             const newResume = uploadResponse.data;
             const resumeId = newResume.resume_id || newResume.id;
+            
+            setProgress(30);
+            
+            if (useInterviewStore.getState().step === 'empty') return;
+
             handleStartAnalysis(resumeId);
+
         } catch (error: any) {
-            const errorMessage = error.response?.data?.error || '업로드 중 오류 발생';
-            setAnalysisError(errorMessage);
-            setStep('empty');
+            // 취소된 요청인지 확인
+            if (axios.isCancel(error) || error.name === 'CanceledError') {
+                console.log("업로드 취소됨");
+            } else {
+                console.error("업로드 오류:", error);
+                const errorMessage = error.response?.data?.error || error.message || '업로드 중 오류 발생';
+                setAnalysisError(errorMessage);
+                setStep('empty');
+                setProgress(0);
+            }
+        } finally {
+            abortControllerRef.current = null;
         }
     };
     
+    // 에러 표시
     useEffect(() => {
         if (analysisError) {
             alert(analysisError);
@@ -302,11 +396,10 @@ function AIInterviewContent() {
     const triggerFileUpload = () => fileInputRef.current?.click();
 
     return (
-        // ✅ [수정] print:h-auto print:overflow-visible로 인쇄 시 스크롤 제한 해제
         <div className="h-[calc(100vh-80px)] bg-[#1A1B1E] flex flex-col items-center justify-start text-white overflow-hidden print:h-auto print:overflow-visible print:bg-white">
             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".pdf,.doc,.docx" />
             
-            <div className="max-w-[1800px] w-full h-full flex flex-col p-6 lg:p-10 scale-[0.95] origin-top">
+            <div id="main-layout" className="max-w-[1800px] w-full h-full flex flex-col p-6 lg:p-10 scale-[0.95] origin-top">
                 <header className="flex justify-between items-center mb-4 shrink-0">
                     <div className="space-y-1">
                         <h1 className="text-3xl font-black tracking-tighter uppercase">AI 역량 분석 리포트</h1>
@@ -392,7 +485,7 @@ function AIInterviewContent() {
                 feedbacks={reportData.feedbacks}
                 questions={reportData.questions}
                 totalScore={resumeMatchScore}
-                jobPostingTitle={reportData.jobPostingTitle} // ✅ 제목 전달
+                jobPostingTitle={reportData.jobPostingTitle} 
             />
         </div>
     );

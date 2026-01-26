@@ -8,11 +8,13 @@ import { api } from "@/lib/api";
 import { getAuthTokens } from "@/lib/auth";
 import JobCard from "../home/JobCard";
 
-// 서울 영등포구 — 채용 지도 첫 화면·리셋 시 고정
-const SEOUL_CENTER = { lat: 37.5172, lng: 126.9074 };
+// ✅ [수정 1] 서울 용산구 — 채용 지도 첫 화면·리셋 시 고정
+// 용산을 중심으로 잡아야 강남, 여의도, 광화문 등 주요 업무 지구를 고르게 볼 수 있음
+const SEOUL_CENTER = { lat: 37.5326, lng: 126.9900 };
 
-// 초기 줌 레벨 변경 (8 -> 5: 더 확대되어 영등포구 위주로 보이게 설정)
-const INITIAL_MAP_LEVEL = 5; 
+// ✅ [수정 2] 초기 줌 레벨 변경 (5 -> 8)
+// 레벨 8로 설정하여 용산을 중심으로 강남, 여의도 등이 한 화면에 들어오도록 축소
+const INITIAL_MAP_LEVEL = 7; 
 
 // --- 행정구역 데이터 (시/도 -> 군/구) ---
 const KOREA_DISTRICTS: Record<string, string[]> = {
@@ -225,49 +227,44 @@ export default function JobMap() {
     return alreadyIn ? visibleCompanies : [selectedCompany, ...visibleCompanies];
   }, [visibleCompanies, selectedCompany]);
 
-  // --- 지도 중심 이동 및 보정 로직 (부드러운 이동 적용) ---
+  // ✅ [수정 3] 지도 중심 이동 및 사이드바 오프셋 보정 로직 (초기화면 포함)
   useEffect(() => {
-    if (!map || !selectedCompany) return;
-    const lat = Number(selectedCompany.latitude);
-    const lng = Number(selectedCompany.longitude);
-    if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return;
+    if (!map) return;
 
-    const kakao = typeof window !== 'undefined' ? (window as any).kakao : null;
-    if (!kakao?.maps?.LatLng) return;
+    // 1. 목표 지점 및 줌 레벨 결정
+    // 선택된 기업이 있으면 그곳으로, 없으면 용산구(SEOUL_CENTER)로
+    const targetLat = selectedCompany ? Number(selectedCompany.latitude) : SEOUL_CENTER.lat;
+    const targetLng = selectedCompany ? Number(selectedCompany.longitude) : SEOUL_CENTER.lng;
+    const targetLevel = selectedCompany ? 3 : INITIAL_MAP_LEVEL; // 기업 선택시 3, 아니면 8
 
-    // 1. 줌 레벨 설정 (레벨 3으로 확대)
-    map.setLevel(3);
+    if (isNaN(targetLat) || isNaN(targetLng)) return;
 
-    // 2. 부드러운 중심 이동 (panTo)
+    // 2. 줌 레벨 적용
+    map.setLevel(targetLevel);
+
+    // 3. 중심 이동 (사이드바 고려)
     const moveWithOffset = () => {
         const projection = map.getProjection();
-        const markerPosition = new kakao.maps.LatLng(lat, lng);
+        if (!projection) return;
 
-        if (!projection) {
-            // 투영법 계산 불가 시 일반 이동
-            map.panTo(markerPosition);
-            return;
-        }
+        const targetPosition = new kakao.maps.LatLng(targetLat, targetLng);
 
-        // 데스크탑 화면(1024px 이상)이고 사이드바가 열려있을 때 오프셋 적용
+        // 데스크탑 화면이고 사이드바가 열려있을 때 보정
         if (isSidebarOpen && window.innerWidth >= 1024) {
-            const markerPoint = projection.pointFromCoords(markerPosition);
-            
-            // 사이드바 너비(400px)의 절반인 200px만큼 '지도 중심'을 왼쪽으로 이동
-            // 이렇게 하면 마커는 화면 중앙보다 200px 오른쪽(보이는 영역의 중심)에 위치하게 됨
-            const newCenterPoint = new kakao.maps.Point(markerPoint.x - 200, markerPoint.y);
+            const point = projection.pointFromCoords(targetPosition);
+            // 400px 사이드바의 절반인 200px만큼 '지도 중심'을 왼쪽(x - 200)으로 설정
+            // 결과적으로 마커(혹은 용산)는 화면 중앙에서 오른쪽으로 200px 이동하여 가시 영역의 중앙에 위치함
+            const newCenterPoint = new kakao.maps.Point(point.x - 200, point.y);
             const newCenter = projection.coordsFromPoint(newCenterPoint);
-            
-            // panTo: 부드럽게 이동
             map.panTo(newCenter);
         } else {
             // 모바일이거나 사이드바 닫힘 -> 그냥 중앙으로 부드럽게 이동
-            map.panTo(markerPosition);
+            map.panTo(targetPosition);
         }
     };
 
-    // 약간의 지연 후 이동 실행
-    setTimeout(moveWithOffset, 100);
+    // Projection 계산을 위해 약간의 지연 필요
+    setTimeout(moveWithOffset, 150);
 
   }, [map, selectedCompany, isSidebarOpen]);
 
