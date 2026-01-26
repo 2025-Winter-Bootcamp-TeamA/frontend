@@ -193,8 +193,8 @@ export default function StackRelationAnalysis({
                             />
                         </div>
                         <div>
-                            <h3 className="text-xl font-bold text-white">{activeDetail.name}</h3>
-                            <span className="text-xs text-blue-400 font-medium px-2 py-0.5 bg-blue-900/30 rounded-md">{activeDetail.role}</span>
+                            <h3 className="text-2xl font-bold text-white">{activeDetail.name}</h3>
+                            <span className="text-xm text-blue-400 font-medium px-2 py-0.5 bg-blue-900/30 rounded-md">{activeDetail.role}</span>
                         </div>
                     </div>
                     <div className="mb-6">
@@ -213,7 +213,7 @@ export default function StackRelationAnalysis({
                                 onStackSelect(activeDetail.id);
                             }
                         }}
-                        className="mt-auto w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 text-xl"
+                        className="mt-auto w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 text-xm"
                     >
                         <span>{activeDetail.name} 분석 화면으로 이동</span>
                         <ArrowRightCircle className="w-6 h-6" />

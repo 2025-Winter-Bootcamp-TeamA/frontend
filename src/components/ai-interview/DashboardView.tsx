@@ -413,9 +413,8 @@ export default function DashboardView({
                     <div className="flex justify-between items-center mb-4 shrink-0">
                         <h3 className="text-lg font-bold text-white flex items-center gap-2"><FileText size={18} className="text-blue-400"/> {resumeTitle}</h3>
                         <div className="flex gap-2 text-[10px] font-bold">
-                            <span className="text-blue-400 px-2 py-1 bg-blue-900/30 rounded">강점</span>
-                            <span className="text-green-400 px-2 py-1 bg-green-900/30 rounded">적합</span>
-                            <span className="text-orange-400 px-2 py-1 bg-orange-900/30 rounded">보완</span>
+                            <span className="text-blue-400 px-2 py-1 bg-blue-900/30 rounded text-sm">강점</span>
+                            <span className="text-orange-400 px-2 py-1 bg-orange-900/30 rounded text-sm">보완할 점</span>
                         </div>
                     </div>
                     {/* ref 연결 및 하이라이트 텍스트 렌더링 */}
@@ -440,8 +439,7 @@ export default function DashboardView({
             <div className="lg:col-span-3 h-full min-h-0 flex flex-col">
                 <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
                     <div className="flex justify-between items-center mb-4 shrink-0">
-                        <h3 className="text-sm font-bold text-gray-400 uppercase flex items-center gap-2"><CheckCircle2 size={14}/> Analysis</h3>
-                        {selectedCompany && <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded border border-green-500/30">Fit</span>}
+                        <h3 className="text-sm font-bold text-gray-400 uppercase flex items-center gap-2"><CheckCircle2 size={14}/> 이력서 세부 분석</h3>
                     </div>
                     <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1">
                         {isLoadingAnalysis ? (

@@ -8,13 +8,11 @@ import { api } from "@/lib/api";
 import { getAuthTokens } from "@/lib/auth";
 import JobCard from "../home/JobCard";
 
-// ✅ [수정 1] 서울 용산구 — 채용 지도 첫 화면·리셋 시 고정
-// 용산을 중심으로 잡아야 강남, 여의도, 광화문 등 주요 업무 지구를 고르게 볼 수 있음
+// 서울 용산구 — 채용 지도 첫 화면·리셋 시 고정
 const SEOUL_CENTER = { lat: 37.5326, lng: 126.9900 };
 
-// ✅ [수정 2] 초기 줌 레벨 변경 (5 -> 8)
-// 레벨 8로 설정하여 용산을 중심으로 강남, 여의도 등이 한 화면에 들어오도록 축소
-const INITIAL_MAP_LEVEL = 7; 
+// 초기 줌 레벨
+const INITIAL_MAP_LEVEL = 8; 
 
 // --- 행정구역 데이터 (시/도 -> 군/구) ---
 const KOREA_DISTRICTS: Record<string, string[]> = {
@@ -35,6 +33,95 @@ const KOREA_DISTRICTS: Record<string, string[]> = {
   "경북": ["경산시", "경주시", "고령군", "구미시", "김천시", "문경시", "봉화군", "상주시", "성주군", "안동시", "영덕군", "영양군", "영주시", "영천시", "예천군", "울릉군", "울진군", "의성군", "청도군", "청송군", "칠곡군", "포항시"],
   "경남": ["거제시", "거창군", "고성군", "김해시", "남해군", "밀양시", "사천시", "산청군", "양산시", "의령군", "진주시", "창녕군", "창원시", "통영시", "하동군", "함안군", "함양군", "합천군"],
   "제주": ["서귀포시", "제주시"]
+};
+
+// ✅ [수정] 지역별 중심 좌표 (중복 구 이름은 '시도 구' 형태로 키 설정)
+const REGION_COORDINATES: Record<string, { lat: number, lng: number }> = {
+    // --- 광역 시/도 ---
+    "서울": { lat: 37.5665, lng: 126.9780 },
+    "경기": { lat: 37.4138, lng: 127.5183 },
+    "인천": { lat: 37.4563, lng: 126.7052 },
+    "부산": { lat: 35.1796, lng: 129.0756 },
+    "대구": { lat: 35.8714, lng: 128.6014 },
+    "광주": { lat: 35.1595, lng: 126.8526 },
+    "대전": { lat: 36.3504, lng: 127.3845 },
+    "울산": { lat: 35.5384, lng: 129.3114 },
+    "세종": { lat: 36.4800, lng: 127.2892 },
+    "강원": { lat: 37.8228, lng: 128.1555 },
+    "충북": { lat: 36.6350, lng: 127.4914 },
+    "충남": { lat: 36.6588, lng: 126.6728 },
+    "전북": { lat: 35.7175, lng: 127.1530 },
+    "전남": { lat: 34.8163, lng: 126.4629 },
+    "경북": { lat: 36.5760, lng: 128.5056 },
+    "경남": { lat: 35.2383, lng: 128.6922 },
+    "제주": { lat: 33.4890, lng: 126.4983 },
+
+    // --- 서울특별시 구 (키를 '서울 구이름'으로 사용하거나 고유한 이름은 그냥 사용) ---
+    "서울 강남구": { lat: 37.5172, lng: 127.0473 }, // 강남구는 서울에만 있지만 통일성을 위해
+    "강남구": { lat: 37.5172, lng: 127.0473 },       // 편의상 짧은 키도 허용
+    "서울 서초구": { lat: 37.4837, lng: 127.0324 },
+    "서초구": { lat: 37.4837, lng: 127.0324 },
+    "서울 송파구": { lat: 37.5145, lng: 127.1066 },
+    "송파구": { lat: 37.5145, lng: 127.1066 },
+    "서울 마포구": { lat: 37.5663, lng: 126.9016 },
+    "서울 영등포구": { lat: 37.5264, lng: 126.8962 },
+    "서울 용산구": { lat: 37.5326, lng: 126.9900 },
+    "서울 종로구": { lat: 37.5730, lng: 126.9794 },
+    "서울 성동구": { lat: 37.5633, lng: 127.0371 },
+    "서울 광진구": { lat: 37.5385, lng: 127.0823 },
+    "서울 구로구": { lat: 37.4954, lng: 126.8874 },
+    "서울 금천구": { lat: 37.4568, lng: 126.8954 },
+    
+    // 🔥 중복 이름 구 처리 (Key를 '시도 구이름'으로 지정)
+    "서울 중구": { lat: 37.5637, lng: 126.9975 },
+    "인천 중구": { lat: 37.4738, lng: 126.6217 },
+    "부산 중구": { lat: 35.1062, lng: 129.0324 },
+    "대구 중구": { lat: 35.8693, lng: 128.6062 },
+    "대전 중구": { lat: 36.3252, lng: 127.4214 },
+    "울산 중구": { lat: 35.5693, lng: 129.3328 },
+
+    "서울 강서구": { lat: 37.5509, lng: 126.8497 },
+    "부산 강서구": { lat: 35.2122, lng: 128.9806 },
+
+    "인천 동구": { lat: 37.4739, lng: 126.6328 },
+    "부산 동구": { lat: 35.1293, lng: 129.0455 },
+    "대구 동구": { lat: 35.8865, lng: 128.6355 },
+    "광주 동구": { lat: 35.1456, lng: 126.9232 },
+    "대전 동구": { lat: 36.3333, lng: 127.4567 },
+    "울산 동구": { lat: 35.5047, lng: 129.4166 },
+
+    "인천 서구": { lat: 37.5454, lng: 126.6760 },
+    "부산 서구": { lat: 35.0979, lng: 129.0242 },
+    "대구 서구": { lat: 35.8717, lng: 128.5591 },
+    "광주 서구": { lat: 35.1520, lng: 126.8577 },
+    "대전 서구": { lat: 36.3553, lng: 127.3835 },
+
+    "인천 남구": { lat: 37.4635, lng: 126.6502 }, // (미추홀구)
+    "부산 남구": { lat: 35.1365, lng: 129.0843 },
+    "대구 남구": { lat: 35.8459, lng: 128.5977 },
+    "광주 남구": { lat: 35.1329, lng: 126.9025 },
+    "울산 남구": { lat: 35.5435, lng: 129.3301 },
+
+    "부산 북구": { lat: 35.1972, lng: 128.9904 },
+    "대구 북구": { lat: 35.8856, lng: 128.5830 },
+    "광주 북구": { lat: 35.1742, lng: 126.9122 },
+    "울산 북구": { lat: 35.5826, lng: 129.3608 },
+
+    // --- 기타 주요 지역 (경기 등) ---
+    "성남시": { lat: 37.4200, lng: 127.1265 },
+    "수원시": { lat: 37.2636, lng: 127.0286 },
+    "용인시": { lat: 37.2410, lng: 127.1775 },
+    "고양시": { lat: 37.6584, lng: 126.8320 },
+    "안양시": { lat: 37.3943, lng: 126.9568 },
+    "안산시": { lat: 37.3219, lng: 126.8309 },
+    "부천시": { lat: 37.5034, lng: 126.7660 },
+    "화성시": { lat: 37.1995, lng: 126.8315 },
+    "평택시": { lat: 36.9921, lng: 127.1127 },
+    "천안시": { lat: 36.8151, lng: 127.1139 },
+    "청주시": { lat: 36.6424, lng: 127.4890 },
+    "전주시": { lat: 35.8242, lng: 127.1480 },
+    "창원시": { lat: 35.2279, lng: 128.6818 },
+    "제주시": { lat: 33.4996, lng: 126.5312 },
 };
 
 // --- 커스텀 훅: 디바운스 (입력 지연 처리) ---
@@ -227,7 +314,7 @@ export default function JobMap() {
     return alreadyIn ? visibleCompanies : [selectedCompany, ...visibleCompanies];
   }, [visibleCompanies, selectedCompany]);
 
-  // ✅ [수정 3] 지도 중심 이동 및 사이드바 오프셋 보정 로직 (초기화면 포함)
+  // --- 지도 중심 이동 및 보정 로직 ---
   useEffect(() => {
     if (!map) return;
 
@@ -253,7 +340,6 @@ export default function JobMap() {
         if (isSidebarOpen && window.innerWidth >= 1024) {
             const point = projection.pointFromCoords(targetPosition);
             // 400px 사이드바의 절반인 200px만큼 '지도 중심'을 왼쪽(x - 200)으로 설정
-            // 결과적으로 마커(혹은 용산)는 화면 중앙에서 오른쪽으로 200px 이동하여 가시 영역의 중앙에 위치함
             const newCenterPoint = new kakao.maps.Point(point.x - 200, point.y);
             const newCenter = projection.coordsFromPoint(newCenterPoint);
             map.panTo(newCenter);
@@ -267,6 +353,61 @@ export default function JobMap() {
     setTimeout(moveWithOffset, 150);
 
   }, [map, selectedCompany, isSidebarOpen]);
+
+  // ✅ [수정] 지역 필터 변경 시 지도 이동 로직 (이름 중복 해결 포함)
+  const moveToRegion = useCallback((regionName: string, zoomLevel: number, parentRegionName?: string) => {
+    if (!map || !regionName) return;
+
+    // 1. 좌표 데이터 찾기 (우선순위: "시도 구이름" -> "구이름")
+    let coords = null;
+    
+    // 부모 지역(시/도)가 있으면 조합해서 먼저 검색 (예: "서울 중구")
+    if (parentRegionName) {
+        coords = REGION_COORDINATES[`${parentRegionName} ${regionName}`];
+    }
+    
+    // 없으면 이름 그대로 검색 (예: "강남구" -> REGION_COORDINATES["강남구"])
+    if (!coords) {
+        coords = REGION_COORDINATES[regionName];
+    }
+    
+    // 2. 좌표가 있으면 이동
+    if (coords) {
+        const moveLatLon = new kakao.maps.LatLng(coords.lat, coords.lng);
+        map.setLevel(zoomLevel, { animate: true }); // 부드러운 줌 변경
+        
+        // 사이드바 오프셋 적용
+        if (isSidebarOpen && window.innerWidth >= 1024) {
+            const projection = map.getProjection();
+            if (projection) {
+                setTimeout(() => {
+                    const point = projection.pointFromCoords(moveLatLon);
+                    const newCenterPoint = new kakao.maps.Point(point.x - 200, point.y);
+                    const newCenter = projection.coordsFromPoint(newCenterPoint);
+                    map.panTo(newCenter);
+                }, 300);
+            } else {
+                map.panTo(moveLatLon);
+            }
+        } else {
+            map.panTo(moveLatLon);
+        }
+    } else {
+        console.warn(`좌표 데이터가 없는 지역입니다: ${parentRegionName} ${regionName}`);
+    }
+  }, [map, isSidebarOpen]);
+
+  // ✅ [수정] 시/도 또는 군/구 변경 감지하여 지도 이동
+  useEffect(() => {
+    if (district) {
+        // 군/구가 선택되면 더 확대 (Level 6), city 정보를 parentRegionName으로 전달
+        moveToRegion(district, 6, city);
+    } else if (city) {
+        // 시/도만 선택되면 적당히 확대 (Level 9)
+        moveToRegion(city, 9);
+    }
+  }, [city, district, moveToRegion]);
+
 
   // --- 핸들러 함수들 ---
 
@@ -300,6 +441,11 @@ export default function JobMap() {
     setJobSearch("");
     setCity("");
     setDistrict("");
+    // 리셋 시 초기 뷰로 복귀
+    if(map) {
+        map.setLevel(INITIAL_MAP_LEVEL, { animate: true });
+        map.panTo(new kakao.maps.LatLng(SEOUL_CENTER.lat, SEOUL_CENTER.lng));
+    }
   };
   
   const hasActiveFilters = careerYear !== "" || jobSearch !== "" || city !== "" || district !== "";
