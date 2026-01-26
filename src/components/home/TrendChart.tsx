@@ -17,6 +17,8 @@ export interface TrendChartDataItem {
   date: string;
   job_mention_count: number;
   job_change_rate: number;
+  article_mention_count: number;
+  article_change_rate: number;
 }
 
 interface TrendChartProps {
@@ -36,21 +38,41 @@ function formatDateLabel(ref: string, period: ChartPeriod): string {
 }
 
 export default function TrendChart({ color, data, period, onPeriodChange, isLoading }: TrendChartProps) {
+  // job_change_rate와 article_change_rate를 직접 사용
+  // 이상한 값(음수 또는 100% 초과) 클리핑
   const chartData = data.map((d) => ({
     ...d,
     dateLabel: formatDateLabel(d.date, period),
+    job_change_rate: Math.max(0, Math.min(d.job_change_rate ?? 0, 100)),
+    article_change_rate: Math.max(0, Math.min(d.article_change_rate ?? 0, 100)),
   }));
 
-  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ payload?: { date: string; dateLabel: string; job_mention_count: number } }>; label?: string }) => {
+  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ payload?: { date: string; dateLabel: string; job_change_rate: number; article_change_rate: number; job_mention_count: number; article_mention_count: number }; dataKey?: string; value?: number; color?: string }>; label?: string }) => {
     if (!active || !payload?.length) return null;
     const row = payload[0]?.payload;
     const lbl = row?.dateLabel ?? label ?? row?.date ?? '';
+    const jobRate = row?.job_change_rate ?? 0;
+    const articleRate = row?.article_change_rate ?? 0;
+    const jobCount = row?.job_mention_count ?? 0;
+    const articleCount = row?.article_mention_count ?? 0;
+    
+    // 비율을 % 형식으로 표시
+    const formatRate = (rate: number) => {
+      return `${rate.toFixed(2)}%`;
+    };
+    
     return (
       <div className="bg-[#1A1B1E] border border-white/10 p-3 rounded-xl shadow-xl text-xs">
         <p className="text-gray-400 mb-2">{lbl} 언급량</p>
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-          <span className="text-white font-bold">채용 언급: {(row?.job_mention_count ?? 0).toLocaleString()}</span>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-blue-500" />
+            <span className="text-white font-bold">채용 언급: {formatRate(jobRate)} ({jobCount.toLocaleString()})</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-yellow-500" />
+            <span className="text-white font-bold">게시글 언급: {formatRate(articleRate)} ({articleCount.toLocaleString()})</span>
+          </div>
         </div>
       </div>
     );
@@ -59,20 +81,43 @@ export default function TrendChart({ color, data, period, onPeriodChange, isLoad
   // X축 틱 간격: 7일=전체, 30일=3일 간격, 90일=9일 간격 (Recharts: interval = 표시 틱 사이에 건너뛸 개수)
   const xAxisInterval = period === 7 ? 0 : period === 30 ? 2 : 8;
 
-  // Y축 domain: 데이터 범위 위·아래에 동일한 여백을 두어 값들이 세로 중앙에 오도록 조정
-  const values = chartData.map((d) => d.job_mention_count).filter((v) => typeof v === 'number');
-  const dataMin = values.length ? Math.min(...values) : 0;
-  const dataMax = values.length ? Math.max(...values) : 100;
+  // Y축 domain: job_change_rate와 article_change_rate의 최소/최대값을 고려
+  // 이상한 값(100% 초과) 필터링 및 합리적인 범위로 제한
+  const jobRates = chartData
+    .map((d) => d.job_change_rate ?? 0)
+    .filter((v) => typeof v === 'number' && v >= 0 && v <= 100);
+  const articleRates = chartData
+    .map((d) => d.article_change_rate ?? 0)
+    .filter((v) => typeof v === 'number' && v >= 0 && v <= 100);
+  const allRates = [...jobRates, ...articleRates];
+  
+  const dataMin = allRates.length ? Math.min(...allRates) : 0;
+  const dataMax = allRates.length ? Math.min(Math.max(...allRates), 100) : 100; // 최대값을 100%로 제한
   const range = dataMax - dataMin || 1;
-  const pad = Math.max(range * 0.2, 5);
+  const pad = Math.max(range * 0.2, 1);
   const yMin = Math.max(0, dataMin - pad);
-  const yMax = dataMax + pad;
-  // Y축 10 단위: domain과 ticks를 10 단위로 맞춤
-  const yDomainMin = Math.max(0, Math.floor(yMin / 10) * 10);
-  const yDomainMax = Math.ceil(yMax / 10) * 10;
-  const yDomain: [number, number] = [yDomainMin, yDomainMax];
+  const yMax = Math.min(dataMax + pad, 100); // 최대값을 100%로 제한
+  const yDomain: [number, number] = [yMin, yMax];
+
+  // Y축 tick을 일정한 간격으로 생성 (최대값 기준)
+  // 최대값에 따라 적절한 간격 계산 (4-6개의 tick이 적당하도록)
+  const calculateTickInterval = (max: number): number => {
+    if (max <= 5) return 1;      // 0-5%: 1% 간격
+    if (max <= 10) return 2;     // 0-10%: 2% 간격
+    if (max <= 20) return 4;     // 0-20%: 4% 간격
+    if (max <= 50) return 10;    // 0-50%: 10% 간격
+    return 20;                   // 0-100%: 20% 간격
+  };
+
+  const tickInterval = calculateTickInterval(yMax);
   const yTicks: number[] = [];
-  for (let t = yDomainMin; t <= yDomainMax; t += 10) yTicks.push(t);
+  for (let t = 0; t <= yMax; t += tickInterval) {
+    yTicks.push(t);
+  }
+  // 최대값이 정확히 포함되도록 마지막 tick 추가 (간격으로 나누어떨어지지 않는 경우)
+  if (yTicks[yTicks.length - 1] < yMax) {
+    yTicks.push(yMax);
+  }
 
   return (
     <div className="w-full h-full min-h-[300px] flex flex-col">
@@ -116,7 +161,14 @@ export default function TrendChart({ color, data, period, onPeriodChange, isLoad
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: '#6B7280', fontSize: 12 }}
-                tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v))}
+                tickFormatter={(v) => {
+                  // 이상한 값 처리: 100보다 큰 값은 표시하지 않음
+                  if (typeof v !== 'number' || v < 0 || v > 100) {
+                    return '';
+                  }
+                  // 정수값으로 반올림
+                  return `${Math.round(v)}%`;
+                }}
                 domain={yDomain}
                 ticks={yTicks}
               />
@@ -128,15 +180,29 @@ export default function TrendChart({ color, data, period, onPeriodChange, isLoad
               />
               <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '12px', paddingBottom: '10px' }} />
 
+              {/* 채용공고 비율 라인 (파란색) */}
               <Line
                 name="채용 언급"
                 yAxisId="left"
                 type="monotone"
-                dataKey="job_mention_count"
-                stroke={color}
+                dataKey="job_change_rate"
+                stroke="#3B82F6"
                 strokeWidth={3}
                 dot={{ r: 4, fill: '#25262B', strokeWidth: 2 }}
-                activeDot={{ r: 6, fill: color }}
+                activeDot={{ r: 6, fill: '#3B82F6' }}
+                isAnimationActive={false}
+              />
+
+              {/* 게시글 비율 라인 (노란색) */}
+              <Line
+                name="게시글 언급"
+                yAxisId="left"
+                type="monotone"
+                dataKey="article_change_rate"
+                stroke="#EAB308"
+                strokeWidth={3}
+                dot={{ r: 4, fill: '#25262B', strokeWidth: 2 }}
+                activeDot={{ r: 6, fill: '#EAB308' }}
                 isAnimationActive={false}
               />
             </LineChart>
