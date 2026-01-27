@@ -55,7 +55,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
             <h2 className="text-3xl font-bold text-white mb-6">로그인</h2>
             <p className="text-[#9FA0A8] text-[15px] leading-relaxed mb-10">
-              Google 계정으로 로그인하세요.
+              지금 로그인하고 맞춤 채용 콘텐츠로 하루를 시작하세요. <br/> 즐겨찾기와 AI 면접 대비 기능을 사용해보세요.
             </p>
 
             <div className="w-full space-y-4">
@@ -78,7 +78,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
             <p className="mt-8 text-[12px] text-gray-500 leading-normal">
               로그인은 <span className="underline underline-offset-2 cursor-pointer">개인 정보 보호 정책</span> 및
-              <span className="underline underline-offset-2 cursor-pointer"> 서비스 약관</span>에 동의하는 것을 의미합니다.
+              <span className="underline underline-offset-2 cursor-pointer"> 서비스 약관</span>에 동의하는 것을 의미하며,<br/> 서비스 이용을 위해 이메일과 이름, 프로필 이미지를 수집합니다.
             </p>
 
             <div className="absolute bottom-0 left-0 w-full overflow-hidden leading-[0]">

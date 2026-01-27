@@ -36,30 +36,21 @@ export default function ReportModal({
         <AnimatePresence>
             {isOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:p-6 print:p-0 print:block print:static">
-                    {/* ✅ [수정] PDF 출력 스타일 최적화 (여백 제거) */}
+                    {/* ✅ [수정] PDF 출력 여백 이슈 해결을 위한 스타일 재정의 */}
                     <style>{`
                         @media print {
-                            @page { margin: 10mm; size: auto; } /* 기본 마진 설정 */
+                            @page { margin: 10mm; size: auto; }
                             
-                            /* 메인 컨텐츠 숨김 (Visibility로 공간은 유지하되 내용은 숨김) */
-                            body * {
-                                visibility: hidden;
-                            }
+                            body * { visibility: hidden; }
+                            #printable-root, #printable-root * { visibility: visible; }
 
-                            /* 모달 내부 컨텐츠만 표시 */
-                            #printable-root, #printable-root * {
-                                visibility: visible;
-                            }
-
-                            /* HTML/Body 높이 제한 해제 (무한 스크롤 방지) */
                             html, body {
                                 height: auto !important;
-                                min-height: 100% !important;
+                                min-height: 0 !important;
                                 overflow: visible !important;
                                 background: white !important;
                             }
 
-                            /* 모달 컨테이너를 문서 최상단에 절대 위치 */
                             #printable-root {
                                 position: absolute !important;
                                 left: 0 !important;
@@ -68,13 +59,13 @@ export default function ReportModal({
                                 height: auto !important;
                                 margin: 0 !important;
                                 padding: 0 !important;
-                                overflow: visible !important; /* 스크롤바 해제 */
+                                overflow: visible !important;
                                 background: white !important;
                                 color: black !important;
                                 border: none !important;
                                 box-shadow: none !important;
                                 z-index: 99999 !important;
-                                transform: none !important; /* Framer Motion 간섭 제거 */
+                                transform: none !important;
                             }
 
                             #printable-content {
@@ -85,6 +76,7 @@ export default function ReportModal({
                                 border: none !important;
                                 box-shadow: none !important;
                                 overflow: visible !important;
+                                display: block !important;
                             }
 
                             .custom-scrollbar {
@@ -95,17 +87,31 @@ export default function ReportModal({
 
                             .no-print { display: none !important; }
 
-                            /* 간격 강제 조정 (화면상 큰 간격을 인쇄 시 축소) */
-                            .print-compact-gap { gap: 1rem !important; }
-                            .print-compact-padding { padding: 1.5rem !important; }
-                            .print-no-min-height { min-height: 0 !important; }
-
-                            /* 페이지 넘김 방지 */
-                            .print-break-inside {
-                                break-inside: avoid;
-                                page-break-inside: avoid;
-                                margin-bottom: 1.5rem;
+                            /* ✅ [핵심 수정] 섹션 간 페이지 넘김 허용 (avoid -> auto) */
+                            .print-section {
+                                margin-bottom: 1rem !important; /* 간격 축소 */
+                                page-break-inside: auto !important; /* 내용이 길면 페이지 넘어가도록 허용 */
+                                break-inside: auto !important;
                             }
+
+                            /* ✅ [핵심 수정] 개별 카드/항목만 쪼개지지 않도록 보호 */
+                            .print-item {
+                                page-break-inside: avoid !important;
+                                break-inside: avoid !important;
+                                margin-bottom: 0.8rem !important; /* 아이템 간 간격 확보 */
+                                display: block !important;
+                            }
+
+                            /* 헤더 바로 뒤에서 페이지가 끊기지 않도록 시도 */
+                            h3 {
+                                page-break-after: avoid !important;
+                                break-after: avoid !important;
+                            }
+
+                            .print-compact-gap { gap: 0.5rem !important; }
+                            .print-compact-padding { padding: 0 !important; }
+                            .print-no-min-height { min-height: 0 !important; height: auto !important; }
+                            .print-block { display: block !important; }
                             
                             p, span, div, h1, h2, h3, h4, li { color: black !important; }
                             .print-color-box { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -125,12 +131,13 @@ export default function ReportModal({
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         className="relative w-full max-w-4xl h-[90vh] bg-[#1A1B1E] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-white/10 print:h-auto print:rounded-none print:border-none print:shadow-none"
                     >
+                        {/* 헤더 (화면용) */}
                         <div className="flex justify-between items-center p-6 border-b border-white/10 bg-[#212226] no-print shrink-0">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-blue-500/10 rounded-lg"><FileText className="text-blue-400" size={24} /></div>
+                                <div className="p-2 bg-blue-500/10 rounded-lg"><FileText className="text-blue-400" size={48} /></div>
                                 <div>
-                                    <h2 className="text-xl font-bold text-white">AI 역량 분석 통합 리포트</h2>
-                                    <p className="text-sm text-gray-400">Analysis for {selectedCompany?.name || 'General'} - {resumeTitle}</p>
+                                    <h2 className="text-2xl font-bold text-white">통합 리포트</h2>
+                                    <p className="text-sm text-gray-400">선택한 기업 : {selectedCompany?.name || 'General'} <br/> 파일 이름 : {resumeTitle}</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
@@ -143,14 +150,15 @@ export default function ReportModal({
                             </div>
                         </div>
 
-                        {/* ✅ [수정] 인쇄용 클래스 추가 (print-compact-*) */}
-                        <div id="printable-content" className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-[#151619] print:bg-white print:p-0">
-                            <div className="max-w-[800px] mx-auto bg-white text-black rounded-sm shadow-xl min-h-[1000px] p-12 flex flex-col gap-10 print:shadow-none print:p-8 print:gap-6 print:min-h-0 print:w-full print:max-w-none print-compact-gap print-compact-padding print-no-min-height">
+                        {/* 리포트 본문 (인쇄 대상) */}
+                        <div id="printable-content" className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-[#151619] print:bg-white print:p-0 print:block">
+                            <div className="max-w-[800px] mx-auto bg-white text-black rounded-sm shadow-xl min-h-[1000px] p-12 flex flex-col gap-10 print:shadow-none print:p-8 print:gap-2 print:min-h-0 print:w-full print:max-w-none print-no-min-height print-block">
                                 
-                                <div className="border-b-2 border-black/10 pb-6 print:pb-4 flex justify-between items-end print-break-inside">
+                                {/* 1. 리포트 헤더 */}
+                                <div className="border-b-2 border-black/10 pb-6 print:pb-4 flex justify-between items-end print-section">
                                     <div>
-                                        <h1 className="text-3xl font-black text-gray-900 mb-2 tracking-tight">COMPETENCY REPORT</h1>
-                                        <p className="text-gray-500 font-medium text-sm">AI-Powered Resume Analysis by DevRoad</p>
+                                        <h1 className="text-3xl font-black text-gray-900 mb-2 tracking-tight">DevRoad 면접 대비 통합 리포트</h1>
+                                        <p className="text-gray-500 font-medium text-sm">당신의 꿈을 항상 응원합니다!</p>
                                     </div>
                                     <div className="flex flex-col items-end">
                                         {selectedCompany?.logo_url ? (
@@ -165,25 +173,27 @@ export default function ReportModal({
                                     </div>
                                 </div>
 
-                                <div className="print-break-inside">
+                                {/* 2. 기술 스택 (Tech Stack) */}
+                                <div className="print-section">
                                     <h3 className="text-lg font-bold uppercase tracking-wider text-gray-800 mb-4 border-l-4 border-blue-600 pl-3 flex items-center gap-2 print:mb-2">
-                                        <Hash size={18} className="text-blue-600"/> Tech Stack
+                                        <Hash size={18} className="text-blue-600"/> 기술 스택
                                     </h3>
                                     <div className="flex flex-wrap gap-2">
                                         {selectedKeywords.length > 0 ? selectedKeywords.map((k, i) => (
-                                            <span key={i} className="px-3 py-1 bg-gray-100 border border-gray-200 rounded-full text-sm font-bold text-gray-700 print-color-box">{k}</span>
+                                            <span key={i} className="px-3 py-1 bg-gray-100 border border-gray-200 rounded-full text-sm font-bold text-gray-700 print-color-box print-item">{k}</span>
                                         )) : <span className="text-gray-400 text-sm">분석된 기술 스택이 없습니다.</span>}
                                     </div>
                                 </div>
 
-                                <div className="print-break-inside">
+                                {/* 3. 상세 분석 (Detailed Analysis) - 여기가 문제였던 부분 */}
+                                <div className="print-section">
                                     <h3 className="text-lg font-bold uppercase tracking-wider text-gray-800 mb-4 border-l-4 border-green-600 pl-3 flex items-center gap-2 print:mb-2">
-                                        <Target size={18} className="text-green-600"/> Detailed Analysis
+                                        <Target size={18} className="text-green-600"/> 상세 분석
                                     </h3>
                                     {feedbacks.length > 0 ? (
-                                        <div className="grid grid-cols-1 gap-4 print:gap-3">
+                                        <div className="grid grid-cols-1 gap-4 print:gap-0 print:block">
                                             {feedbacks.map((fb, i) => (
-                                                <div key={i} className={`p-4 rounded-lg border flex flex-col gap-2 print-break-inside print-color-box ${fb.type==='strength'?'bg-blue-50 border-blue-100':fb.type==='matching'?'bg-green-50 border-green-100':'bg-orange-50 border-orange-100'}`}>
+                                                <div key={i} className={`p-4 rounded-lg border flex flex-col gap-2 print-item print-color-box ${fb.type==='strength'?'bg-blue-50 border-blue-100':fb.type==='matching'?'bg-green-50 border-green-100':'bg-orange-50 border-orange-100'}`}>
                                                     <div className="flex items-center gap-2 font-bold">
                                                         {fb.type==='strength' && <TrendingUp size={16} className="text-blue-600"/>}
                                                         {fb.type==='matching' && <CheckCircle2 size={16} className="text-green-600"/>}
@@ -200,14 +210,15 @@ export default function ReportModal({
                                     ) : <p className="text-gray-400 italic">상세 분석 데이터가 없습니다.</p>}
                                 </div>
 
-                                <div className="print-break-inside">
+                                {/* 4. 예상 질문 (Questions) */}
+                                <div className="print-section">
                                     <h3 className="text-lg font-bold uppercase tracking-wider text-gray-800 mb-4 border-l-4 border-purple-600 pl-3 flex items-center gap-2 print:mb-2">
-                                        <BrainCircuit size={18} className="text-purple-600"/> AI Interview Questions
+                                        <BrainCircuit size={18} className="text-purple-600"/> AI 인터뷰 예상 질문
                                     </h3>
                                     {questions.length > 0 ? (
-                                        <ul className="space-y-4 print:space-y-3">
+                                        <ul className="space-y-4 print:space-y-0 print:block">
                                             {questions.map((q, i) => (
-                                                <li key={i} className="flex gap-4 items-start bg-purple-50 p-5 rounded-xl border border-purple-100 print-break-inside print-color-box print:p-4">
+                                                <li key={i} className="flex gap-4 items-start bg-purple-50 p-5 rounded-xl border border-purple-100 print-item print-color-box">
                                                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-bold shrink-0 shadow-md print-color-box">Q{i+1}</span>
                                                     <p className="text-gray-800 font-medium leading-relaxed">{q}</p>
                                                 </li>
@@ -216,10 +227,11 @@ export default function ReportModal({
                                     ) : <p className="text-gray-400 italic">생성된 면접 질문이 없습니다.</p>}
                                 </div>
 
+                                {/* 5. 이력서 원본 (Resume Content) */}
                                 {resumeText && (
-                                    <div className="print-break-inside">
+                                    <div className="print-section">
                                         <h3 className="text-lg font-bold uppercase tracking-wider text-gray-800 mb-4 border-l-4 border-gray-400 pl-3 flex items-center gap-2 print:mb-2">
-                                            <FileText size={18} className="text-gray-600"/> Resume Content
+                                            <FileText size={18} className="text-gray-600"/> 이력서 원본
                                         </h3>
                                         <div className="bg-gray-50 p-6 rounded-xl text-gray-600 leading-relaxed text-xs whitespace-pre-wrap font-mono border border-gray-200 print-color-box print:p-4">{resumeText}</div>
                                     </div>
