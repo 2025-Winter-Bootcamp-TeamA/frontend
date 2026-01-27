@@ -2,7 +2,9 @@ import axios from 'axios';
 import { getAuthTokens, refreshAccessToken, clearAuthTokens } from './auth';
 
 // ✅ [수정됨] 환경변수(localhost:8000) 뒤에 API 버전(/api/v1)을 붙임
-const BASE_URL = `${process.env.NEXT_PUBLIC_API_URL}/api/v1`;
+// 환경변수가 없으면 기본값 사용 (개발 환경)
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+const BASE_URL = `${API_URL}/api/v1`;
 
 export const api = axios.create({
   baseURL: BASE_URL,
