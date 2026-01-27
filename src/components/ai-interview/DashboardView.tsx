@@ -475,38 +475,36 @@ export default function DashboardView({
                         <button onClick={() => setCompanyListTab('search')} className={`flex-1 py-1.5 text-xs font-bold rounded-md ${companyListTab === 'search' ? 'bg-white/10 text-white' : 'text-gray-500'}`}>검색</button>
                     </div>
                     {companyListTab === 'search' && (
-                        <>
-                            <div className="relative mb-3 shrink-0">
-                                <input type="text" value={companySearchQuery} onChange={(e) => setCompanySearchQuery(e.target.value)} placeholder="기업명 검색" className="w-full pl-9 pr-8 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500" />
-                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                {companySearchQuery && <button onClick={() => setCompanySearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><X size={14}/></button>}
-                            </div>
-                            
-                            {/* 즐겨찾기가 아닌 분석한 공고 */}
-                            {nonFavoriteAnalyzedJobs.length > 0 && !companySearchQuery && (
-                                <div className="mb-3 space-y-1 shrink-0">
-                                    {nonFavoriteAnalyzedJobs.map(job => (
-                                        <div 
-                                            key={job.jobPostingId} 
-                                            onClick={() => { 
-                                                setSelectedJobPostingId(job.jobPostingId); 
-                                                setSelectedCompany({ id: job.companyId, name: job.companyName, logo_url: job.companyLogo, jobPostingId: job.jobPostingId }); 
-                                            }}
-                                            className={`p-2 rounded-lg border cursor-pointer flex items-center gap-2 ${selectedJobPostingId === job.jobPostingId ? 'border-green-500/50 bg-green-500/10' : 'border-white/5 bg-white/5 hover:bg-white/10'}`}
-                                        >
-                                            <div className="w-5 h-5 rounded bg-white p-0.5 flex items-center justify-center shrink-0">
-                                                {job.companyLogo ? <img src={job.companyLogo} alt="" className="w-full h-full object-contain"/> : <span className="text-black font-bold text-[8px]">{job.companyName[0]}</span>}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-[10px] text-gray-500 truncate">{job.companyName}</div>
-                                                <div className="text-xs text-gray-300 truncate">{job.jobTitle}</div>
-                                            </div>
-                                            <CheckCircle2 size={12} className="text-green-400 shrink-0" />
-                                        </div>
-                                    ))}
+                        <div className="relative mb-3 shrink-0">
+                            <input type="text" value={companySearchQuery} onChange={(e) => setCompanySearchQuery(e.target.value)} placeholder="기업명 검색" className="w-full pl-9 pr-8 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500" />
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            {companySearchQuery && <button onClick={() => setCompanySearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><X size={14}/></button>}
+                        </div>
+                    )}
+                    
+                    {/* 즐겨찾기가 아닌 분석한 공고 (검색 탭에서만, 검색어 없을 때 표시) */}
+                    {nonFavoriteAnalyzedJobs.length > 0 && companyListTab === 'search' && !companySearchQuery && (
+                        <div className="mb-3 space-y-1 shrink-0">
+                            {nonFavoriteAnalyzedJobs.map(job => (
+                                <div 
+                                    key={job.jobPostingId} 
+                                    onClick={() => { 
+                                        setSelectedJobPostingId(job.jobPostingId); 
+                                        setSelectedCompany({ id: job.companyId, name: job.companyName, logo_url: job.companyLogo, jobPostingId: job.jobPostingId }); 
+                                    }}
+                                    className={`p-2 rounded-lg border cursor-pointer flex items-center gap-2 ${selectedJobPostingId === job.jobPostingId ? 'border-green-500/50 bg-green-500/10' : 'border-white/5 bg-white/5 hover:bg-white/10'}`}
+                                >
+                                    <div className="w-5 h-5 rounded bg-white p-0.5 flex items-center justify-center shrink-0">
+                                        {job.companyLogo ? <img src={job.companyLogo} alt="" className="w-full h-full object-contain"/> : <span className="text-black font-bold text-[8px]">{job.companyName[0]}</span>}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-[10px] text-gray-500 truncate">{job.companyName}</div>
+                                        <div className="text-xs text-gray-300 truncate">{job.jobTitle}</div>
+                                    </div>
+                                    <CheckCircle2 size={12} className="text-green-400 shrink-0" />
                                 </div>
-                            )}
-                        </>
+                            ))}
+                        </div>
                     )}
                     <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
                         {(companyListTab === 'favorites' ? companiesWithJobs : searchResults).map(company => {
