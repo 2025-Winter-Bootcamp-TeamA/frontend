@@ -70,6 +70,17 @@ export default function DashboardView({
     const [expandedCompanyIds, setExpandedCompanyIds] = useState<Set<number>>(new Set());
     
     const [techLogos, setTechLogos] = useState<Record<string, string>>({});
+    
+    // 분석 완료된 채용공고 관련 상태
+    const [analyzedJobPostingIds, setAnalyzedJobPostingIds] = useState<Set<number>>(new Set());
+    const [recentAnalyzedJobs, setRecentAnalyzedJobs] = useState<Array<{
+        jobPostingId: number;
+        jobTitle: string;
+        companyId: number;
+        companyName: string;
+        companyLogo?: string;
+    }>>([]);
+    const [favoriteCorpIds, setFavoriteCorpIds] = useState<Set<number>>(new Set());
 
     // ✅ [추가] 선택 해제 시에도 마지막 색상으로 사라지게 하기 위한 상태
     const [lastActiveFeedback, setLastActiveFeedback] = useState<AnalysisFeedback | null>(null);
@@ -89,6 +100,50 @@ export default function DashboardView({
         loadTechLogos();
     }, []);
 
+    // 1.5 분석 완료된 채용공고 목록 로딩
+    useEffect(() => {
+        const loadAnalyzedJobPostings = async () => {
+            if (!resumeId) return;
+            try {
+                const matchingsResponse = await api.get('/resumes/matchings/');
+                const matchings = matchingsResponse.data.results || matchingsResponse.data || [];
+                
+                // 현재 이력서와 매칭된 채용공고만 필터링
+                const currentResumeMatchings = matchings.filter((m: any) => m.resume === resumeId);
+                const analyzedIds = new Set<number>(currentResumeMatchings.map((m: any) => m.job_posting));
+                setAnalyzedJobPostingIds(analyzedIds);
+                
+                // 분석된 채용공고의 상세 정보 가져오기
+                const analyzedJobsDetails: Array<{
+                    jobPostingId: number;
+                    jobTitle: string;
+                    companyId: number;
+                    companyName: string;
+                    companyLogo?: string;
+                }> = [];
+                
+                for (const matching of currentResumeMatchings) {
+                    try {
+                        const jobRes = await api.get(`/jobs/job-postings/${matching.job_posting}/`);
+                        const jobData = jobRes.data;
+                        if (jobData) {
+                            analyzedJobsDetails.push({
+                                jobPostingId: jobData.id,
+                                jobTitle: jobData.title,
+                                companyId: jobData.corp?.id || jobData.corp_id,
+                                companyName: jobData.corp?.name || '알 수 없음',
+                                companyLogo: jobData.corp?.logo_url
+                            });
+                        }
+                    } catch (e) { /* 개별 오류 무시 */ }
+                }
+                
+                setRecentAnalyzedJobs(analyzedJobsDetails);
+            } catch (error) { console.error('분석 완료된 채용공고 로딩 실패:', error); }
+        };
+        loadAnalyzedJobPostings();
+    }, [resumeId]);
+
     // 2. 기업 목록 로딩
     useEffect(() => {
         const loadFavoriteCompaniesWithJobs = async () => {
@@ -100,15 +155,16 @@ export default function DashboardView({
                 
                 const bookmarksResponse = await api.get('/jobs/corp-bookmarks/');
                 const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
-                const favoriteCorpIds = bookmarks.map((b:any) => b.corp?.id ?? b.corp_id).filter(Boolean);
+                const favCorpIds = bookmarks.map((b:any) => b.corp?.id ?? b.corp_id).filter(Boolean);
+                setFavoriteCorpIds(new Set(favCorpIds)); // 즐겨찾기 기업 ID 저장
                 
-                if (favoriteCorpIds.length === 0) {
+                if (favCorpIds.length === 0) {
                     setCompaniesWithJobs([]);
                     setIsLoadingCompanies(false);
                     return;
                 }
 
-                const companiesData = await Promise.all(favoriteCorpIds.map(async (id: number) => {
+                const companiesData = await Promise.all(favCorpIds.map(async (id: number) => {
                     try {
                         let corpData = bookmarks.find((b:any) => (b.corp?.id === id || b.corp_id === id))?.corp;
                         if (!corpData || !corpData.name) {
@@ -128,7 +184,7 @@ export default function DashboardView({
                                 title: j.title,
                                 description: j.description,
                                 url: j.url,
-                                isAnalyzed: false
+                                isAnalyzed: analyzedJobPostingIds.has(j.id)
                             })),
                             isAllAnalyzed: false
                         };
@@ -140,7 +196,7 @@ export default function DashboardView({
             finally { setIsLoadingCompanies(false); }
         };
         if (companyListTab === 'favorites') loadFavoriteCompaniesWithJobs();
-    }, [companyListTab, resumeId]);
+    }, [companyListTab, resumeId, analyzedJobPostingIds]);
 
     // 3. 검색 로직
     useEffect(() => {
@@ -161,7 +217,10 @@ export default function DashboardView({
                         name: corp.name,
                         logo_url: corp.logo_url,
                         address: corp.address,
-                        jobPostings: jobPostings.map((j:any) => ({...j, isAnalyzed: false})), 
+                        jobPostings: jobPostings.map((j:any) => ({
+                            ...j, 
+                            isAnalyzed: analyzedJobPostingIds.has(j.id)
+                        })), 
                         isAllAnalyzed: false 
                     };
                 }));
@@ -171,7 +230,12 @@ export default function DashboardView({
         };
         const timer = setTimeout(() => { if (companyListTab === 'search') searchCompanies(); }, 300);
         return () => clearTimeout(timer);
-    }, [companySearchQuery, companyListTab]);
+    }, [companySearchQuery, companyListTab, analyzedJobPostingIds]);
+
+    // 3.5 즐겨찾기가 아닌 분석 완료된 채용공고 필터링
+    const nonFavoriteAnalyzedJobs = useMemo(() => {
+        return recentAnalyzedJobs.filter(job => !favoriteCorpIds.has(job.companyId));
+    }, [recentAnalyzedJobs, favoriteCorpIds]);
 
     // 5. 분석 데이터 가져오기
     useEffect(() => {
@@ -202,6 +266,10 @@ export default function DashboardView({
                 }
                 
                 setAnalysisData(resultData);
+                
+                // 분석 완료 시 analyzedJobPostingIds에 추가
+                setAnalyzedJobPostingIds(prev => new Set([...prev, selectedJobPostingId]));
+                
                 const parsedFeedbacks = parseFeedbacks(resultData);
                 const parsedQuestions = parseQuestions(resultData.question);
 
@@ -407,14 +475,45 @@ export default function DashboardView({
                         <button onClick={() => setCompanyListTab('search')} className={`flex-1 py-1.5 text-xs font-bold rounded-md ${companyListTab === 'search' ? 'bg-white/10 text-white' : 'text-gray-500'}`}>검색</button>
                     </div>
                     {companyListTab === 'search' && (
-                        <div className="relative mb-3 shrink-0">
-                            <input type="text" value={companySearchQuery} onChange={(e) => setCompanySearchQuery(e.target.value)} placeholder="기업명 검색" className="w-full pl-9 pr-8 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500" />
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                            {companySearchQuery && <button onClick={() => setCompanySearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><X size={14}/></button>}
-                        </div>
+                        <>
+                            <div className="relative mb-3 shrink-0">
+                                <input type="text" value={companySearchQuery} onChange={(e) => setCompanySearchQuery(e.target.value)} placeholder="기업명 검색" className="w-full pl-9 pr-8 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500" />
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                {companySearchQuery && <button onClick={() => setCompanySearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><X size={14}/></button>}
+                            </div>
+                            
+                            {/* 즐겨찾기가 아닌 분석한 공고 */}
+                            {nonFavoriteAnalyzedJobs.length > 0 && !companySearchQuery && (
+                                <div className="mb-3 space-y-1 shrink-0">
+                                    {nonFavoriteAnalyzedJobs.map(job => (
+                                        <div 
+                                            key={job.jobPostingId} 
+                                            onClick={() => { 
+                                                setSelectedJobPostingId(job.jobPostingId); 
+                                                setSelectedCompany({ id: job.companyId, name: job.companyName, logo_url: job.companyLogo, jobPostingId: job.jobPostingId }); 
+                                            }}
+                                            className={`p-2 rounded-lg border cursor-pointer flex items-center gap-2 ${selectedJobPostingId === job.jobPostingId ? 'border-green-500/50 bg-green-500/10' : 'border-white/5 bg-white/5 hover:bg-white/10'}`}
+                                        >
+                                            <div className="w-5 h-5 rounded bg-white p-0.5 flex items-center justify-center shrink-0">
+                                                {job.companyLogo ? <img src={job.companyLogo} alt="" className="w-full h-full object-contain"/> : <span className="text-black font-bold text-[8px]">{job.companyName[0]}</span>}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-[10px] text-gray-500 truncate">{job.companyName}</div>
+                                                <div className="text-xs text-gray-300 truncate">{job.jobTitle}</div>
+                                            </div>
+                                            <CheckCircle2 size={12} className="text-green-400 shrink-0" />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </>
                     )}
                     <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
-                        {(companyListTab === 'favorites' ? companiesWithJobs : searchResults).map(company => (
+                        {(companyListTab === 'favorites' ? companiesWithJobs : searchResults).map(company => {
+                            const analyzedCount = company.jobPostings.filter(j => j.isAnalyzed || analyzedJobPostingIds.has(j.id)).length;
+                            const isAllAnalyzed = company.jobPostings.length > 0 && analyzedCount === company.jobPostings.length;
+                            
+                            return (
                             <div key={company.id} className="space-y-1">
                                 <div onClick={(e) => toggleCompanyExpand(e, company.id)} className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer hover:bg-white/5 ${selectedCompany?.id === company.id ? 'border-white/20 bg-white/5' : 'border-transparent'}`}>
                                     <div className="w-8 h-8 rounded bg-white p-1 flex items-center justify-center shrink-0">
@@ -424,21 +523,31 @@ export default function DashboardView({
                                         <div className="text-sm font-bold text-gray-200 truncate">{company.name}</div>
                                         <div className="text-[10px] text-gray-500">{company.jobPostings.length}개 공고</div>
                                     </div>
+                                    {isAllAnalyzed && <CheckCircle2 size={14} className="text-green-400 shrink-0" />}
                                     <ChevronDown size={14} className={`text-gray-500 transition-transform ${expandedCompanyIds.has(company.id) ? 'rotate-180' : ''}`} />
                                 </div>
                                 <AnimatePresence>
                                     {expandedCompanyIds.has(company.id) && (
                                         <motion.div initial={{height:0}} animate={{height:'auto'}} exit={{height:0}} className="overflow-hidden ml-2 pl-2 border-l border-white/10 space-y-1">
-                                            {company.jobPostings.map(job => (
-                                                <div key={job.id} onClick={(e) => { e.stopPropagation(); setSelectedJobPostingId(job.id); setSelectedCompany({...company, jobPostingId: job.id}); }} className={`p-2 rounded text-xs cursor-pointer truncate ${selectedJobPostingId === job.id ? 'text-blue-300 bg-blue-500/10' : 'text-gray-400 hover:text-white'}`}>
-                                                    {job.title}
-                                                </div>
-                                            ))}
+                                            {company.jobPostings.map(job => {
+                                                const isAnalyzed = job.isAnalyzed || analyzedJobPostingIds.has(job.id);
+                                                return (
+                                                    <div 
+                                                        key={job.id} 
+                                                        onClick={(e) => { e.stopPropagation(); setSelectedJobPostingId(job.id); setSelectedCompany({...company, jobPostingId: job.id}); }} 
+                                                        className={`p-2 rounded text-xs cursor-pointer flex items-center gap-1 ${selectedJobPostingId === job.id ? 'text-blue-300 bg-blue-500/10' : 'text-gray-400 hover:text-white'}`}
+                                                    >
+                                                        <span className="truncate flex-1">{job.title}</span>
+                                                        {isAnalyzed && <CheckCircle2 size={12} className="text-green-400 shrink-0" />}
+                                                    </div>
+                                                );
+                                            })}
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
                             </div>
-                        ))}
+                        );
+                        })}
                     </div>
                 </section>
                 
