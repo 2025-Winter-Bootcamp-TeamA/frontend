@@ -94,10 +94,25 @@ function AIInterviewContent() {
         };
     };
 
-    // 상태 복구 로직
+    // 페이지 진입 시 초기화 (URL 파라미터가 없으면 항상 이력서 선택 화면으로)
     useEffect(() => {
+        const resumeIdParam = searchParams?.get('resumeId');
+        const pickResumeParam = searchParams?.get('pickResume');
+        
+        // URL 파라미터가 없으면 상태 초기화
+        if (!resumeIdParam && !pickResumeParam) {
+            resetProcess();
+            setSelectedResume(null);
+        }
+    }, []); // 컴포넌트 마운트 시 1회만 실행
+
+    // 상태 복구 로직 (URL 파라미터가 있을 때만)
+    useEffect(() => {
+        const resumeIdParam = searchParams?.get('resumeId');
+        
         const restoreState = async () => {
-            if (step === 'result' && analyzingResumeId && !selectedResume) {
+            // URL 파라미터가 있고, 분석 결과 상태일 때만 복구
+            if (resumeIdParam && step === 'result' && analyzingResumeId && !selectedResume) {
                 try {
                     const detailedResume = await fetchResumeDetails(analyzingResumeId);
                     setSelectedResume(detailedResume);
@@ -108,7 +123,7 @@ function AIInterviewContent() {
             }
         };
         restoreState();
-    }, [step, analyzingResumeId, selectedResume, setStep]);
+    }, [step, analyzingResumeId, selectedResume, setStep, searchParams]);
 
     // 분석 상태 폴링
     const { data: analysisData, error: pollingError } = useQuery({
@@ -406,7 +421,7 @@ function AIInterviewContent() {
                     </div>
 
                     <div className="flex items-center gap-4">
-                        {step !== 'empty' && (
+                        {step === 'result' && (
                             <>
                                 <button 
                                     onClick={() => setIsReportModalOpen(true)}
