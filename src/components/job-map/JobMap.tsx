@@ -7,6 +7,8 @@ import { Search, MapPin, RefreshCw, ArrowLeft, Building2, Star, Filter, X, List,
 import { api } from "@/lib/api";
 import { getAuthTokens } from "@/lib/auth";
 import JobCard from "../home/JobCard";
+import LoginCheckModal from "@/components/LoginCheckModal";
+import LoginModal from "@/components/LoginModal";
 
 // 서울 용산구 — 채용 지도 첫 화면·리셋 시 고정
 const SEOUL_CENTER = { lat: 37.5326, lng: 126.9900 };
@@ -56,9 +58,9 @@ const REGION_COORDINATES: Record<string, { lat: number, lng: number }> = {
     "경남": { lat: 35.2383, lng: 128.6922 },
     "제주": { lat: 33.4890, lng: 126.4983 },
 
-    // --- 서울특별시 구 (키를 '서울 구이름'으로 사용하거나 고유한 이름은 그냥 사용) ---
-    "서울 강남구": { lat: 37.5172, lng: 127.0473 }, // 강남구는 서울에만 있지만 통일성을 위해
-    "강남구": { lat: 37.5172, lng: 127.0473 },       // 편의상 짧은 키도 허용
+    // --- 서울특별시 구 ---
+    "서울 강남구": { lat: 37.5172, lng: 127.0473 },
+    "강남구": { lat: 37.5172, lng: 127.0473 },
     "서울 서초구": { lat: 37.4837, lng: 127.0324 },
     "서초구": { lat: 37.4837, lng: 127.0324 },
     "서울 송파구": { lat: 37.5145, lng: 127.1066 },
@@ -72,7 +74,7 @@ const REGION_COORDINATES: Record<string, { lat: number, lng: number }> = {
     "서울 구로구": { lat: 37.4954, lng: 126.8874 },
     "서울 금천구": { lat: 37.4568, lng: 126.8954 },
     
-    // 🔥 중복 이름 구 처리 (Key를 '시도 구이름'으로 지정)
+    // 🔥 중복 이름 구 처리
     "서울 중구": { lat: 37.5637, lng: 126.9975 },
     "인천 중구": { lat: 37.4738, lng: 126.6217 },
     "부산 중구": { lat: 35.1062, lng: 129.0324 },
@@ -96,7 +98,7 @@ const REGION_COORDINATES: Record<string, { lat: number, lng: number }> = {
     "광주 서구": { lat: 35.1520, lng: 126.8577 },
     "대전 서구": { lat: 36.3553, lng: 127.3835 },
 
-    "인천 남구": { lat: 37.4635, lng: 126.6502 }, // (미추홀구)
+    "인천 남구": { lat: 37.4635, lng: 126.6502 }, 
     "부산 남구": { lat: 35.1365, lng: 129.0843 },
     "대구 남구": { lat: 35.8459, lng: 128.5977 },
     "광주 남구": { lat: 35.1329, lng: 126.9025 },
@@ -107,7 +109,7 @@ const REGION_COORDINATES: Record<string, { lat: number, lng: number }> = {
     "광주 북구": { lat: 35.1742, lng: 126.9122 },
     "울산 북구": { lat: 35.5826, lng: 129.3608 },
 
-    // --- 기타 주요 지역 (경기 등) ---
+    // --- 기타 주요 지역 ---
     "성남시": { lat: 37.4200, lng: 127.1265 },
     "수원시": { lat: 37.2636, lng: 127.0286 },
     "용인시": { lat: 37.2410, lng: 127.1775 },
@@ -188,6 +190,10 @@ export default function JobMap() {
   const [city, setCity] = useState<string>("");
   const [district, setDistrict] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
+
+  // ✅ 로그인 모달 상태
+  const [showLoginCheck, setShowLoginCheck] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const debouncedCareer = useDebounce(careerYear, 500);
   const debouncedJobSearch = useDebounce(jobSearch, 500);
@@ -319,10 +325,9 @@ export default function JobMap() {
     if (!map) return;
 
     // 1. 목표 지점 및 줌 레벨 결정
-    // 선택된 기업이 있으면 그곳으로, 없으면 용산구(SEOUL_CENTER)로
     const targetLat = selectedCompany ? Number(selectedCompany.latitude) : SEOUL_CENTER.lat;
     const targetLng = selectedCompany ? Number(selectedCompany.longitude) : SEOUL_CENTER.lng;
-    const targetLevel = selectedCompany ? 3 : INITIAL_MAP_LEVEL; // 기업 선택시 3, 아니면 8
+    const targetLevel = selectedCompany ? 3 : INITIAL_MAP_LEVEL;
 
     if (isNaN(targetLat) || isNaN(targetLng)) return;
 
@@ -336,47 +341,36 @@ export default function JobMap() {
 
         const targetPosition = new kakao.maps.LatLng(targetLat, targetLng);
 
-        // 데스크탑 화면이고 사이드바가 열려있을 때 보정
         if (isSidebarOpen && window.innerWidth >= 1024) {
             const point = projection.pointFromCoords(targetPosition);
-            // 400px 사이드바의 절반인 200px만큼 '지도 중심'을 왼쪽(x - 200)으로 설정
             const newCenterPoint = new kakao.maps.Point(point.x - 200, point.y);
             const newCenter = projection.coordsFromPoint(newCenterPoint);
             map.panTo(newCenter);
         } else {
-            // 모바일이거나 사이드바 닫힘 -> 그냥 중앙으로 부드럽게 이동
             map.panTo(targetPosition);
         }
     };
 
-    // Projection 계산을 위해 약간의 지연 필요
     setTimeout(moveWithOffset, 150);
 
   }, [map, selectedCompany, isSidebarOpen]);
 
-  // ✅ [수정] 지역 필터 변경 시 지도 이동 로직 (이름 중복 해결 포함)
+  // 지역 필터 변경 시 지도 이동 로직
   const moveToRegion = useCallback((regionName: string, zoomLevel: number, parentRegionName?: string) => {
     if (!map || !regionName) return;
 
-    // 1. 좌표 데이터 찾기 (우선순위: "시도 구이름" -> "구이름")
     let coords = null;
-    
-    // 부모 지역(시/도)가 있으면 조합해서 먼저 검색 (예: "서울 중구")
     if (parentRegionName) {
         coords = REGION_COORDINATES[`${parentRegionName} ${regionName}`];
     }
-    
-    // 없으면 이름 그대로 검색 (예: "강남구" -> REGION_COORDINATES["강남구"])
     if (!coords) {
         coords = REGION_COORDINATES[regionName];
     }
     
-    // 2. 좌표가 있으면 이동
     if (coords) {
         const moveLatLon = new kakao.maps.LatLng(coords.lat, coords.lng);
-        map.setLevel(zoomLevel, { animate: true }); // 부드러운 줌 변경
+        map.setLevel(zoomLevel, { animate: true }); 
         
-        // 사이드바 오프셋 적용
         if (isSidebarOpen && window.innerWidth >= 1024) {
             const projection = map.getProjection();
             if (projection) {
@@ -392,18 +386,13 @@ export default function JobMap() {
         } else {
             map.panTo(moveLatLon);
         }
-    } else {
-        console.warn(`좌표 데이터가 없는 지역입니다: ${parentRegionName} ${regionName}`);
     }
   }, [map, isSidebarOpen]);
 
-  // ✅ [수정] 시/도 또는 군/구 변경 감지하여 지도 이동
   useEffect(() => {
     if (district) {
-        // 군/구가 선택되면 더 확대 (Level 6), city 정보를 parentRegionName으로 전달
         moveToRegion(district, 6, city);
     } else if (city) {
-        // 시/도만 선택되면 적당히 확대 (Level 9)
         moveToRegion(city, 9);
     }
   }, [city, district, moveToRegion]);
@@ -441,7 +430,6 @@ export default function JobMap() {
     setJobSearch("");
     setCity("");
     setDistrict("");
-    // 리셋 시 초기 뷰로 복귀
     if(map) {
         map.setLevel(INITIAL_MAP_LEVEL, { animate: true });
         map.panTo(new kakao.maps.LatLng(SEOUL_CENTER.lat, SEOUL_CENTER.lng));
@@ -450,16 +438,21 @@ export default function JobMap() {
   
   const hasActiveFilters = careerYear !== "" || jobSearch !== "" || city !== "" || district !== "";
 
-  // 시/도 변경 핸들러
   const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setCity(e.target.value);
     setDistrict(""); 
   };
 
+  // ✅ [수정] 즐겨찾기 토글 (비로그인 체크 추가)
   const toggleCompanyFavorite = async (e: React.MouseEvent, corpId: number) => {
     e.stopPropagation();
     const { accessToken } = getAuthTokens();
-    if (!accessToken) return;
+    
+    // ✅ 토큰이 없으면 로그인 모달 띄우기
+    if (!accessToken) {
+        setShowLoginCheck(true);
+        return;
+    }
 
     try {
       const isFavorite = favoriteCompanyIds.includes(corpId);
@@ -486,8 +479,6 @@ export default function JobMap() {
 
   const handleSelectCompany = (company: Company) => {
     setSelectedCompany(company);
-    // setCenter는 여기서 호출하지 않고 useEffect의 panTo에 맡김
-    // setCenter({ lat: Number(company.latitude), lng: Number(company.longitude) }); 
     setLevel(3);
     fetchCompanyJobs(company.id);
     if (!isSidebarOpen) setIsSidebarOpen(true); 
@@ -535,6 +526,17 @@ export default function JobMap() {
   return (
     <div className="flex flex-col lg:flex-row w-full h-full bg-[#1A1B1E] rounded-[32px] overflow-hidden border border-white/10 shadow-2xl relative">
       
+      {/* ✅ 로그인 모달 컴포넌트 추가 */}
+      <LoginCheckModal 
+          isOpen={showLoginCheck} 
+          onClose={() => setShowLoginCheck(false)}
+          onConfirm={() => {
+              setShowLoginCheck(false);
+              setShowLoginModal(true);
+          }}
+      />
+      <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
+
       {/* 🔴 사이드바 */}
       <div 
         className={`absolute left-0 top-0 h-full w-full md:w-[400px] bg-[#25262B] z-20 transition-transform duration-300 shadow-2xl flex flex-col border-r border-white/5 ${

@@ -45,8 +45,8 @@ export default function LoginCheckModal({ isOpen, onClose, onConfirm }: LoginChe
             </div>
 
             {/* 텍스트 */}
-            <h3 className="text-lg font-bold text-white mb-2">로그인 필요</h3>
-            <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+            <h3 className="text-2xl font-bold text-white mb-2">로그인 필요</h3>
+            <p className="text-gray-400 text-xm mb-6 leading-relaxed">
               로그인 후 사용할 수 있는 기능입니다.<br />
               로그인 하시겠습니까?
             </p>
@@ -55,13 +55,13 @@ export default function LoginCheckModal({ isOpen, onClose, onConfirm }: LoginChe
             <div className="flex gap-3 w-full">
               <button
                 onClick={onClose}
-                className="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm font-medium transition-colors"
+                className="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-gray-300 text-xm font-medium transition-colors"
               >
                 아니오
               </button>
               <button
                 onClick={onConfirm}
-                className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold transition-colors shadow-lg shadow-blue-500/20"
+                className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xm font-bold transition-colors shadow-lg shadow-blue-500/20"
               >
                 네
               </button>

@@ -71,6 +71,9 @@ export default function DashboardView({
     
     const [techLogos, setTechLogos] = useState<Record<string, string>>({});
 
+    // ✅ [추가] 선택 해제 시에도 마지막 색상으로 사라지게 하기 위한 상태
+    const [lastActiveFeedback, setLastActiveFeedback] = useState<AnalysisFeedback | null>(null);
+
     // 1. 기술 스택 로고 로딩
     useEffect(() => {
         const loadTechLogos = async () => {
@@ -227,17 +230,14 @@ export default function DashboardView({
         fetchAnalysis();
     }, [resumeId, selectedJobPostingId]);
 
-    // ✅ [수정] 타겟 텍스트 추출 로직 강화
     const extractTargetText = (text: string) => {
-        // 1. 따옴표로 감싸진 텍스트
+        if (!text) return "";
+        const bracketMatch = text.match(/^\s*\[\s*(?:'|")([^'"]+)(?:'|")\s*\]\s*$/);
+        if (bracketMatch) return bracketMatch[1];
         const quoteMatch = text.match(/(?:'|")([^'"]{3,})(?:'|")/);
         if (quoteMatch) return quoteMatch[1];
-        
-        // 2. 콜론(:) 뒤의 텍스트
         const colonMatch = text.split(/:\s*/);
         if (colonMatch.length > 1) return colonMatch[1];
-
-        // 3. 문장 전체 반환 (단, 너무 길면 앞부분만 자를 수도 있으나 일단 전체 반환)
         return text; 
     };
 
@@ -257,68 +257,112 @@ export default function DashboardView({
 
     const currentFeedbacks = useMemo(() => parseFeedbacks(analysisData), [analysisData]);
 
-    // ✅ [핵심 수정] 하이라이트 스타일을 즉시 적용 (애니메이션 최소화)
-    const getHighlightStyle = (type: string) => {
+    const getHighlightRGB = (type: string) => {
         switch (type) {
-            case 'strength': return { backgroundColor: 'rgba(37, 99, 235, 0.3)', fontWeight: 'bold', borderRadius: '4px', padding: '2px 0' };
-            case 'matching': return { backgroundColor: 'rgba(22, 163, 74, 0.3)', fontWeight: 'bold', borderRadius: '4px', padding: '2px 0' };
-            case 'improvement': return { backgroundColor: 'rgba(234, 88, 12, 0.3)', fontWeight: 'bold', borderRadius: '4px', padding: '2px 0' };
-            default: return {};
+            case 'strength': return '59, 130, 246'; // Blue
+            case 'matching': return '34, 197, 94'; // Green
+            case 'improvement': return '249, 115, 22'; // Orange
+            default: return '255, 255, 255';
         }
     };
 
-    // ✅ [핵심 수정] 정규식 기반의 강력한 텍스트 렌더링
+    const extractKeywords = (text: string) => {
+        if (!text) return [];
+        const words = text.match(/([a-zA-Z0-9+#]+|[가-힣]+)/g) || [];
+        return words.filter(w => w.length >= 2);
+    };
+
+    // ✅ [핵심] 마지막 선택된 피드백 기억 (사라지는 애니메이션 용)
+    useEffect(() => {
+        const current = currentFeedbacks.find(fb => fb.id === clickedFeedbackId);
+        if (current) {
+            setLastActiveFeedback(current);
+        }
+    }, [clickedFeedbackId, currentFeedbacks]);
+
+    // ✅ [핵심] 렌더링 로직 개선 (Transition 활용)
+    // 텍스트를 항상 문장 단위로 쪼개고, isActive 상태에 따라 스타일만 부드럽게 변경
     const renderHighlightedText = (text: string) => {
+        // 문장 분리 (메모이제이션 권장되나 텍스트가 짧아 직접 수행)
+        const sentences = text.split(/([.\n!?]+)/);
+
+        // 현재 활성화된 피드백이 없으면(선택 해제 시), 직전에 활성화되었던 피드백 정보를 사용해
+        // "어떤 단어를 칠했었는지"를 기억하고 있다가 색을 뺍니다.
         const activeFeedback = currentFeedbacks.find(fb => fb.id === clickedFeedbackId);
-        
-        if (!activeFeedback || !activeFeedback.targetText) {
+        const displayFeedback = activeFeedback || lastActiveFeedback;
+
+        if (!displayFeedback) {
             return <div className="text-gray-300 leading-relaxed whitespace-pre-wrap text-sm lg:text-base font-light">{text}</div>;
         }
 
-        // 1. Target Text의 특수문자 이스케이프 및 공백 유연화
-        // 예: "Docker\nContainer" 와 "Docker Container"를 같게 취급
-        const escapedTarget = activeFeedback.targetText
-            .replace(/[.*+?^${}()|[\]\\]/g, '\\$&') // 특수문자 처리
-            .replace(/\s+/g, '[\\s\\n\\r]+'); // 모든 공백을 정규식 공백으로 치환
-
-        // 2. 정규식 생성 (대소문자 무시)
-        const regex = new RegExp(`(${escapedTarget})`, 'gi');
-        const parts = text.split(regex);
-
-        // 3. 매칭 실패 시 Fallback (문장 단위 유사도)
-        if (parts.length === 1) {
-             const sentences = text.match(/[^.!?\n]+[.!?\n]+/g) || [text];
-             const targetWords = activeFeedback.targetText.replace(/[^\w\s가-힣]/g, '').split(/\s+/).filter(w => w.length > 1);
-             
-             return (
-                <div className="text-gray-300 leading-relaxed whitespace-pre-wrap text-sm lg:text-base font-light">
-                    {sentences.map((sentence, i) => {
-                        const matchCount = targetWords.filter(w => sentence.includes(w)).length;
-                        const isMatch = targetWords.length > 0 && (matchCount / targetWords.length) > 0.4;
-                        
-                        return (
-                            <span 
-                                key={i} 
-                                id={isMatch ? "highlighted-part" : undefined}
-                                style={isMatch ? getHighlightStyle(activeFeedback.type) : {}}
-                            >
-                                {sentence}
-                            </span>
-                        );
-                    })}
-                </div>
-             );
-        }
+        const sourceForKeywords = (displayFeedback.targetText && displayFeedback.targetText.length > 5) 
+            ? displayFeedback.targetText 
+            : displayFeedback.comment;
+            
+        const searchKeywords = extractKeywords(sourceForKeywords);
+        const highlightRGB = getHighlightRGB(displayFeedback.type);
 
         return (
             <div className="text-gray-300 leading-relaxed whitespace-pre-wrap text-sm lg:text-base font-light">
-                {parts.map((part, i) => {
-                    const isMatch = part.match(regex);
+                {sentences.map((part, i) => {
+                    if (!part || part.match(/^[.\n!?\s]+$/)) {
+                        return <span key={i}>{part}</span>;
+                    }
+
+                    const partKeywords = extractKeywords(part);
+                    const hasMatch = partKeywords.some(word => 
+                        searchKeywords.some(keyword => 
+                            word.toLowerCase().includes(keyword.toLowerCase()) || 
+                            keyword.toLowerCase().includes(word.toLowerCase())
+                        )
+                    );
+
+                    // ✅ 현재 선택된 상태인지 확인 (선택 해제되면 false가 되어 스타일이 빠짐)
+                    const isActive = !!activeFeedback && hasMatch;
+
+                    // 키워드가 포함된 문장은 항상 span으로 렌더링하되, 스타일을 동적으로 변경
+                    if (hasMatch || isActive) {
+                        return (
+                            <span 
+                                key={i}
+                                id={isActive ? "highlighted-part" : undefined}
+                                style={{
+                                    // 1. 배경 그라데이션 (항상 존재하지만 Size로 조절)
+                                    backgroundImage: `linear-gradient(to right, rgba(${highlightRGB}, 0.5) 0%, rgba(${highlightRGB}, 0.2) 100%)`,
+                                    backgroundRepeat: 'no-repeat',
+                                    backgroundPosition: 'left 85%', 
+                                    
+                                    // 2. 애니메이션 핵심: isActive면 100%, 아니면 0% (사라짐)
+                                    backgroundSize: isActive ? '100% 90%' : '0% 90%',
+                                    
+                                    // 3. 텍스트 스타일 변화
+                                    color: isActive ? '#ffffff' : 'rgba(209, 213, 219, 1)', // white <-> gray-300
+                                    fontWeight: isActive ? '600' : '300',
+                                    textShadow: isActive ? `0 0 10px rgba(${highlightRGB}, 0.8)` : 'none',
+                                    
+                                    // 4. 공통 스타일
+                                    borderRadius: '2px',
+                                    padding: '2px 0',
+                                    boxDecorationBreak: 'clone',
+                                    WebkitBoxDecorationBreak: 'clone',
+                                    
+                                    // 5. 부드러운 전환 (Transition)
+                                    transition: 'background-size 0.6s cubic-bezier(0.25, 1, 0.5, 1), color 0.4s ease, text-shadow 0.4s ease'
+                                }}
+                            >
+                                {part}
+                            </span>
+                        );
+                    }
+
+                    // 관련 없는 문장은 일반 텍스트 + 투명도 조절
                     return (
                         <span 
                             key={i} 
-                            id={isMatch ? "highlighted-part" : undefined}
-                            style={isMatch ? getHighlightStyle(activeFeedback.type) : {}}
+                            style={{ 
+                                opacity: activeFeedback ? 0.5 : 1, // 활성화된게 있으면 나머지는 흐리게, 없으면 선명하게
+                                transition: 'opacity 0.5s ease' 
+                            }}
                         >
                             {part}
                         </span>
@@ -328,12 +372,14 @@ export default function DashboardView({
         );
     };
 
-    // 자동 스크롤
+    // 하이라이트된 부분으로 자동 스크롤
     useEffect(() => {
         if (clickedFeedbackId) {
             setTimeout(() => {
                 const el = document.getElementById('highlighted-part');
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
             }, 100);
         }
     }, [clickedFeedbackId]);
@@ -355,7 +401,7 @@ export default function DashboardView({
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 lg:grid-cols-12 gap-4 w-full h-[calc(100vh-140px)] min-h-[600px]">
             {/* 좌측 패널 */}
             <div className="lg:col-span-3 flex flex-col gap-4 h-full min-h-0">
-                <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
+                <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden min-h-0">
                     <div className="flex bg-black/20 p-1 rounded-lg mb-4 shrink-0">
                         <button onClick={() => setCompanyListTab('favorites')} className={`flex-1 py-1.5 text-xs font-bold rounded-md ${companyListTab === 'favorites' ? 'bg-white/10 text-white' : 'text-gray-500'}`}>즐겨찾기</button>
                         <button onClick={() => setCompanyListTab('search')} className={`flex-1 py-1.5 text-xs font-bold rounded-md ${companyListTab === 'search' ? 'bg-white/10 text-white' : 'text-gray-500'}`}>검색</button>
@@ -395,7 +441,8 @@ export default function DashboardView({
                         ))}
                     </div>
                 </section>
-                <section className="h-[200px] shrink-0 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col">
+                
+                <section className="h-[250px] shrink-0 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col">
                     <h3 className="text-sm font-bold text-gray-400 mb-3 uppercase flex items-center gap-2"><Hash size={14}/> My Tech</h3>
                     <div className="flex flex-wrap gap-2 overflow-y-auto custom-scrollbar content-start">
                         {resumeKeywords.map((k, i) => (
@@ -417,8 +464,8 @@ export default function DashboardView({
                             <span className="text-orange-400 px-2 py-1 bg-orange-900/30 rounded text-sm">보완할 점</span>
                         </div>
                     </div>
-                    {/* ref 연결 및 하이라이트 텍스트 렌더링 */}
-                    <div ref={resumeViewerRef} className="flex-1 overflow-y-auto custom-scrollbar bg-[#1A1B1E] rounded-xl p-6 border border-white/5 shadow-inner">
+                    {/* ✅ 하이라이트 텍스트 렌더링 */}
+                    <div ref={resumeViewerRef} className="flex-1 overflow-y-auto custom-scrollbar bg-[#1A1B1E] rounded-xl p-6 border border-white/5 shadow-inner leading-relaxed">
                         {resumeText ? renderHighlightedText(resumeText) : <div className="text-center text-gray-500 py-10 text-sm">이력서 내용이 없습니다.</div>}
                     </div>
                 </section>
