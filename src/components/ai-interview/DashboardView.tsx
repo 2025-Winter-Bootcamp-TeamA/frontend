@@ -100,7 +100,24 @@ export default function DashboardView({
         loadTechLogos();
     }, []);
 
-    // 1.5 분석 완료된 채용공고 목록 로딩
+    // 1.5 컴포넌트 마운트 시 즐겨찾기 기업 ID 먼저 로딩
+    useEffect(() => {
+        const loadFavoriteCorpIds = async () => {
+            try {
+                const { getAuthTokens } = await import('@/lib/auth');
+                const { accessToken } = getAuthTokens();
+                if (!accessToken) return;
+                
+                const bookmarksResponse = await api.get('/jobs/corp-bookmarks/');
+                const bookmarks = bookmarksResponse.data.results || bookmarksResponse.data || [];
+                const favCorpIds = bookmarks.map((b: any) => b.corp?.id ?? b.corp_id).filter(Boolean);
+                setFavoriteCorpIds(new Set(favCorpIds));
+            } catch (error) { console.error('즐겨찾기 기업 ID 로딩 실패:', error); }
+        };
+        loadFavoriteCorpIds();
+    }, []);
+
+    // 1.6 분석 완료된 채용공고 목록 로딩
     useEffect(() => {
         const loadAnalyzedJobPostings = async () => {
             if (!resumeId) return;
