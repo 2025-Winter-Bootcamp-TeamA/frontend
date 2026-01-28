@@ -73,6 +73,7 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
     }
   }, []);
 
+  // ✅ [수정] 즐겨찾기 데이터 매핑 로직 수정 (tech_name 필드 추가 확인)
   useEffect(() => {
     const fetchFavorites = async () => {
         const { accessToken } = getAuthTokens();
@@ -88,6 +89,7 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
             
             const formattedFavorites = bookmarks.map((item: any) => {
                 const tech = item.tech_stack || item;
+                // ✅ 수정된 부분: tech_name 우선 확인 (FavoritesSection과 동일하게 맞춤)
                 const techName = tech.tech_name || tech.name || tech.tech_stack_name || "Unknown";
 
                 return {
@@ -405,7 +407,9 @@ export default function StackComparison({ initialBaseStack, allStacks, onBack }:
                                 <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
                             </motion.div>
 
-                            {/* ✅ [수정] 중앙 구분선 제거 */}
+                            {totalCount > 0 && (
+                                <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gray-900/50 -translate-x-1/2 z-20 blur-[1px]"></div>
+                            )}
                           </div>
                     </div>
                 </div>
