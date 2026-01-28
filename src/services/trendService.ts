@@ -48,10 +48,24 @@ const fetchAllPages = async (initialUrl: string): Promise<TechStackData[]> => {
     let nextUrl: string | null = initialUrl;
 
     try {
+        // 첫 페이지 요청
+        const initialResponse = await apiPublic.get(nextUrl);
+        const initialData = initialResponse.data;
+
+        // 응답이 페이지네이션 객체가 아닌 순수 배열인 경우 (pagination_class = None)
+        if (Array.isArray(initialData)) {
+            return initialData; // 전체 데이터를 바로 반환
+        }
+
+        // 페이지네이션 객체인 경우, 기존 로직 수행
+        if (initialData.results && Array.isArray(initialData.results)) {
+            allResults = [...allResults, ...initialData.results];
+        }
+        nextUrl = initialData.next;
+
+        // 다음 페이지가 있으면 계속 가져옴
         while (nextUrl) {
-            // nextUrl이 http로 시작하면 baseURL 무시됨 (정상 동작)
-            // apiPublic: AllowAny 엔드포인트, preflight 제거
-            const response: AxiosResponse<PaginatedResponse<TechStackData>> = await apiPublic.get(nextUrl);
+            const response = await apiPublic.get(nextUrl);
             const data = response.data;
 
             if (data.results && Array.isArray(data.results)) {
