@@ -25,7 +25,7 @@ interface DashboardViewProps {
 
 interface AnalysisFeedback {
     id: string;
-    type: 'strength' | 'improvement' | 'matching';
+    type: 'strength' | 'weakness' | 'enhancement';
     targetText?: string;
     comment: string;
 }
@@ -330,8 +330,8 @@ export default function DashboardView({
         if (!data) return [];
         const feedbacks: AnalysisFeedback[] = [];
         if (data.positive_feedback) feedbacks.push({ id: 'positive', type: 'strength', comment: data.positive_feedback, targetText: extractTargetText(data.positive_feedback) });
-        if (data.negative_feedback) feedbacks.push({ id: 'negative', type: 'improvement', comment: data.negative_feedback, targetText: extractTargetText(data.negative_feedback) });
-        if (data.enhancements_feedback) feedbacks.push({ id: 'enhancements', type: 'improvement', comment: data.enhancements_feedback, targetText: extractTargetText(data.enhancements_feedback) });
+        if (data.negative_feedback) feedbacks.push({ id: 'negative', type: 'weakness', comment: data.negative_feedback, targetText: extractTargetText(data.negative_feedback) });
+        if (data.enhancements_feedback) feedbacks.push({ id: 'enhancements', type: 'enhancement', comment: data.enhancements_feedback, targetText: extractTargetText(data.enhancements_feedback) });
         return feedbacks;
     };
 
@@ -344,9 +344,9 @@ export default function DashboardView({
 
     const getHighlightRGB = (type: string) => {
         switch (type) {
-            case 'strength': return '59, 130, 246'; // Blue
-            case 'matching': return '34, 197, 94'; // Green
-            case 'improvement': return '249, 115, 22'; // Orange
+            case 'strength': return '59, 130, 246'; // Blue (강점)
+            case 'weakness': return '249, 115, 22'; // Orange (약점)
+            case 'enhancement': return '34, 197, 94'; // Green (보완점)
             default: return '255, 255, 255';
         }
     };
@@ -483,7 +483,7 @@ export default function DashboardView({
     };
 
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 lg:grid-cols-12 gap-4 w-full h-[calc(100vh-140px)] min-h-[600px]">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 lg:grid-cols-12 gap-4 w-full h-[calc(100vh-100px)] min-h-[800px]">
             {/* 좌측 패널 */}
             <div className="lg:col-span-3 flex flex-col gap-4 h-full min-h-0">
                 <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden min-h-0">
@@ -566,7 +566,7 @@ export default function DashboardView({
                     </div>
                 </section>
                 
-                <section className="h-[250px] shrink-0 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col">
+                <section className="h-[180px] shrink-0 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col">
                     <h3 className="text-sm font-bold text-gray-400 mb-3 uppercase flex items-center gap-2"><Hash size={14}/> My Tech</h3>
                     <div className="flex flex-wrap gap-2 overflow-y-auto custom-scrollbar content-start">
                         {resumeKeywords.map((k, i) => (
@@ -580,17 +580,22 @@ export default function DashboardView({
 
             {/* 중앙 패널 */}
             <div className="lg:col-span-6 flex flex-col gap-4 h-full min-h-0">
-                <section className="h-[60%] bg-[#212226] border border-white/5 rounded-[24px] p-6 flex flex-col relative group">
+                <section className="h-[65%] bg-[#212226] border border-white/5 rounded-[24px] p-6 flex flex-col relative group">
                     <div className="flex justify-between items-center mb-4 shrink-0">
                         <h3 className="text-lg font-bold text-white flex items-center gap-2"><FileText size={18} className="text-blue-400"/> {resumeTitle}</h3>
                         <div className="flex gap-2 text-[10px] font-bold">
                             <span className="text-blue-400 px-2 py-1 bg-blue-900/30 rounded text-sm">강점</span>
-                            <span className="text-orange-400 px-2 py-1 bg-orange-900/30 rounded text-sm">보완할 점</span>
+                            <span className="text-orange-400 px-2 py-1 bg-orange-900/30 rounded text-sm">약점</span>
+                            <span className="text-green-400 px-2 py-1 bg-green-900/30 rounded text-sm">보완점</span>
                         </div>
                     </div>
-                    {/* ✅ 하이라이트 텍스트 렌더링 */}
+                    {/* 이력서 텍스트 렌더링 */}
                     <div ref={resumeViewerRef} className="flex-1 overflow-y-auto custom-scrollbar bg-[#1A1B1E] rounded-xl p-6 border border-white/5 shadow-inner leading-relaxed">
-                        {resumeText ? renderHighlightedText(resumeText) : <div className="text-center text-gray-500 py-10 text-sm">이력서 내용이 없습니다.</div>}
+                        {resumeText ? (
+                            <div className="text-gray-300 leading-relaxed whitespace-pre-wrap text-sm lg:text-base font-light">{resumeText}</div>
+                        ) : (
+                            <div className="text-center text-gray-500 py-10 text-sm">이력서 내용이 없습니다.</div>
+                        )}
                     </div>
                 </section>
                 <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-6 flex flex-col overflow-hidden">
@@ -612,7 +617,7 @@ export default function DashboardView({
                     <div className="flex justify-between items-center mb-4 shrink-0">
                         <h3 className="text-sm font-bold text-gray-400 uppercase flex items-center gap-2"><CheckCircle2 size={14}/> 이력서 세부 분석</h3>
                     </div>
-                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1">
+                    <div className="flex-1 overflow-y-auto space-y-3 pr-1 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                         {isLoadingAnalysis ? (
                             <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"/> <span className="text-xs">분석 중...</span></div>
                         ) : currentFeedbacks.length === 0 ? (
@@ -621,23 +626,28 @@ export default function DashboardView({
                             currentFeedbacks.map(fb => (
                                 <div 
                                     key={fb.id} 
-                                    onClick={() => handleFeedbackClick(fb.id)}
-                                    className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
-                                        clickedFeedbackId === fb.id 
-                                        ? (fb.type === 'strength' ? 'bg-blue-900/20 border-blue-500 ring-1 ring-blue-500' : fb.type === 'matching' ? 'bg-green-900/20 border-green-500 ring-1 ring-green-500' : 'bg-orange-900/20 border-orange-500 ring-1 ring-orange-500')
-                                        : 'bg-white/5 border-transparent hover:bg-white/10'
+                                    className={`p-4 rounded-xl border transition-all duration-200 ${
+                                        fb.type === 'strength' ? 'bg-blue-900/10 border-blue-500/30' : 
+                                        fb.type === 'weakness' ? 'bg-orange-900/10 border-orange-500/30' : 
+                                        'bg-green-900/10 border-green-500/30'
                                     }`}
                                 >
                                     <div className="flex items-center gap-2 mb-2">
                                         {fb.type === 'strength' && <TrendingUp size={14} className="text-blue-400"/>}
-                                        {fb.type === 'matching' && <CheckCircle2 size={14} className="text-green-400"/>}
-                                        {fb.type === 'improvement' && <AlertCircle size={14} className="text-orange-400"/>}
-                                        <span className={`text-xs font-bold uppercase ${fb.type==='strength'?'text-blue-400':fb.type==='matching'?'text-green-400':'text-orange-400'}`}>
-                                            {fb.type === 'strength' ? 'Strength' : fb.type === 'matching' ? 'Fit' : 'Suggestion'}
+                                        {fb.type === 'weakness' && <AlertCircle size={14} className="text-orange-400"/>}
+                                        {fb.type === 'enhancement' && <CheckCircle2 size={14} className="text-green-400"/>}
+                                        <span className={`text-xs font-bold ${fb.type==='strength'?'text-blue-400':fb.type==='weakness'?'text-orange-400':'text-green-400'}`}>
+                                            {fb.type === 'strength' ? 'STRENGTH' : fb.type === 'weakness' ? 'WEAKNESS' : 'SUGGESTION'}
                                         </span>
                                     </div>
-                                    <p className="text-sm text-gray-200">{fb.comment}</p>
-                                    {clickedFeedbackId !== fb.id && <div className="text-right mt-1"><Info size={10} className="inline text-gray-600"/></div>}
+                                    <div className="text-sm text-gray-200 space-y-2">
+                                        {fb.comment.split(/[•·]/).filter(item => item.trim()).map((item, idx) => (
+                                            <div key={idx} className="flex items-start gap-2">
+                                                <span className={`text-lg font-bold leading-tight ${fb.type==='strength'?'text-blue-400':fb.type==='weakness'?'text-orange-400':'text-green-400'}`}>•</span>
+                                                <span className="flex-1">{item.trim()}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             ))
                         )}
