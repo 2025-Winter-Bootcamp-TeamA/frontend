@@ -56,6 +56,7 @@ export default function DashboardView({
         negative_feedback?: string;
         enhancements_feedback?: string;
         question?: string;
+        answer?: string;
     } | null>(null);
     
     const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
@@ -70,7 +71,7 @@ export default function DashboardView({
     const [expandedCompanyIds, setExpandedCompanyIds] = useState<Set<number>>(new Set());
     
     const [techLogos, setTechLogos] = useState<Record<string, string>>({});
-    
+
     // 분석 완료된 채용공고 관련 상태
     const [analyzedJobPostingIds, setAnalyzedJobPostingIds] = useState<Set<number>>(new Set());
     const [recentAnalyzedJobs, setRecentAnalyzedJobs] = useState<Array<{
@@ -84,6 +85,13 @@ export default function DashboardView({
 
     // ✅ [추가] 선택 해제 시에도 마지막 색상으로 사라지게 하기 위한 상태
     const [lastActiveFeedback, setLastActiveFeedback] = useState<AnalysisFeedback | null>(null);
+
+    // 질문 팝업 상태
+    const [selectedQAIndex, setSelectedQAIndex] = useState<number | null>(null);
+
+    // 프로젝트 및 업무 경험 데이터
+    const [projectExperiences, setProjectExperiences] = useState<Array<{title: string, details: string}>>([]);
+    const [workExperiences, setWorkExperiences] = useState<Array<{title: string, details: string}>>([]);
 
     // 1. 기술 스택 로고 로딩
     useEffect(() => {
@@ -337,16 +345,31 @@ export default function DashboardView({
 
     const parseQuestions = (qStr?: string): string[] => {
         if (!qStr) return [];
-        return qStr.split('\n').map(q => q.trim()).filter(q => q.length > 0 && q.startsWith('-')).map(q => q.substring(1).trim());
+        return qStr.split('\n').map(q => q.trim()).filter(q => q.length > 0 && q.startsWith('-')).map(q => q.substring(1).trim()).slice(0, 5);
+    };
+
+    const parseAnswers = (aStr?: string): string[] => {
+        if (!aStr) return [];
+        return aStr.split('\n').map(a => a.trim()).filter(a => a.length > 0 && a.startsWith('-')).map(a => a.substring(1).trim()).slice(0, 5);
+    };
+
+    // 질문과 답변을 쌍으로 묶기
+    const getQAPairs = () => {
+        const questions = parseQuestions(analysisData?.question);
+        const answers = parseAnswers(analysisData?.answer);
+        return questions.map((q, i) => ({
+            question: q,
+            answer: answers[i] || '답변 없음'
+        }));
     };
 
     const currentFeedbacks = useMemo(() => parseFeedbacks(analysisData), [analysisData]);
 
     const getHighlightRGB = (type: string) => {
         switch (type) {
-            case 'strength': return '59, 130, 246'; // Blue (강점)
-            case 'weakness': return '249, 115, 22'; // Orange (약점)
-            case 'enhancement': return '34, 197, 94'; // Green (보완점)
+            case 'strength': return '96, 165, 250'; // Blue (강점)
+            case 'weakness': return '251, 146, 60'; // Orange (약점)
+            case 'enhancement': return '74, 222, 128'; // Green (보완점)
             default: return '255, 255, 255';
         }
     };
@@ -483,19 +506,19 @@ export default function DashboardView({
     };
 
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 lg:grid-cols-12 gap-4 w-full h-[calc(100vh-100px)] min-h-[800px]">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 lg:grid-cols-12 gap-4 w-full pb-8">
             {/* 좌측 패널 */}
-            <div className="lg:col-span-3 flex flex-col gap-4 h-full min-h-0">
-                <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden min-h-0">
+            <div className="lg:col-span-3 flex flex-col gap-4 h-fit">
+                <section className="h-[570px] bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
                     <div className="flex bg-black/20 p-1 rounded-lg mb-4 shrink-0">
-                        <button onClick={() => setCompanyListTab('favorites')} className={`flex-1 py-1.5 text-xs font-bold rounded-md ${companyListTab === 'favorites' ? 'bg-white/10 text-white' : 'text-gray-500'}`}>즐겨찾기</button>
-                        <button onClick={() => setCompanyListTab('search')} className={`flex-1 py-1.5 text-xs font-bold rounded-md ${companyListTab === 'search' ? 'bg-white/10 text-white' : 'text-gray-500'}`}>검색</button>
+                        <button onClick={() => setCompanyListTab('favorites')} className={`flex-1 py-1.5 text-sm font-bold rounded-md ${companyListTab === 'favorites' ? 'bg-white/10 text-white' : 'text-gray-500'}`}>즐겨찾기</button>
+                        <button onClick={() => setCompanyListTab('search')} className={`flex-1 py-1.5 text-sm font-bold rounded-md ${companyListTab === 'search' ? 'bg-white/10 text-white' : 'text-gray-500'}`}>검색</button>
                     </div>
                     {companyListTab === 'search' && (
                         <div className="relative mb-3 shrink-0">
-                            <input type="text" value={companySearchQuery} onChange={(e) => setCompanySearchQuery(e.target.value)} placeholder="기업명 검색" className="w-full pl-9 pr-8 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500" />
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                            {companySearchQuery && <button onClick={() => setCompanySearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><X size={14}/></button>}
+                            <input type="text" value={companySearchQuery} onChange={(e) => setCompanySearchQuery(e.target.value)} placeholder="기업명 검색" className="w-full pl-10 pr-9 py-2.5 bg-white/5 border border-white/10 rounded-lg text-base text-white focus:outline-none focus:border-blue-400" />
+                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            {companySearchQuery && <button onClick={() => setCompanySearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"><X size={16}/></button>}
                         </div>
                     )}
                     
@@ -509,14 +532,14 @@ export default function DashboardView({
                                         setSelectedJobPostingId(job.jobPostingId); 
                                         setSelectedCompany({ id: job.companyId, name: job.companyName, logo_url: job.companyLogo, jobPostingId: job.jobPostingId }); 
                                     }}
-                                    className={`p-2 rounded-lg border cursor-pointer flex items-center gap-2 ${selectedJobPostingId === job.jobPostingId ? 'border-green-500/50 bg-green-500/10' : 'border-white/5 bg-white/5 hover:bg-white/10'}`}
+                                    className={`p-2 rounded-lg border cursor-pointer flex items-center gap-2 ${selectedJobPostingId === job.jobPostingId ? 'border-green-500/50 bg-green-900/20' : 'border-white/5 bg-white/5 hover:bg-white/10'}`}
                                 >
                                     <div className="w-5 h-5 rounded bg-white p-0.5 flex items-center justify-center shrink-0">
-                                        {job.companyLogo ? <img src={job.companyLogo} alt="" className="w-full h-full object-contain"/> : <span className="text-black font-bold text-[8px]">{job.companyName[0]}</span>}
+                                        {job.companyLogo ? <img src={job.companyLogo} alt="" className="w-full h-full object-contain"/> : <span className="text-black font-bold text-[9px]">{job.companyName[0]}</span>}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-[10px] text-gray-500 truncate">{job.companyName}</div>
-                                        <div className="text-xs text-gray-300 truncate">{job.jobTitle}</div>
+                                        <div className="text-xs text-gray-500 truncate">{job.companyName}</div>
+                                        <div className="text-sm text-gray-300 truncate">{job.jobTitle}</div>
                                     </div>
                                     <CheckCircle2 size={12} className="text-green-400 shrink-0" />
                                 </div>
@@ -535,8 +558,8 @@ export default function DashboardView({
                                         {company.logo_url ? <img src={company.logo_url} alt="" className="w-full h-full object-contain"/> : <span className="text-black font-bold text-xs">{company.name[0]}</span>}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-bold text-gray-200 truncate">{company.name}</div>
-                                        <div className="text-[10px] text-gray-500">{company.jobPostings.length}개 공고</div>
+                                        <div className="text-base font-bold text-gray-200 truncate">{company.name}</div>
+                                        <div className="text-xs text-gray-500">{company.jobPostings.length}개 공고</div>
                                     </div>
                                     {isAllAnalyzed && <CheckCircle2 size={14} className="text-green-400 shrink-0" />}
                                     <ChevronDown size={14} className={`text-gray-500 transition-transform ${expandedCompanyIds.has(company.id) ? 'rotate-180' : ''}`} />
@@ -547,10 +570,10 @@ export default function DashboardView({
                                             {company.jobPostings.map(job => {
                                                 const isAnalyzed = job.isAnalyzed || analyzedJobPostingIds.has(job.id);
                                                 return (
-                                                    <div 
-                                                        key={job.id} 
-                                                        onClick={(e) => { e.stopPropagation(); setSelectedJobPostingId(job.id); setSelectedCompany({...company, jobPostingId: job.id}); }} 
-                                                        className={`p-2 rounded text-xs cursor-pointer flex items-center gap-1 ${selectedJobPostingId === job.id ? 'text-blue-300 bg-blue-500/10' : 'text-gray-400 hover:text-white'}`}
+                                                    <div
+                                                        key={job.id}
+                                                        onClick={(e) => { e.stopPropagation(); setSelectedJobPostingId(job.id); setSelectedCompany({...company, jobPostingId: job.id}); }}
+                                                        className={`p-2 rounded text-sm cursor-pointer flex items-center gap-1 ${selectedJobPostingId === job.id ? 'text-blue-300 bg-blue-900/20' : 'text-gray-400 hover:text-white'}`}
                                                     >
                                                         <span className="truncate flex-1">{job.title}</span>
                                                         {isAnalyzed && <CheckCircle2 size={12} className="text-green-400 shrink-0" />}
@@ -565,13 +588,13 @@ export default function DashboardView({
                         })}
                     </div>
                 </section>
-                
-                <section className="h-[180px] shrink-0 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col">
-                    <h3 className="text-sm font-bold text-gray-400 mb-3 uppercase flex items-center gap-2"><Hash size={14}/> My Tech</h3>
+
+                <section className="h-[330px] bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
+                    <h3 className="text-base font-bold text-gray-400 mb-3 uppercase flex items-center gap-2 shrink-0"><Hash size={16}/> My Tech</h3>
                     <div className="flex flex-wrap gap-2 overflow-y-auto custom-scrollbar content-start">
                         {resumeKeywords.map((k, i) => (
-                            <span key={i} className="px-2 py-1 bg-white/5 rounded border border-white/10 text-xs text-gray-300 flex items-center gap-1">
-                                {techLogos[k.toLowerCase()] && <img src={techLogos[k.toLowerCase()]} alt="" className="w-3 h-3 object-contain"/>} {k}
+                            <span key={i} className="px-2.5 py-1.5 bg-white/5 rounded border border-white/10 text-sm text-gray-300 flex items-center gap-1">
+                                {techLogos[k.toLowerCase()] && <img src={techLogos[k.toLowerCase()]} alt="" className="w-4 h-4 object-contain"/>} {k}
                             </span>
                         ))}
                     </div>
@@ -579,71 +602,130 @@ export default function DashboardView({
             </div>
 
             {/* 중앙 패널 */}
-            <div className="lg:col-span-6 flex flex-col gap-4 h-full min-h-0">
-                <section className="h-[65%] bg-[#212226] border border-white/5 rounded-[24px] p-6 flex flex-col relative group">
+            <div className="lg:col-span-6 flex flex-col gap-4 h-fit">
+                <section className="h-[500px] bg-[#212226] border border-white/5 rounded-[24px] p-6 flex flex-col relative group">
                     <div className="flex justify-between items-center mb-4 shrink-0">
-                        <h3 className="text-lg font-bold text-white flex items-center gap-2"><FileText size={18} className="text-blue-400"/> {resumeTitle}</h3>
-                        <div className="flex gap-2 text-[10px] font-bold">
-                            <span className="text-blue-400 px-2 py-1 bg-blue-900/30 rounded text-sm">강점</span>
-                            <span className="text-orange-400 px-2 py-1 bg-orange-900/30 rounded text-sm">약점</span>
-                            <span className="text-green-400 px-2 py-1 bg-green-900/30 rounded text-sm">보완점</span>
+                        <h3 className="text-xl font-bold text-white flex items-center gap-2"><FileText size={20} className="text-blue-400"/> {resumeTitle}</h3>
+                        <div className="flex gap-2 font-bold">
+                            <span className="text-blue-400 px-2.5 py-1.5 bg-blue-900/25 rounded text-sm">강점</span>
+                            <span className="text-orange-400 px-2.5 py-1.5 bg-orange-900/25 rounded text-sm">약점</span>
+                            <span className="text-green-400 px-2.5 py-1.5 bg-green-900/25 rounded text-sm">보완점</span>
                         </div>
                     </div>
                     {/* 이력서 텍스트 렌더링 */}
                     <div ref={resumeViewerRef} className="flex-1 overflow-y-auto custom-scrollbar bg-[#1A1B1E] rounded-xl p-6 border border-white/5 shadow-inner leading-relaxed">
                         {resumeText ? (
-                            <div className="text-gray-300 leading-relaxed whitespace-pre-wrap text-sm lg:text-base font-light">{resumeText}</div>
+                            <div className="text-gray-300 leading-relaxed whitespace-pre-wrap text-base lg:text-lg font-light">{resumeText}</div>
                         ) : (
-                            <div className="text-center text-gray-500 py-10 text-sm">이력서 내용이 없습니다.</div>
+                            <div className="text-center text-gray-500 py-10 text-base">이력서 내용이 없습니다.</div>
                         )}
                     </div>
                 </section>
-                <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-6 flex flex-col overflow-hidden">
-                    <h3 className="text-sm font-bold text-purple-400 mb-3 uppercase flex items-center gap-2 shrink-0"><HelpCircle size={16}/> AI 예상 질문</h3>
-                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
-                        {analysisData?.question ? parseQuestions(analysisData.question).map((q, i) => (
-                            <div key={i} className="bg-purple-500/5 border border-purple-500/10 p-3 rounded-xl flex gap-3">
-                                <span className="text-purple-400 font-bold text-xs mt-0.5">Q{i+1}</span>
-                                <p className="text-gray-300 text-sm">{q}</p>
+                <section className="h-[400px] bg-[#212226] border border-white/5 rounded-[24px] p-6 flex flex-col">
+                    <div className="flex justify-between items-center mb-4 shrink-0">
+                        <h3 className="text-base font-bold text-gray-400 mb-0 uppercase flex items-center gap-2"><HelpCircle size={18}/> AI 예상 질문</h3>
+
+                        {/* 질문 버튼 목록 - 오른쪽 상단 */}
+                        <div className="flex flex-wrap gap-1.5 justify-end">
+                            {analysisData?.question ? getQAPairs().map((_, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => setSelectedQAIndex(i)}
+                                    className={`w-8 h-8 bg-white/5 hover:bg-white/10 border rounded-lg transition-all flex items-center justify-center ${
+                                        selectedQAIndex === i ? 'border-gray-400 bg-white/15' : 'border-white/10 hover:border-white/20'
+                                    }`}
+                                >
+                                    <span className="text-gray-400 font-semibold text-xs">
+                                        Q{i+1}
+                                    </span>
+                                </button>
+                            )) : null}
+                        </div>
+                    </div>
+
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        {/* 질문 내용 표시 영역 */}
+                        <div className="bg-purple-900/20 border border-purple-500/30 rounded-2xl p-5 mb-3 h-[140px] flex flex-col">
+                            <div className="flex items-start gap-3 h-full">
+                                <span className="w-10 h-10 bg-purple-500/30 rounded-xl flex items-center justify-center text-purple-400 font-bold text-sm shrink-0">
+                                    Q
+                                </span>
+                                <div className="flex-1 flex flex-col min-h-0">
+                                    <span className="text-purple-400 text-sm font-bold uppercase mb-3 block shrink-0">Question</span>
+                                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                        <div className="pb-3">
+                                            {selectedQAIndex !== null && analysisData?.question ? (
+                                                <p className="text-gray-200 text-base leading-relaxed">
+                                                    {getQAPairs()[selectedQAIndex]?.question}
+                                                </p>
+                                            ) : (
+                                                <p className="text-gray-500 text-base">질문을 선택해주세요</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        )) : <div className="h-full flex items-center justify-center text-gray-500 text-xs">분석 완료 시 질문이 표시됩니다.</div>}
+                        </div>
+
+                        {/* 답변 내용 표시 영역 */}
+                        <div className="bg-green-900/20 border border-green-500/30 rounded-2xl p-5 h-[140px] flex flex-col mb-4">
+                            <div className="flex items-start gap-3 h-full">
+                                <span className="w-10 h-10 bg-green-500/30 rounded-xl flex items-center justify-center text-green-400 font-bold text-sm shrink-0">
+                                    A
+                                </span>
+                                <div className="flex-1 flex flex-col min-h-0">
+                                    <span className="text-green-400 text-sm font-bold uppercase mb-3 block shrink-0">Answer</span>
+                                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                        <div className="pb-3">
+                                            {selectedQAIndex !== null && analysisData?.answer ? (
+                                                <p className="text-gray-200 text-base leading-relaxed">
+                                                    {getQAPairs()[selectedQAIndex]?.answer}
+                                                </p>
+                                            ) : (
+                                                <p className="text-gray-500 text-base">답변을 확인하려면 질문을 선택해주세요</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </section>
             </div>
 
             {/* 우측 패널 */}
-            <div className="lg:col-span-3 h-full min-h-0 flex flex-col">
-                <section className="flex-1 bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
+            <div className="lg:col-span-3 flex flex-col h-fit">
+                <section className="h-[916px] bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
                     <div className="flex justify-between items-center mb-4 shrink-0">
-                        <h3 className="text-sm font-bold text-gray-400 uppercase flex items-center gap-2"><CheckCircle2 size={14}/> 이력서 세부 분석</h3>
+                        <h3 className="text-base font-bold text-gray-400 uppercase flex items-center gap-2"><CheckCircle2 size={16}/> 이력서 세부 분석</h3>
                     </div>
                     <div className="flex-1 overflow-y-auto space-y-3 pr-1 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                         {isLoadingAnalysis ? (
-                            <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"/> <span className="text-xs">분석 중...</span></div>
+                            <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"/> <span className="text-sm">분석 중...</span></div>
                         ) : currentFeedbacks.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2"><Info size={20}/><span className="text-xs">데이터 없음</span></div>
+                            <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2"><Info size={20}/><span className="text-sm">데이터 없음</span></div>
                         ) : (
                             currentFeedbacks.map(fb => (
-                                <div 
-                                    key={fb.id} 
+                                <div
+                                    key={fb.id}
                                     className={`p-4 rounded-xl border transition-all duration-200 ${
-                                        fb.type === 'strength' ? 'bg-blue-900/10 border-blue-500/30' : 
-                                        fb.type === 'weakness' ? 'bg-orange-900/10 border-orange-500/30' : 
-                                        'bg-green-900/10 border-green-500/30'
+                                        fb.type === 'strength' ? 'bg-blue-900/20 border-blue-500/30' :
+                                        fb.type === 'weakness' ? 'bg-orange-900/20 border-orange-500/30' :
+                                        'bg-green-900/20 border-green-500/30'
                                     }`}
                                 >
                                     <div className="flex items-center gap-2 mb-2">
-                                        {fb.type === 'strength' && <TrendingUp size={14} className="text-blue-400"/>}
-                                        {fb.type === 'weakness' && <AlertCircle size={14} className="text-orange-400"/>}
-                                        {fb.type === 'enhancement' && <CheckCircle2 size={14} className="text-green-400"/>}
-                                        <span className={`text-xs font-bold ${fb.type==='strength'?'text-blue-400':fb.type==='weakness'?'text-orange-400':'text-green-400'}`}>
+                                        {fb.type === 'strength' && <TrendingUp size={16} className="text-blue-400"/>}
+                                        {fb.type === 'weakness' && <AlertCircle size={16} className="text-orange-400"/>}
+                                        {fb.type === 'enhancement' && <CheckCircle2 size={16} className="text-green-400"/>}
+                                        <span className={`text-sm font-bold ${fb.type==='strength'?'text-blue-400':fb.type==='weakness'?'text-orange-400':'text-green-400'}`}>
                                             {fb.type === 'strength' ? 'STRENGTH' : fb.type === 'weakness' ? 'WEAKNESS' : 'SUGGESTION'}
                                         </span>
                                     </div>
-                                    <div className="text-sm text-gray-200 space-y-2">
-                                        {fb.comment.split(/[•·]/).filter(item => item.trim()).map((item, idx) => (
+                                    <div className="text-base text-gray-200 space-y-2">
+                                        {fb.comment.split(/[•·]/).filter(item => item.trim()).slice(0, 3).map((item, idx) => (
                                             <div key={idx} className="flex items-start gap-2">
-                                                <span className={`text-lg font-bold leading-tight ${fb.type==='strength'?'text-blue-400':fb.type==='weakness'?'text-orange-400':'text-green-400'}`}>•</span>
+                                                <span className={`text-xl font-bold leading-tight ${fb.type==='strength'?'text-blue-400':fb.type==='weakness'?'text-orange-400':'text-green-400'}`}>•</span>
                                                 <span className="flex-1">{item.trim()}</span>
                                             </div>
                                         ))}
