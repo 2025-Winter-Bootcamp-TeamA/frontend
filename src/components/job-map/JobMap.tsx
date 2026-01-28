@@ -275,7 +275,7 @@ export default function JobMap() {
     }
   }, [debouncedCareer, debouncedJobSearch, debouncedCity, debouncedDistrict, allCompanies]);
 
-  // 3. 최종 리스트 계산
+  // 3. 최종 리스트 계산 (사이드바용)
   const finalCompanies = useMemo(() => {
     let result = companies;
     if (activeTab === "favorites") {
@@ -289,13 +289,24 @@ export default function JobMap() {
     return result;
   }, [companies, activeTab, favoriteCompanyIds, searchQuery]);
 
+  // 지도에 표시할 기업 목록 (검색어만 반영)
+  const mapCompanies = useMemo(() => {
+    let result = companies;
+    if (searchQuery) {
+      result = result.filter(c =>
+        c.name && c.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    return result;
+  }, [companies, searchQuery]);
+
   // 4. 지도 뷰포트 내 마커 필터링
   const updateVisibleCompanies = useCallback(() => {
     if (!map) return;
     const bounds = map.getBounds();
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
-    const visible = finalCompanies.filter((company) => {
+    const visible = mapCompanies.filter((company) => {
       return (
         company.latitude >= sw.getLat() &&
         company.latitude <= ne.getLat() &&
@@ -304,7 +315,7 @@ export default function JobMap() {
       );
     });
     setVisibleCompanies(visible);
-  }, [map, finalCompanies]);
+  }, [map, mapCompanies]);
 
   useEffect(() => {
     updateVisibleCompanies();
@@ -821,10 +832,28 @@ export default function JobMap() {
                             <div className={`w-3 h-3 rounded-full shadow-lg transition-all ${favoriteCompanyIds.includes(company.id) ? "bg-yellow-500 scale-125" : "bg-blue-600"}`} />
                         ) : (
                             <>
-                                <div className={`w-10 h-10 rounded-full border-2 border-blue-600 shadow-xl flex items-center justify-center bg-white transition-all duration-300 ${selectedCompany?.id === company.id ? "!border-blue-500 scale-125 ring-4 ring-blue-500/20" : ""}`}>
-                                    {company.logo_url ? <img src={company.logo_url} alt={company.name} className="w-full h-full object-contain rounded-full p-1.5" /> : <Building2 size={16} className="text-gray-400" />}
-                                </div>
-                                <div className={`w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] -mt-0.5 transition-colors ${selectedCompany?.id === company.id ? "border-t-blue-500" : "border-t-blue-600"}`} />
+                                {/* 즐겨찾기 상태에 따라 마커 색상 변경 */}
+                                {(() => {
+                                    const isFavorite = favoriteCompanyIds.includes(company.id);
+                                    const isSelected = selectedCompany?.id === company.id;
+                                    const borderColorClass = isFavorite
+                                        ? (isSelected ? "!border-yellow-500" : "border-yellow-500")
+                                        : (isSelected ? "!border-blue-500" : "border-blue-600");
+                                    const ringClass = isSelected
+                                        ? "scale-125 ring-4 " + (isFavorite ? "ring-yellow-500/20" : "ring-blue-500/20")
+                                        : "";
+                                    const pointerColorClass = isFavorite
+                                        ? (isSelected ? "border-t-yellow-500" : "border-t-yellow-600")
+                                        : (isSelected ? "border-t-blue-500" : "border-t-blue-600");
+                                    return (
+                                        <>
+                                            <div className={`w-10 h-10 rounded-full border-2 ${borderColorClass} shadow-xl flex items-center justify-center bg-white transition-all duration-300 ${ringClass}`}>
+                                                {company.logo_url ? <img src={company.logo_url} alt={company.name} className="w-full h-full object-contain rounded-full p-1.5" /> : <Building2 size={16} className="text-gray-400" />}
+                                            </div>
+                                            <div className={`w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] -mt-0.5 transition-colors ${pointerColorClass}`} />
+                                        </>
+                                    );
+                                })()}
                             </>
                         )}
                     </div>
