@@ -1,28 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Info, ArrowRightCircle, Share2, Quote } from "lucide-react";
+import { X, Info, ArrowRightCircle, Share2, ZoomIn, ZoomOut, Maximize } from "lucide-react";
 import { RelatedTechStackRelation } from "@/services/trendService";
 
-// ✅ Props 타입 정의
 interface StackRelationAnalysisProps {
   mainStackName: string;
   mainLogo: string;
-  mainStackDescription?: string; // 기술 설명
+  mainStackDescription?: string; 
   relatedStacks: RelatedTechStackRelation[];
   onClose: () => void;
   onStackSelect?: (stackId: number) => void;
 }
 
-// ✅ [오류 해결] 함수 직접 정의
 const getExternalLogoUrl = (name: string) => {
   if (!name) return "";
   const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '');
   return `https://cdn.simpleicons.org/${slug}`;
 };
 
-// 이미지 에러 핸들러
 const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, name: string) => {
   const target = e.target as HTMLImageElement;
   target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&size=128&bold=true`;
@@ -38,16 +35,20 @@ export default function StackRelationAnalysis({
 }: StackRelationAnalysisProps) {
   
   const [focusedNode, setFocusedNode] = useState<RelatedTechStackRelation | null>(null);
-  
-  // 데이터 변경 시 초기화
+  const [scale, setScale] = useState(1);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     setFocusedNode(null);
+    setScale(1); 
   }, [relatedStacks.length, mainStackName]);
   
-  // 가중치 순 정렬
   const sortedByWeight = [...relatedStacks].sort((a, b) => b.weight - a.weight);
   
-  // 선택된 노드 상세 정보
+  const weights = sortedByWeight.map(r => r.weight);
+  const maxWeight = weights.length > 0 ? Math.max(...weights) : 1;
+  const minWeight = weights.length > 0 ? Math.min(...weights) : 0;
+
   const activeDetail = focusedNode ? {
     name: focusedNode.tech_stack.name,
     role: focusedNode.relationship_type_display,
@@ -57,66 +58,122 @@ export default function StackRelationAnalysis({
     id: focusedNode.tech_stack.id
   } : null;
 
+  const handleZoom = (delta: number) => {
+    setScale(prev => Math.min(Math.max(0.5, prev + delta), 2.0));
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.deltaY < 0) {
+        handleZoom(0.1); 
+    } else {
+        handleZoom(-0.1); 
+    }
+  };
+
   return (
     <div className="w-full h-full min-h-[500px] flex flex-col md:flex-row bg-[#25262B]/50 rounded-[32px] overflow-hidden border border-gray-800 relative">
-      <button onClick={onClose} className="absolute top-4 right-4 z-50 text-gray-500 hover:text-white bg-gray-900/50 p-2 rounded-full">
+      
+      <style jsx global>{`
+          .hover-scroll {
+              overflow-y: auto;
+              scrollbar-width: thin;
+              scrollbar-color: transparent transparent;
+              transition: scrollbar-color 0.3s ease;
+          }
+          .hover-scroll:hover {
+              scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+          }
+          .hover-scroll::-webkit-scrollbar {
+              width: 6px;
+          }
+          .hover-scroll::-webkit-scrollbar-track {
+              background: transparent;
+          }
+          .hover-scroll::-webkit-scrollbar-thumb {
+              background-color: transparent;
+              border-radius: 10px;
+              transition: background-color 0.3s ease-in-out;
+          }
+          .hover-scroll:hover::-webkit-scrollbar-thumb {
+              background-color: rgba(255, 255, 255, 0.2);
+          }
+      `}</style>
+
+      <button onClick={onClose} className="absolute top-4 right-4 z-50 text-gray-500 hover:text-white bg-gray-900/50 p-2 rounded-full transition-colors hover:bg-gray-800">
         <X className="w-5 h-5" />
       </button>
 
-      {/* LEFT: Graph & Info */}
-      <div className="flex-1 relative flex items-center justify-center bg-gradient-to-br from-[#1A1B1E] to-[#141517]">
-        <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#4b5563 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+      {/* LEFT: Graph Area */}
+      <div 
+        className="flex-1 relative flex items-center justify-center bg-gradient-to-br from-[#1A1B1E] to-[#141517] overflow-hidden cursor-move active:cursor-grabbing" 
+        ref={containerRef}
+        onWheel={handleWheel} 
+      >
+        <div className="absolute inset-0 opacity-20 pointer-events-none" 
+             style={{ 
+                 backgroundImage: 'radial-gradient(#4b5563 1px, transparent 1px)', 
+                 backgroundSize: '32px 32px' 
+             }} 
+        />
         
-        {/* 왼쪽 위: 기술 설명 */}
         <div className="absolute top-6 left-6 z-40 max-w-xs pointer-events-none">
             <div className="flex items-center gap-2 mb-2">
-                <span className="text-blue-400 text-x font-bold uppercase tracking-wider"> 연관 기술 스택 맵</span>
+                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                <span className="text-blue-400 text-xm font-bold uppercase tracking-wider">연관 기술 스택</span>
             </div>
         </div>
 
-        {/* Graph Area */}
-        <div className="relative w-full h-full flex items-center justify-center p-10 overflow-hidden">
-            {/* Center Node (Main) */}
+        <div className="absolute bottom-6 left-6 z-40 flex flex-col gap-2 bg-gray-900/80 rounded-xl p-2 border border-white/10 backdrop-blur-md shadow-xl">
+            <button onClick={() => handleZoom(0.1)} className="p-2 hover:bg-white/10 rounded-lg text-white transition-colors" title="확대"><ZoomIn size={18}/></button>
+            <button onClick={() => setScale(1)} className="p-2 hover:bg-white/10 rounded-lg text-white transition-colors" title="초기화"><Maximize size={18}/></button>
+            <button onClick={() => handleZoom(-0.1)} className="p-2 hover:bg-white/10 rounded-lg text-white transition-colors" title="축소"><ZoomOut size={18}/></button>
+        </div>
+
+        <div 
+            className="relative w-full h-full flex items-center justify-center transition-transform duration-500 cubic-bezier(0.25, 0.1, 0.25, 1)"
+            style={{ transform: `scale(${scale})`, transformOrigin: 'center' }}
+        >
+            {/* Center Node (Fixed Main) */}
             <motion.div 
                 className="absolute z-30 flex flex-col items-center justify-center cursor-default"
+                initial={{ scale: 0, opacity: 0 }}
                 animate={{ 
-                    scale: focusedNode ? 0.8 : 1.1, 
-                    opacity: focusedNode ? 0.4 : 1, 
-                    filter: focusedNode ? "grayscale(100%)" : "grayscale(0%)" 
+                    scale: focusedNode ? 0.9 : 1, 
+                    opacity: focusedNode ? 0.5 : 1, 
+                    filter: focusedNode ? "grayscale(100%) blur(1px)" : "grayscale(0%) blur(0px)" 
                 }}
+                transition={{ type: "spring", bounce: 0.5, duration: 0.8 }}
             >
-                <div className="w-24 h-24 bg-gray-900 rounded-full border-4 border-blue-600 shadow-[0_0_40px_rgba(37,99,235,0.4)] flex items-center justify-center overflow-hidden p-2">
-                    {mainLogo ? (
-                        <img 
-                            src={mainLogo} 
-                            alt={mainStackName} 
-                            className="w-full h-full object-contain"
-                            onError={(e) => handleImageError(e, mainStackName)}
-                        />
-                    ) : (
-                        <span className="text-white font-bold text-lg">{mainStackName.substring(0, 2).toUpperCase()}</span>
-                    )}
+                <div className="relative">
+                    <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-ping" />
+                    <div className="w-32 h-32 bg-[#1A1B1E] rounded-full border-4 border-blue-500 shadow-[0_0_60px_rgba(37,99,235,0.4)] flex items-center justify-center overflow-hidden p-6 relative z-10">
+                        {mainLogo ? (
+                            <img 
+                                src={mainLogo} 
+                                alt={mainStackName} 
+                                className="w-full h-full object-contain drop-shadow-lg"
+                                onError={(e) => handleImageError(e, mainStackName)}
+                            />
+                        ) : (
+                            <span className="text-white font-bold text-2xl">{mainStackName.substring(0, 2).toUpperCase()}</span>
+                        )}
+                    </div>
                 </div>
-                <span className="mt-3 text-lg font-bold text-white tracking-wide">{mainStackName}</span>
+                {/* Center Node Text Size: text-2xl (24px) */}
+                <span className="mt-4 text-2xl font-bold text-white tracking-tight drop-shadow-lg bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm border border-white/5">{mainStackName}</span>
             </motion.div>
 
             {/* Related Nodes */}
             {sortedByWeight.map((relation, index) => {
                 const totalNodes = sortedByWeight.length;
+                const angle = totalNodes === 1 ? -Math.PI / 2 : (index / totalNodes) * 2 * Math.PI - Math.PI / 2;
                 
-                // ✅ [핵심 로직] 노드 배치 계산
-                // 1. 각도 계산 (균등 분배)
-                // 노드가 1개일 때는 위쪽(-90도)에 배치
-                const angle = totalNodes === 1 ? -Math.PI / 2 : (index / totalNodes) * 2 * Math.PI;
-                
-                // 2. 거리(Radius) 계산: 지그재그 배치 (길게-짧게)
-                // 노드가 5개 미만이면 그냥 일정하게, 많으면 지그재그로
-                const baseRadius = 180;
+                const baseRadius = 240; 
                 let currentRadius = baseRadius;
-                
-                if (totalNodes > 5) {
-                    // 짝수 인덱스는 멀리(240), 홀수 인덱스는 가까이(150)
-                    currentRadius = index % 2 === 0 ? 240 : 150;
+                if (totalNodes > 8) {
+                    currentRadius = index % 2 === 0 ? 300 : 200;
+                } else if (totalNodes > 4) {
+                    currentRadius = 260;
                 }
 
                 const x = Math.cos(angle) * currentRadius;
@@ -126,47 +183,105 @@ export default function StackRelationAnalysis({
                 const isDimmed = focusedNode !== null && !isSelected;
                 const stack = relation.tech_stack;
 
+                // 노드 기본 크기 계산
+                let sizeRatio = 0;
+                if (maxWeight !== minWeight) {
+                    sizeRatio = (relation.weight - minWeight) / (maxWeight - minWeight);
+                } else {
+                    sizeRatio = 1; 
+                }
+                const nodeSize = 45 + (sizeRatio * 45); // 최소 45px ~ 최대 90px
+
+                // ✅ 중앙 노드(128px)에 맞추기 위한 노드 스케일 계산
+                const targetCenterSize = 128; 
+                const selectedScale = targetCenterSize / nodeSize;
+
+                // ✅ 텍스트 크기 보정 계산
+                // 목표: 최종적으로 중앙 노드 텍스트(24px, text-2xl)와 같아져야 함.
+                // 현재 텍스트(12px) * 부모스케일(selectedScale) * 텍스트보정 = 24px
+                // 텍스트보정 = 24 / (12 * selectedScale) = 2 / selectedScale
+                const textScaleCorrection = 2.0 / selectedScale;
+
                 return (
                     <motion.div
                         key={`node-${stack.id}-${index}`}
                         className="absolute z-20"
-                        initial={{ x: 0, y: 0, opacity: 0 }}
+                        initial={{ x: 0, y: 0, opacity: 0, scale: 0 }}
                         animate={{ 
                             x: isSelected ? 0 : x, 
                             y: isSelected ? 0 : y, 
-                            scale: isSelected ? 1.4 : (isDimmed ? 0.8 : 1), 
-                            opacity: isDimmed ? 0.2 : 1, 
-                            zIndex: isSelected ? 50 : 20 
+                            scale: isSelected ? selectedScale : (isDimmed ? 0.8 : 1), 
+                            opacity: isDimmed ? 0.3 : 1, 
+                            zIndex: isSelected ? 50 : 20,
+                            translateY: isSelected ? 0 : [0, -5, 0]
                         }}
-                        transition={{ type: "spring", stiffness: 80, damping: 15 }}
+                        transition={{ 
+                            type: "spring", 
+                            stiffness: 60, 
+                            damping: 12, 
+                            delay: index * 0.05, 
+                            translateY: {
+                                duration: 3 + Math.random() * 2, 
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                                delay: Math.random() * 2
+                            }
+                        }}
                         onClick={() => setFocusedNode(isSelected ? null : relation)}
                     >
-                        {/* 연결선 (Line) */}
-                        <svg className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] pointer-events-none -z-10 overflow-visible">
+                        {/* Connecting Line */}
+                        <svg className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] pointer-events-none -z-10 overflow-visible">
                             <motion.line 
-                                x1="300" 
-                                y1="300" 
-                                x2={300 - (isSelected ? 0 : x)} 
-                                y2={300 - (isSelected ? 0 : y)} 
+                                x1="500" 
+                                y1="500" 
+                                x2="500" 
+                                y2="500"
+                                animate={{
+                                    x2: 500 - (isSelected ? 0 : x),
+                                    y2: 500 - (isSelected ? 0 : y),
+                                    strokeOpacity: isSelected ? 0 : (isDimmed ? 0.1 : 0.4)
+                                }}
                                 stroke="#3b82f6" 
-                                strokeWidth={Math.max(1, relation.weight / 2)} 
-                                animate={{ strokeOpacity: isSelected ? 0 : (isDimmed ? 0.1 : 0.3) }} 
+                                strokeWidth={Math.max(1, relation.weight / 3)} 
+                                strokeLinecap="round"
+                                transition={{ duration: 0.8, delay: index * 0.05 }}
                             />
                         </svg>
 
-                        {/* 노드 아이콘 및 텍스트 */}
-                        <div className={`flex flex-col items-center gap-2 cursor-pointer group transition-all duration-300 ${isSelected ? 'scale-110' : ''}`}>
-                            <div className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg border-2 transition-colors duration-300 overflow-hidden p-1.5 ${isSelected ? 'bg-blue-600 border-white shadow-blue-500/50' : 'bg-[#2C2E33] border-gray-600 group-hover:border-blue-400 group-hover:bg-gray-800'}`}>
-                                <img 
-                                    src={stack.logo || getExternalLogoUrl(stack.name)} 
-                                    alt={stack.name} 
-                                    className="w-full h-full object-contain"
-                                    onError={(e) => handleImageError(e, stack.name)}
-                                />
+                        {/* Node Circle & Text Container */}
+                        <div className={`flex flex-col items-center gap-3 cursor-pointer group`}>
+                            <div 
+                                style={{ width: nodeSize, height: nodeSize }}
+                                className={`rounded-full flex items-center justify-center border-2 transition-all duration-300 relative ${
+                                    isSelected 
+                                    ? 'bg-blue-600 border-white shadow-[0_0_30px_rgba(59,130,246,0.6)]' 
+                                    : 'bg-[#2C2E33] border-gray-600 hover:border-blue-400 hover:bg-gray-800 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)]'
+                                }`}
+                            >
+                                <div className="w-[60%] h-[60%] flex items-center justify-center">
+                                    <img 
+                                        src={stack.logo || getExternalLogoUrl(stack.name)} 
+                                        alt={stack.name} 
+                                        className="w-full h-full object-contain filter drop-shadow-md"
+                                        onError={(e) => handleImageError(e, stack.name)}
+                                    />
+                                </div>
                             </div>
-                            <span className={`text-[14px] font-bold px-2 py-0.5 rounded-full border transition-all whitespace-nowrap ${isSelected ? 'bg-white text-blue-900 border-white scale-110' : 'text-gray-400 bg-gray-900/80 border-gray-700 group-hover:text-white'}`}>
+                            
+                            {/* ✅ 텍스트 애니메이션 적용: 선택 시 부모 스케일에 맞춰 역보정하여 최종 24px로 만듦 */}
+                            <motion.span 
+                                animate={{ 
+                                    scale: isSelected ? textScaleCorrection : 1,
+                                    y: isSelected ? 10 : 0 // 선택됐을 때 원과의 거리를 살짝 조정 (중앙 노드 mt-4 효과)
+                                }}
+                                className={`text-[12px] font-bold px-3 py-1 rounded-full border backdrop-blur-md transition-colors whitespace-nowrap shadow-sm ${
+                                    isSelected 
+                                    ? 'bg-black/30 text-white border-white/5 shadow-lg' 
+                                    : 'text-gray-300 bg-black/40 border-white/10 group-hover:bg-blue-900/40 group-hover:text-white group-hover:border-blue-400/50'
+                                }`}
+                            >
                                 {stack.name}
-                            </span>
+                            </motion.span>
                         </div>
                     </motion.div>
                 );
@@ -177,14 +292,15 @@ export default function StackRelationAnalysis({
       {/* RIGHT: Detail Panel */}
       <AnimatePresence mode="wait">
         <motion.div 
-            className="w-full md:w-[320px] bg-[#1A1B1E] border-l border-gray-800 p-6 flex flex-col overflow-y-auto custom-scrollbar" 
-            initial={{ x: 50, opacity: 0 }} 
+            className="w-full md:w-[320px] bg-[#1A1B1E] border-l border-gray-800 p-6 flex flex-col hover-scroll relative z-50 shadow-[-10px_0_30px_rgba(0,0,0,0.3)]" 
+            initial={{ x: 100, opacity: 0 }} 
             animate={{ x: 0, opacity: 1 }}
+            transition={{ type: "spring", damping: 20 }}
         >
             {activeDetail ? (
                 <motion.div key={activeDetail.name} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="flex flex-col h-full">
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="w-12 h-12 bg-blue-600/20 rounded-xl flex items-center justify-center border border-blue-500/30 overflow-hidden p-1">
+                    <div className="flex items-center gap-4 mb-6">
+                        <div className="w-14 h-14 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-2xl flex items-center justify-center border border-white/10 overflow-hidden p-2 shadow-inner">
                             <img 
                                 src={activeDetail.logo || getExternalLogoUrl(activeDetail.name)} 
                                 alt={activeDetail.name} 
@@ -193,39 +309,55 @@ export default function StackRelationAnalysis({
                             />
                         </div>
                         <div>
-                            <h3 className="text-2xl font-bold text-white">{activeDetail.name}</h3>
-                            <span className="text-xm text-blue-400 font-medium px-2 py-0.5 bg-blue-900/30 rounded-md">{activeDetail.role}</span>
+                            <h3 className="text-2xl font-bold text-white tracking-tight">{activeDetail.name}</h3>
+                            <span className="text-xs font-semibold text-blue-300 bg-blue-500/10 px-2.5 py-1 rounded-md border border-blue-500/20 inline-block mt-1">
+                                {activeDetail.role}
+                            </span>
                         </div>
                     </div>
+                    
                     <div className="mb-6">
-                        <h4 className="flex items-center gap-2 text-gray-500 text-xm font-bold uppercase tracking-wider mb-2"><Info className="w-3.5 h-3.5" /> 기술 설명</h4>
-                        <p className="text-xm text-gray-300 leading-relaxed bg-gray-800/50 p-3 rounded-lg border border-gray-700/50">{activeDetail.description}</p>
+                        <h4 className="flex items-center gap-2 text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">
+                            <Info className="w-3.5 h-3.5 text-blue-400" /> 기술 설명
+                        </h4>
+                        <p className="text-sm text-gray-300 leading-relaxed bg-[#25262B] p-4 rounded-xl border border-white/5">
+                            {activeDetail.description}
+                        </p>
                     </div>
+                    
                     <div className="mb-6 flex-1">
-                        <h4 className="flex items-center gap-2 text-gray-500 text-xm font-bold uppercase tracking-wider mb-2"><Share2 className="w-3.5 h-3.5" /> 기술과의 관계</h4>
-                        <div className="bg-gradient-to-b from-blue-900/10 to-transparent p-4 rounded-xl border border-blue-500/20">
-                            <p className="text-xm text-gray-200 leading-relaxed">"{activeDetail.relationReason}"</p>
+                        <h4 className="flex items-center gap-2 text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">
+                            <Share2 className="w-3.5 h-3.5 text-purple-400" /> 관계 분석
+                        </h4>
+                        <div className="bg-gradient-to-br from-blue-500/5 to-purple-500/5 p-4 rounded-xl border border-white/10 relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-blue-500 to-purple-500 opacity-50" />
+                            <p className="text-sm text-gray-200 leading-relaxed pl-2">
+                                "{activeDetail.relationReason}"
+                            </p>
                         </div>
                     </div>
+                    
                     <button 
                         onClick={() => {
                             if (activeDetail && onStackSelect) {
                                 onStackSelect(activeDetail.id);
                             }
                         }}
-                        className="mt-auto w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 text-xm"
+                        className="mt-auto w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-xl hover:from-blue-500 hover:to-blue-600 transition-all shadow-lg hover:shadow-blue-500/25 flex items-center justify-center gap-2 text-sm group"
                     >
-                        <span>{activeDetail.name} 분석 화면으로 이동</span>
-                        <ArrowRightCircle className="w-6 h-6" />
+                        <span>상세 분석 보기</span>
+                        <ArrowRightCircle className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                     </button>
                 </motion.div>
             ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center opacity-40">
-                    <div className="w-20 h-20 bg-gray-800 rounded-full flex items-center justify-center mb-4"><Share2 className="w-10 h-10 text-gray-400" /></div>
-                    <p className="text-gray-300 font-medium text-sm">왼쪽 그래프에서 노드를 클릭하여<br/>상세 관계 정보를 확인하세요.</p>
-                    {sortedByWeight.length === 0 && (
-                        <p className="text-gray-500 text-xs mt-2">등록된 관련 기술 스택 데이터가 없습니다.</p>
-                    )}
+                    <div className="w-24 h-24 bg-gradient-to-tr from-gray-800 to-gray-700 rounded-full flex items-center justify-center mb-6 shadow-inner border border-white/5">
+                        <Share2 className="w-10 h-10 text-gray-400" />
+                    </div>
+                    <h4 className="text-lg font-bold text-gray-200 mb-2">노드 선택</h4>
+                    <p className="text-gray-400 text-sm leading-relaxed max-w-[200px]">
+                        그래프에서 연관 기술 노드를<br/>클릭하여 상세 관계 정보를<br/>확인하세요.
+                    </p>
                 </div>
             )}
         </motion.div>
