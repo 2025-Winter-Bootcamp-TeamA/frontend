@@ -40,7 +40,7 @@ export default function UploadSection({ onUploadClick, onMyPageClick }: UploadSe
                 initial={{ opacity: 0, scale: 0.98 }} 
                 animate={{ opacity: 1, scale: 1 }} 
                 exit={{ opacity: 0, scale: 0.98 }}
-                className="h-full w-full flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-[40px] bg-white/[0.01] hover:bg-white/[0.02] transition-all cursor-default group p-6 lg:p-10"
+                className="h-full min-h-[500px] lg:min-h-[600px] w-full flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-[40px] bg-white/[0.01] hover:bg-white/[0.02] transition-all cursor-default group p-6 lg:p-10"
             >
                 <div className="flex flex-col items-center justify-center w-full max-w-3xl gap-6 lg:gap-10">
                     

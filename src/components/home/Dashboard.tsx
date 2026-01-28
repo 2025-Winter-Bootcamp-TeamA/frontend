@@ -13,7 +13,7 @@ import { getAuthTokens } from "@/lib/auth";
 import LoginCheckModal from "@/components/LoginCheckModal";
 import LoginModal from "@/components/LoginModal";
 
-import { searchTechStacks, getTechStackRelations, getTechStackById, RelatedTechStackRelation, getExternalLogoUrl, fetchTop5TechStacksByJobCount, fetchTechTrends, TechTrendChartItem } from "@/services/trendService";
+import { searchTechStacks, getTechStackRelations, getTechStackById, RelatedTechStackRelation, getExternalLogoUrl, fetchTop5TechStacksByJobCount, fetchTechTrends, TechTrendChartItem, fetchTop5ByTrends, TopTechStackItem } from "@/services/trendService";
 import { TechStackData } from "@/types/trend";
 import type { ChartPeriod } from "./TrendChart";
 
@@ -144,37 +144,25 @@ export default function Dashboard() {
                     }
                 }
 
-                // (2) Top 5 데이터 로드 및 정렬 로직 수정
-                const top5Data = await fetchTop5TechStacksByJobCount();
+                // (2) Top 5 데이터 로드 (job_stack_count 기준, 언급량은 90일간 job_mention_count 합계)
+                const top5Data = await fetchTop5ByTrends();
                 
-                // 중복 제거
-                const uniqueData = Array.from(new Map(top5Data.map((s: any) => [s.id, s])).values());
-
-                if (uniqueData.length > 0) {
-                    // 1. 먼저 데이터를 매핑하여 count 값을 숫자로 변환
-                    let mappedStacks = uniqueData.map((stack: any) => ({
+                if (top5Data.length > 0) {
+                    // job_stack_count 기준 정렬된 상태로 반환됨
+                    const finalTop5 = top5Data.map((stack: TopTechStackItem, index: number) => ({
                         id: stack.id,
                         name: stack.name,
-                        postCount: Number(stack.article_stack_count) || Number(stack.count) || 0,
-                        jobCount: Number(stack.job_stack_count) || Number(stack.job_posting_count) || 0,
+                        // 90일간 job_mention_count 합계 (전체 언급량으로 표시)
+                        postCount: 0,
+                        jobCount: stack.total_mentions || 0,
+                        totalMentions: stack.total_mentions || 0,
+                        jobStackCount: stack.job_stack_count || 0,  // 정렬 기준값
                         growth: 0,
                         logo: stack.logo || getExternalLogoUrl(stack.name),
                         themeColor: "#3B82F6",
-                        description: stack.description || "상세 설명이 없습니다.",
+                        description: "상세 설명이 없습니다.",
                         officialSite: stack.docs_url || "#",
-                        created_at: stack.created_at,
-                        color: "" // 나중에 할당
-                    }));
-
-                    // 2. [핵심 수정] (채용공고 + 게시글) 합계 기준으로 내림차순 정렬
-                    mappedStacks.sort((a, b) => (b.postCount + b.jobCount) - (a.postCount + a.jobCount));
-
-                    // 3. 상위 5개만 자르기
-                    const top5Stacks = mappedStacks.slice(0, 5);
-
-                    // 4. 색상 할당 (순위에 따라 색상 지정)
-                    const finalTop5 = top5Stacks.map((stack, index) => ({
-                        ...stack,
+                        created_at: "",
                         color: index % 2 === 0 ? "from-blue-500 to-indigo-500" : "from-green-500 to-emerald-500"
                     }));
 
@@ -604,14 +592,14 @@ export default function Dashboard() {
                             className="order-2 md:order-1 w-full md:w-56 group relative"
                         >
                             <div className="absolute inset-0 bg-slate-400/10 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <div className="relative bg-[#2A2B30]/60 backdrop-blur-xl border border-white/5 rounded-[32px] p-5 flex flex-col items-center gap-4 hover:border-gray-400/30 transition-all shadow-2xl">
+                            <div className="relative bg-[#2A2B30]/60 backdrop-blur-xl border border-white/5 rounded-[32px] p-6 flex flex-col items-center gap-5 hover:border-gray-400/30 transition-all shadow-2xl min-h-[200px]">
                                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gray-400/20 border border-gray-400/50 px-4 py-1 rounded-full text-gray-300 text-sm font-bold shadow-lg">2등</div>
-                                <div className="w-14 h-14 bg-white/5 rounded-2xl p-3 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                                <div className="w-16 h-16 bg-white/5 rounded-2xl p-3 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
                                     <img src={topStacks[1].logo} alt="" className="w-full h-full object-contain drop-shadow-md" onError={(e) => handleImageError(e, topStacks[1].name)} />
                                 </div>
                                 <div className="text-center">
-                                    <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">{topStacks[1].name}</h3>
-                                    <p className="text-sm text-blue-400 font-medium mt-1">{(topStacks[1].postCount + topStacks[1].jobCount).toLocaleString()} <span className="text-xs text-gray-500">언급량</span></p>
+                                    <h3 className="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">{topStacks[1].name}</h3>
+                                    <p className="text-base text-blue-400 font-medium mt-2">{(topStacks[1].postCount + topStacks[1].jobCount).toLocaleString()} <span className="text-xs text-gray-500">언급량</span></p>
                                 </div>
                             </div>
                         </motion.button>
@@ -660,14 +648,14 @@ export default function Dashboard() {
                             className="order-3 w-full md:w-56 group relative"
                         >
                             <div className="absolute inset-0 bg-orange-700/10 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <div className="relative bg-[#2A2B30]/60 backdrop-blur-xl border border-white/5 rounded-[32px] p-5 flex flex-col items-center gap-4 hover:border-orange-700/30 transition-all shadow-2xl">
-                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-orange-700/20 border border-orange-700/50 px-4 py-1 rounded-full text-orange-400 text-xm font-bold shadow-lg">3등</div>
-                                <div className="w-14 h-14 bg-white/5 rounded-2xl p-3 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                            <div className="relative bg-[#2A2B30]/60 backdrop-blur-xl border border-white/5 rounded-[32px] p-6 flex flex-col items-center gap-5 hover:border-orange-700/30 transition-all shadow-2xl min-h-[200px]">
+                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-orange-700/20 border border-orange-700/50 px-4 py-1 rounded-full text-orange-400 text-sm font-bold shadow-lg">3등</div>
+                                <div className="w-16 h-16 bg-white/5 rounded-2xl p-3 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
                                     <img src={topStacks[2].logo} alt="" className="w-full h-full object-contain drop-shadow-md" onError={(e) => handleImageError(e, topStacks[2].name)} />
                                 </div>
                                 <div className="text-center">
-                                    <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">{topStacks[2].name}</h3>
-                                    <p className="text-sm text-blue-400 font-medium mt-1">{(topStacks[2].postCount + topStacks[2].jobCount).toLocaleString()} <span className="text-xs text-gray-500">언급량</span></p>
+                                    <h3 className="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">{topStacks[2].name}</h3>
+                                    <p className="text-base text-blue-400 font-medium mt-2">{(topStacks[2].postCount + topStacks[2].jobCount).toLocaleString()} <span className="text-xs text-gray-500">언급량</span></p>
                                 </div>
                             </div>
                         </motion.button>

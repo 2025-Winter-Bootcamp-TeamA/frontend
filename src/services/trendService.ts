@@ -119,7 +119,7 @@ export const fetchAllTechStacks = async (): Promise<TechStackData[]> => {
 };
 
 /**
- * 대시보드 첫 화면용: job_stack_count 기준 상위 5개만 1회 요청
+ * 대시보드 첫 화면용: job_stack_count 기준 상위 5개만 1회 요청 (기존 방식 - 사용하지 않음)
  */
 export const fetchTop5TechStacksByJobCount = async (): Promise<TechStackData[]> => {
     try {
@@ -134,6 +134,32 @@ export const fetchTop5TechStacksByJobCount = async (): Promise<TechStackData[]> 
         return top5;
     } catch (error) {
         console.error("fetchTop5TechStacksByJobCount failed:", error);
+        return [];
+    }
+};
+
+// Top 5 API 응답 타입
+export interface TopTechStackItem {
+    id: number;
+    name: string;
+    logo: string | null;
+    docs_url: string | null;
+    job_stack_count: number;    // 정렬 기준 (채용공고 스택 수)
+    total_mentions: number;      // 표시될 언급량 (90일간 job_mention_count 합계)
+}
+
+/**
+ * 대시보드 첫 화면용: 최근 90일간 TechTrend 데이터 기준 Top 5
+ */
+export const fetchTop5ByTrends = async (): Promise<TopTechStackItem[]> => {
+    try {
+        const response = await apiPublic.get<TopTechStackItem[]>('/trends/top-stacks/');
+        return response.data.map(s => ({
+            ...s,
+            logo: s.logo || getExternalLogoUrl(s.name),
+        }));
+    } catch (error) {
+        console.error("fetchTop5ByTrends failed:", error);
         return [];
     }
 };

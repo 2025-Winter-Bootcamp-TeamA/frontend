@@ -411,7 +411,7 @@ function AIInterviewContent() {
     const triggerFileUpload = () => fileInputRef.current?.click();
 
     return (
-        <div className="h-[calc(100vh-80px)] bg-[#1A1B1E] flex flex-col items-center justify-start text-white overflow-hidden print:h-auto print:overflow-visible print:bg-white">
+        <div className="min-h-[calc(100vh-80px)] bg-[#1A1B1E] flex flex-col items-center justify-start text-white overflow-y-auto print:h-auto print:overflow-visible print:bg-white">
             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".pdf,.doc,.docx" />
             
             <div id="main-layout" className="max-w-[1800px] w-full h-full flex flex-col p-6 lg:p-10 scale-[0.95] origin-top">
