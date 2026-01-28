@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { Map as KakaoMap, CustomOverlayMap, useKakaoLoader } from "react-kakao-maps-sdk";
+import { Map as KakaoMap, CustomOverlayMap, useKakaoLoader, MarkerClusterer } from "react-kakao-maps-sdk";
 import { Search, MapPin, RefreshCw, ArrowLeft, Building2, Star, Filter, X, List, ChevronDown } from "lucide-react";
 import { api } from "@/lib/api";
 import { getAuthTokens } from "@/lib/auth";
@@ -812,54 +812,110 @@ export default function JobMap() {
                 updateVisibleCompanies(); 
             }}
         >
-          {companiesToShow.map((company) => (
-            <CustomOverlayMap 
-                key={company.id} 
-                position={{ lat: company.latitude, lng: company.longitude }} 
-                yAnchor={0.5}
-                zIndex={selectedCompany?.id === company.id ? 20 : 1}
-            >
-                <div 
-                    onClick={(e) => { e.stopPropagation(); handleSelectCompany(company); }} 
-                    className="relative cursor-pointer group"
+          {(() => {
+            const favoriteCompanies = companiesToShow.filter(c => favoriteCompanyIds.includes(c.id));
+            const nonFavoriteCompanies = companiesToShow.filter(c => !favoriteCompanyIds.includes(c.id));
+
+            const renderMarker = (company: Company) => (
+                <CustomOverlayMap 
+                    key={company.id} 
+                    position={{ lat: company.latitude, lng: company.longitude }} 
+                    yAnchor={0.5}
+                    zIndex={selectedCompany?.id === company.id ? 20 : favoriteCompanyIds.includes(company.id) ? 10 : 1}
                 >
-                    <div className="flex flex-col items-center">
-                        <div className={`px-2 py-1 bg-gray-900 text-white text-[10px] font-bold rounded mb-1.5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-white/20 flex items-center gap-1 shadow-md ${selectedCompany?.id === company.id ? "opacity-100 bg-blue-600 border-blue-400" : ""}`}>
-                            {favoriteCompanyIds.includes(company.id) && <Star size={10} fill="#EAB308" className="text-yellow-500" />}
-                            {company.name}
+                    <div 
+                        onClick={(e) => { e.stopPropagation(); handleSelectCompany(company); }} 
+                        className="relative cursor-pointer group"
+                    >
+                        <div className="flex flex-col items-center">
+                            <div className={`px-2 py-1 bg-gray-900 text-white text-[10px] font-bold rounded mb-1.5 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-white/20 flex items-center gap-1 shadow-md ${selectedCompany?.id === company.id ? "opacity-100 bg-blue-600 border-blue-400" : ""}`}>
+                                {favoriteCompanyIds.includes(company.id) && <Star size={10} fill="#EAB308" className="text-yellow-500" />}
+                                {company.name}
+                            </div>
+                            {level >= 6 ? (
+                                <div className={`w-3 h-3 rounded-full shadow-lg transition-all ${favoriteCompanyIds.includes(company.id) ? "bg-yellow-500" : "bg-blue-600"}`} />
+                            ) : (
+                                <>
+                                    {/* 즐겨찾기 상태에 따라 마커 색상 변경 */}
+                                    {(() => {
+                                        const isFavorite = favoriteCompanyIds.includes(company.id);
+                                        const isSelected = selectedCompany?.id === company.id;
+                                        const borderColorClass = isFavorite
+                                            ? (isSelected ? "!border-yellow-500" : "border-yellow-500")
+                                            : (isSelected ? "!border-blue-500" : "border-blue-600");
+                                        const ringClass = isSelected
+                                            ? "scale-125 ring-4 " + (isFavorite ? "ring-yellow-500/20" : "ring-blue-500/20")
+                                            : "";
+                                        const pointerColorClass = isFavorite
+                                            ? (isSelected ? "border-t-yellow-500" : "border-t-yellow-600")
+                                            : (isSelected ? "border-t-blue-500" : "border-t-blue-600");
+                                        return (
+                                            <>
+                                                <div className={`w-10 h-10 rounded-full border-2 ${borderColorClass} shadow-xl flex items-center justify-center bg-white transition-all duration-300 ${ringClass}`}>
+                                                    {company.logo_url ? <img src={company.logo_url} alt={company.name} className="w-full h-full object-contain rounded-full p-1.5" /> : <Building2 size={16} className="text-gray-400" />}
+                                                </div>
+                                                <div className={`w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] -mt-0.5 transition-colors ${pointerColorClass}`} />
+                                            </>
+                                        );
+                                    })()}
+                                </>
+                            )}
                         </div>
-                        {level >= 6 ? (
-                            <div className={`w-3 h-3 rounded-full shadow-lg transition-all ${favoriteCompanyIds.includes(company.id) ? "bg-yellow-500 scale-125" : "bg-blue-600"}`} />
-                        ) : (
-                            <>
-                                {/* 즐겨찾기 상태에 따라 마커 색상 변경 */}
-                                {(() => {
-                                    const isFavorite = favoriteCompanyIds.includes(company.id);
-                                    const isSelected = selectedCompany?.id === company.id;
-                                    const borderColorClass = isFavorite
-                                        ? (isSelected ? "!border-yellow-500" : "border-yellow-500")
-                                        : (isSelected ? "!border-blue-500" : "border-blue-600");
-                                    const ringClass = isSelected
-                                        ? "scale-125 ring-4 " + (isFavorite ? "ring-yellow-500/20" : "ring-blue-500/20")
-                                        : "";
-                                    const pointerColorClass = isFavorite
-                                        ? (isSelected ? "border-t-yellow-500" : "border-t-yellow-600")
-                                        : (isSelected ? "border-t-blue-500" : "border-t-blue-600");
-                                    return (
-                                        <>
-                                            <div className={`w-10 h-10 rounded-full border-2 ${borderColorClass} shadow-xl flex items-center justify-center bg-white transition-all duration-300 ${ringClass}`}>
-                                                {company.logo_url ? <img src={company.logo_url} alt={company.name} className="w-full h-full object-contain rounded-full p-1.5" /> : <Building2 size={16} className="text-gray-400" />}
-                                            </div>
-                                            <div className={`w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] -mt-0.5 transition-colors ${pointerColorClass}`} />
-                                        </>
-                                    );
-                                })()}
-                            </>
-                        )}
                     </div>
-                </div>
-            </CustomOverlayMap>
-          ))}
+                </CustomOverlayMap>
+            );
+
+            return (
+              <>
+                <MarkerClusterer
+                  averageCenter={true}
+                  minLevel={4}
+                  minClusterSize={2}
+                  styles={[
+                    {
+                      width: '30px', height: '30px',
+                      background: 'rgba(51, 126, 255, 0.8)',
+                      borderRadius: '50%', color: '#fff',
+                      textAlign: 'center', fontWeight: 'bold',
+                      lineHeight: '30px',
+                      border: '1px solid rgba(255, 255, 255, 0.5)',
+                      range: '10' // 1-9 markers
+                    },
+                    {
+                      width: '40px', height: '40px',
+                      background: 'rgba(51, 126, 255, 0.85)',
+                      borderRadius: '50%', color: '#fff',
+                      textAlign: 'center', fontWeight: 'bold',
+                      lineHeight: '40px',
+                      border: '1px solid rgba(255, 255, 255, 0.6)',
+                      range: '50' // 10-49 markers
+                    },
+                    {
+                      width: '50px', height: '50px',
+                      background: 'rgba(51, 126, 255, 0.9)',
+                      borderRadius: '50%', color: '#fff',
+                      textAlign: 'center', fontWeight: 'bold',
+                      lineHeight: '50px',
+                      border: '1px solid rgba(255, 255, 255, 0.7)',
+                      range: '100' // 50-99 markers
+                    },
+                    {
+                      width: '60px', height: '60px',
+                      background: 'rgba(51, 126, 255, 0.95)',
+                      borderRadius: '50%', color: '#fff',
+                      textAlign: 'center', fontWeight: 'bold',
+                      lineHeight: '60px',
+                      border: '1px solid rgba(255, 255, 255, 0.8)',
+                      range: '200' // 100-199 markers, choose a reasonable max
+                    }
+                  ]}
+                >
+                  {nonFavoriteCompanies.map(renderMarker)}
+                </MarkerClusterer>
+                {favoriteCompanies.map(renderMarker)}
+              </>
+            );
+          })()}
         </KakaoMap>
       </div>
     </div>
