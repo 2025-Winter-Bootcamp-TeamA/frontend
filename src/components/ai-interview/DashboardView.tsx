@@ -89,10 +89,6 @@ export default function DashboardView({
     // 질문 팝업 상태
     const [selectedQAIndex, setSelectedQAIndex] = useState<number | null>(null);
 
-    // 프로젝트 및 업무 경험 데이터
-    const [projectExperiences, setProjectExperiences] = useState<Array<{title: string, details: string}>>([]);
-    const [workExperiences, setWorkExperiences] = useState<Array<{title: string, details: string}>>([]);
-
     // 1. 기술 스택 로고 로딩
     useEffect(() => {
         const loadTechLogos = async () => {
@@ -589,7 +585,7 @@ export default function DashboardView({
                     </div>
                 </section>
 
-                <section className="h-[330px] bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
+                <section className="h-[500px] bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
                     <h3 className="text-base font-bold text-gray-400 mb-3 uppercase flex items-center gap-2 shrink-0"><Hash size={16}/> My Tech</h3>
                     <div className="flex flex-wrap gap-2 overflow-y-auto custom-scrollbar content-start">
                         {resumeKeywords.map((k, i) => (
@@ -603,7 +599,7 @@ export default function DashboardView({
 
             {/* 중앙 패널 */}
             <div className="lg:col-span-6 flex flex-col gap-4 h-fit">
-                <section className="h-[500px] bg-[#212226] border border-white/5 rounded-[24px] p-6 flex flex-col relative group">
+                <section className="h-[570px] bg-[#212226] border border-white/5 rounded-[24px] p-6 flex flex-col relative group">
                     <div className="flex justify-between items-center mb-4 shrink-0">
                         <h3 className="text-xl font-bold text-white flex items-center gap-2"><FileText size={20} className="text-blue-400"/> {resumeTitle}</h3>
                         <div className="flex gap-2 font-bold">
@@ -621,7 +617,7 @@ export default function DashboardView({
                         )}
                     </div>
                 </section>
-                <section className="h-[400px] bg-[#212226] border border-white/5 rounded-[24px] p-6 flex flex-col">
+                <section className="h-[500px] bg-[#212226] border border-white/5 rounded-[24px] p-6 flex flex-col">
                     <div className="flex justify-between items-center mb-4 shrink-0">
                         <h3 className="text-base font-bold text-gray-400 mb-0 uppercase flex items-center gap-2"><HelpCircle size={18}/> AI 예상 질문</h3>
 
@@ -643,9 +639,9 @@ export default function DashboardView({
                         </div>
                     </div>
 
-                    <div className="flex-1 flex flex-col overflow-hidden">
+                    <div className="flex-1 flex flex-col gap-3 overflow-hidden">
                         {/* 질문 내용 표시 영역 */}
-                        <div className="bg-purple-900/20 border border-purple-500/30 rounded-2xl p-5 mb-3 h-[140px] flex flex-col">
+                        <div className="bg-purple-900/20 border border-purple-500/30 rounded-2xl p-5 flex-1 flex flex-col min-h-0">
                             <div className="flex items-start gap-3 h-full">
                                 <span className="w-10 h-10 bg-purple-500/30 rounded-xl flex items-center justify-center text-purple-400 font-bold text-sm shrink-0">
                                     Q
@@ -668,7 +664,7 @@ export default function DashboardView({
                         </div>
 
                         {/* 답변 내용 표시 영역 */}
-                        <div className="bg-green-900/20 border border-green-500/30 rounded-2xl p-5 h-[140px] flex flex-col mb-4">
+                        <div className="bg-green-900/20 border border-green-500/30 rounded-2xl p-5 flex-1 flex flex-col min-h-0">
                             <div className="flex items-start gap-3 h-full">
                                 <span className="w-10 h-10 bg-green-500/30 rounded-xl flex items-center justify-center text-green-400 font-bold text-sm shrink-0">
                                     A
@@ -695,7 +691,7 @@ export default function DashboardView({
 
             {/* 우측 패널 */}
             <div className="lg:col-span-3 flex flex-col h-fit">
-                <section className="h-[916px] bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
+                <section className="h-[1086px] bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
                     <div className="flex justify-between items-center mb-4 shrink-0">
                         <h3 className="text-base font-bold text-gray-400 uppercase flex items-center gap-2"><CheckCircle2 size={16}/> 이력서 세부 분석</h3>
                     </div>
