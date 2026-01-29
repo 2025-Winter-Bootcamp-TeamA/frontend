@@ -5,7 +5,7 @@ import { X, Download, FileText, CheckCircle2, AlertCircle, TrendingUp, Target, B
 
 interface AnalysisFeedback {
     id: string;
-    type: 'strength' | 'improvement' | 'matching';
+    type: 'strength' | 'weakness' | 'enhancement';
     targetText?: string;
     comment: string;
 }
@@ -19,12 +19,13 @@ interface ReportModalProps {
     selectedKeywords: string[];
     feedbacks: AnalysisFeedback[];
     questions: string[];
+    answers: string[];
     totalScore: number;
     jobPostingTitle?: string;
 }
 
-export default function ReportModal({ 
-    isOpen, onClose, resumeTitle, resumeText, selectedCompany, selectedKeywords, feedbacks, questions, totalScore, jobPostingTitle 
+export default function ReportModal({
+    isOpen, onClose, resumeTitle, resumeText, selectedCompany, selectedKeywords, feedbacks, questions, answers, totalScore, jobPostingTitle
 }: ReportModalProps) {
     if (!isOpen) return null;
 
@@ -173,7 +174,56 @@ export default function ReportModal({
                                     </div>
                                 </div>
 
-                                {/* 2. 기술 스택 (Tech Stack) */}
+                                {/* 2. 이력서 원본 (Resume Content) */}
+                                {resumeText && (
+                                    <div className="print-section">
+                                        <h3 className="text-lg font-bold uppercase tracking-wider text-gray-800 mb-4 border-l-4 border-gray-400 pl-3 flex items-center gap-2 print:mb-2">
+                                            <FileText size={18} className="text-gray-600"/> {resumeTitle}
+                                        </h3>
+                                        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden print-color-box">
+                                            <div className="p-6 space-y-4">
+                                                {resumeText.split(/\n{2,}/).map((section, idx) => {
+                                                    const lines = section.split('\n').filter(line => line.trim());
+                                                    if (lines.length === 0) return null;
+
+                                                    // 섹션 제목 감지 (직무 경험, 프로젝트 경험 등)
+                                                    const firstLine = lines[0];
+                                                    const isSectionTitle = firstLine.includes(':') ||
+                                                                          firstLine.includes('경험') ||
+                                                                          firstLine.includes('경력') ||
+                                                                          firstLine.match(/^[가-힣\s]+:$/);
+
+                                                    return (
+                                                        <div key={idx} className="space-y-2">
+                                                            {isSectionTitle ? (
+                                                                <h4 className="text-base font-bold text-gray-800 border-b border-gray-200 pb-2">{firstLine}</h4>
+                                                            ) : lines.length > 1 && !firstLine.startsWith('•') ? (
+                                                                <h5 className="text-sm font-bold text-gray-700">{firstLine}</h5>
+                                                            ) : null}
+
+                                                            <div className="text-gray-600 text-sm leading-relaxed space-y-1">
+                                                                {lines.slice(isSectionTitle || (!firstLine.startsWith('•') && lines.length > 1) ? 1 : 0).map((line, lineIdx) => (
+                                                                    <div key={lineIdx} className={line.startsWith('•') ? 'flex items-start gap-2 ml-2' : line.match(/^-{3,}/) ? 'border-t border-gray-200 my-2' : line.match(/^={3,}/) ? 'border-t-2 border-gray-300 my-3' : ''}>
+                                                                        {line.startsWith('•') ? (
+                                                                            <>
+                                                                                <span className="text-blue-500 font-bold shrink-0">•</span>
+                                                                                <span className="flex-1">{line.substring(1).trim()}</span>
+                                                                            </>
+                                                                        ) : !line.match(/^[-=]{3,}/) ? (
+                                                                            <span>{line}</span>
+                                                                        ) : null}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 3. 기술 스택 (Tech Stack) */}
                                 <div className="print-section">
                                     <h3 className="text-lg font-bold uppercase tracking-wider text-gray-800 mb-4 border-l-4 border-blue-600 pl-3 flex items-center gap-2 print:mb-2">
                                         <Hash size={18} className="text-blue-600"/> 기술 스택
@@ -185,57 +235,71 @@ export default function ReportModal({
                                     </div>
                                 </div>
 
-                                {/* 3. 상세 분석 (Detailed Analysis) - 여기가 문제였던 부분 */}
+                                {/* 4. 상세 분석 (Detailed Analysis) */}
                                 <div className="print-section">
                                     <h3 className="text-lg font-bold uppercase tracking-wider text-gray-800 mb-4 border-l-4 border-green-600 pl-3 flex items-center gap-2 print:mb-2">
                                         <Target size={18} className="text-green-600"/> 상세 분석
                                     </h3>
                                     {feedbacks.length > 0 ? (
-                                        <div className="grid grid-cols-1 gap-4 print:gap-0 print:block">
-                                            {feedbacks.map((fb, i) => (
-                                                <div key={i} className={`p-4 rounded-lg border flex flex-col gap-2 print-item print-color-box ${fb.type==='strength'?'bg-blue-50 border-blue-100':fb.type==='matching'?'bg-green-50 border-green-100':'bg-orange-50 border-orange-100'}`}>
-                                                    <div className="flex items-center gap-2 font-bold">
-                                                        {fb.type==='strength' && <TrendingUp size={16} className="text-blue-600"/>}
-                                                        {fb.type==='matching' && <CheckCircle2 size={16} className="text-green-600"/>}
-                                                        {fb.type==='improvement' && <AlertCircle size={16} className="text-orange-600"/>}
-                                                        <span className={fb.type==='strength'?'text-blue-800':fb.type==='matching'?'text-green-800':'text-orange-800'}>
-                                                            {fb.type==='strength'?'강점 (Strength)':fb.type==='matching'?'기업 적합 (Company Fit)':'보완 제안 (Suggestion)'}
-                                                        </span>
+                                        <div className="grid grid-cols-1 gap-4 print:gap-2 print:block">
+                                            {feedbacks.map((fb, i) => {
+                                                // comment를 글머리 기호(•)로 분리
+                                                const items = fb.comment
+                                                    .split(/[•·]/)
+                                                    .map(item => item.trim())
+                                                    .filter(item => item.length > 0);
+
+                                                return (
+                                                    <div key={i} className={`p-4 rounded-lg border flex flex-col gap-2 print-item print-color-box ${fb.type==='strength'?'bg-blue-50 border-blue-100':fb.type==='weakness'?'bg-orange-50 border-orange-100':'bg-green-50 border-green-100'}`}>
+                                                        <div className="flex items-center gap-2 font-bold">
+                                                            {fb.type==='strength' && <TrendingUp size={16} className="text-blue-600"/>}
+                                                            {fb.type==='weakness' && <AlertCircle size={16} className="text-orange-600"/>}
+                                                            {fb.type==='enhancement' && <CheckCircle2 size={16} className="text-green-600"/>}
+                                                            <span className={fb.type==='strength'?'text-blue-800':fb.type==='weakness'?'text-orange-800':'text-green-800'}>
+                                                                {fb.type==='strength'?'강점 (Strength)':fb.type==='weakness'?'약점 (Weakness)':'보완점 (Suggestion)'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-gray-600 text-sm leading-relaxed space-y-1">
+                                                            {items.map((item, idx) => (
+                                                                <div key={idx} className="flex items-start gap-2">
+                                                                    <span className={`text-base font-bold ${fb.type==='strength'?'text-blue-600':fb.type==='weakness'?'text-orange-600':'text-green-600'}`}>•</span>
+                                                                    <span className="flex-1">{item}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </div>
-                                                    {fb.targetText && <p className="font-semibold text-gray-800 text-sm border-l-2 border-black/10 pl-2 italic">"{fb.targetText}"</p>}
-                                                    <p className="text-gray-600 text-sm leading-relaxed">{fb.comment}</p>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     ) : <p className="text-gray-400 italic">상세 분석 데이터가 없습니다.</p>}
                                 </div>
 
-                                {/* 4. 예상 질문 (Questions) */}
+                                {/* 5. 예상 질문 및 답변 (Questions & Answers) */}
                                 <div className="print-section">
                                     <h3 className="text-lg font-bold uppercase tracking-wider text-gray-800 mb-4 border-l-4 border-purple-600 pl-3 flex items-center gap-2 print:mb-2">
-                                        <BrainCircuit size={18} className="text-purple-600"/> AI 인터뷰 예상 질문
+                                        <BrainCircuit size={18} className="text-purple-600"/> AI 면접 예상 질문
                                     </h3>
                                     {questions.length > 0 ? (
-                                        <ul className="space-y-4 print:space-y-0 print:block">
+                                        <div className="space-y-4 print:space-y-2">
                                             {questions.map((q, i) => (
-                                                <li key={i} className="flex gap-4 items-start bg-purple-50 p-5 rounded-xl border border-purple-100 print-item print-color-box">
-                                                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-bold shrink-0 shadow-md print-color-box">Q{i+1}</span>
-                                                    <p className="text-gray-800 font-medium leading-relaxed">{q}</p>
-                                                </li>
+                                                <div key={i} className="print-item">
+                                                    {/* 질문 */}
+                                                    <div className="flex gap-4 items-start bg-purple-50 p-5 rounded-xl border border-purple-100 print-color-box">
+                                                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-bold shrink-0 shadow-md print-color-box">Q{i+1}</span>
+                                                        <p className="text-gray-800 font-medium leading-relaxed flex-1">{q}</p>
+                                                    </div>
+                                                    {/* 답변 */}
+                                                    {answers[i] && (
+                                                        <div className="flex gap-4 items-start bg-green-50 p-5 rounded-xl border border-green-100 mt-2 ml-10 print-color-box">
+                                                            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-600 text-white text-xs font-bold shrink-0 shadow-md print-color-box">A</span>
+                                                            <p className="text-gray-700 leading-relaxed flex-1 text-sm">{answers[i]}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             ))}
-                                        </ul>
+                                        </div>
                                     ) : <p className="text-gray-400 italic">생성된 면접 질문이 없습니다.</p>}
                                 </div>
-
-                                {/* 5. 이력서 원본 (Resume Content) */}
-                                {resumeText && (
-                                    <div className="print-section">
-                                        <h3 className="text-lg font-bold uppercase tracking-wider text-gray-800 mb-4 border-l-4 border-gray-400 pl-3 flex items-center gap-2 print:mb-2">
-                                            <FileText size={18} className="text-gray-600"/> 이력서 원본
-                                        </h3>
-                                        <div className="bg-gray-50 p-6 rounded-xl text-gray-600 leading-relaxed text-xs whitespace-pre-wrap font-mono border border-gray-200 print-color-box print:p-4">{resumeText}</div>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </motion.div>

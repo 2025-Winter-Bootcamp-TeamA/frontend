@@ -66,8 +66,9 @@ function AIInterviewContent() {
     const [reportData, setReportData] = useState<{
         feedbacks: any[];
         questions: string[];
+        answers: string[];
         jobPostingTitle?: string;
-    }>({ feedbacks: [], questions: [], jobPostingTitle: undefined });
+    }>({ feedbacks: [], questions: [], answers: [], jobPostingTitle: undefined });
 
     const simulationData = useSimulation();
 
@@ -499,8 +500,9 @@ function AIInterviewContent() {
                 selectedKeywords={resumeKeywords}
                 feedbacks={reportData.feedbacks}
                 questions={reportData.questions}
+                answers={reportData.answers}
                 totalScore={resumeMatchScore}
-                jobPostingTitle={reportData.jobPostingTitle} 
+                jobPostingTitle={reportData.jobPostingTitle}
             />
         </div>
     );

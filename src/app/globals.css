@@ -42,6 +42,40 @@ body {
     -ms-overflow-style: none; /* IE and Edge */
     scrollbar-width: none; /* Firefox */
   }
+
+  /* 스크롤할 때만 보이는 스크롤바 */
+  .auto-hide-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 0.3s ease;
+  }
+
+  .auto-hide-scrollbar:hover {
+    scrollbar-color: rgba(64, 64, 64, 0.5) transparent;
+  }
+
+  .auto-hide-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .auto-hide-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .auto-hide-scrollbar::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 3px;
+    transition: background 0.3s ease;
+  }
+
+  .auto-hide-scrollbar:hover::-webkit-scrollbar-thumb {
+    background: rgba(64, 64, 64, 0.5);
+  }
+
+  .auto-hide-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(80, 80, 80, 0.7);
+  }
 }
 /* ✅ global.css 또는 별도 스타일 시트에 추가 */
 

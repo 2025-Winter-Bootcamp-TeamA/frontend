@@ -19,6 +19,7 @@ interface DashboardViewProps {
     onDataUpdate: (data: {
         feedbacks: AnalysisFeedback[];
         questions: string[];
+        answers: string[];
         jobPostingTitle?: string;
     }) => void;
 }
@@ -264,7 +265,7 @@ export default function DashboardView({
             if (!resumeId || !selectedJobPostingId) {
                 setAnalysisData(null);
                 setClickedFeedbackId(null);
-                onDataUpdate({ feedbacks: [], questions: [], jobPostingTitle: undefined });
+                onDataUpdate({ feedbacks: [], questions: [], answers: [], jobPostingTitle: undefined });
                 setIsLoadingAnalysis(false);
                 return;
             }
@@ -287,12 +288,13 @@ export default function DashboardView({
                 }
                 
                 setAnalysisData(resultData);
-                
+
                 // 분석 완료 시 analyzedJobPostingIds에 추가
                 setAnalyzedJobPostingIds(prev => new Set([...prev, selectedJobPostingId]));
-                
+
                 const parsedFeedbacks = parseFeedbacks(resultData);
                 const parsedQuestions = parseQuestions(resultData.question);
+                const parsedAnswers = parseAnswers(resultData.answer);
 
                 let jobTitle = "채용공고";
                 const allCompanies = companyListTab === 'favorites' ? companiesWithJobs : searchResults;
@@ -304,16 +306,17 @@ export default function DashboardView({
                     }
                 }
 
-                onDataUpdate({ 
-                    feedbacks: parsedFeedbacks, 
-                    questions: parsedQuestions, 
-                    jobPostingTitle: jobTitle 
+                onDataUpdate({
+                    feedbacks: parsedFeedbacks,
+                    questions: parsedQuestions,
+                    answers: parsedAnswers,
+                    jobPostingTitle: jobTitle
                 });
 
-            } catch (error) { 
-                onDataUpdate({ feedbacks: [], questions: [], jobPostingTitle: undefined });
-            } finally { 
-                setIsLoadingAnalysis(false); 
+            } catch (error) {
+                onDataUpdate({ feedbacks: [], questions: [], answers: [], jobPostingTitle: undefined });
+            } finally {
+                setIsLoadingAnalysis(false);
             }
         };
         fetchAnalysis();
@@ -502,7 +505,7 @@ export default function DashboardView({
     };
 
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 lg:grid-cols-12 gap-4 w-full pb-8">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 lg:grid-cols-12 gap-4 w-full">
             {/* 좌측 패널 */}
             <div className="lg:col-span-3 flex flex-col gap-4 h-fit">
                 <section className="h-[570px] bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
@@ -542,7 +545,7 @@ export default function DashboardView({
                             ))}
                         </div>
                     )}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
+                    <div className="flex-1 overflow-y-auto space-y-2 auto-hide-scrollbar">
                         {(companyListTab === 'favorites' ? companiesWithJobs : searchResults).map(company => {
                             const analyzedCount = company.jobPostings.filter(j => j.isAnalyzed || analyzedJobPostingIds.has(j.id)).length;
                             const isAllAnalyzed = company.jobPostings.length > 0 && analyzedCount === company.jobPostings.length;
@@ -586,8 +589,8 @@ export default function DashboardView({
                 </section>
 
                 <section className="h-[500px] bg-[#212226] border border-white/5 rounded-[24px] p-5 flex flex-col overflow-hidden">
-                    <h3 className="text-base font-bold text-gray-400 mb-3 uppercase flex items-center gap-2 shrink-0"><Hash size={16}/> My Tech</h3>
-                    <div className="flex flex-wrap gap-2 overflow-y-auto custom-scrollbar content-start">
+                    <h3 className="text-base font-bold text-gray-400 mb-3 uppercase flex items-center gap-2 shrink-0"><Hash size={16}/> 보유 기술 스택</h3>
+                    <div className="flex flex-wrap gap-2 overflow-y-auto content-start auto-hide-scrollbar">
                         {resumeKeywords.map((k, i) => (
                             <span key={i} className="px-2.5 py-1.5 bg-white/5 rounded border border-white/10 text-sm text-gray-300 flex items-center gap-1">
                                 {techLogos[k.toLowerCase()] && <img src={techLogos[k.toLowerCase()]} alt="" className="w-4 h-4 object-contain"/>} {k}
@@ -609,9 +612,46 @@ export default function DashboardView({
                         </div>
                     </div>
                     {/* 이력서 텍스트 렌더링 */}
-                    <div ref={resumeViewerRef} className="flex-1 overflow-y-auto custom-scrollbar bg-[#1A1B1E] rounded-xl p-6 border border-white/5 shadow-inner leading-relaxed">
+                    <div ref={resumeViewerRef} className="flex-1 overflow-y-auto bg-[#1A1B1E] rounded-xl p-6 border border-white/5 shadow-inner leading-relaxed auto-hide-scrollbar">
                         {resumeText ? (
-                            <div className="text-gray-300 leading-relaxed whitespace-pre-wrap text-base lg:text-lg font-light">{resumeText}</div>
+                            <div className="space-y-4">
+                                {resumeText.split(/\n{2,}/).map((section, idx) => {
+                                    const lines = section.split('\n').filter(line => line.trim());
+                                    if (lines.length === 0) return null;
+
+                                    // 섹션 제목 감지 (직무 경험, 프로젝트 경험 등)
+                                    const firstLine = lines[0];
+                                    const isSectionTitle = firstLine.includes(':') ||
+                                                          firstLine.includes('경험') ||
+                                                          firstLine.includes('경력') ||
+                                                          firstLine.match(/^[가-힣\s]+:$/);
+
+                                    return (
+                                        <div key={idx} className="space-y-2">
+                                            {isSectionTitle ? (
+                                                <h4 className="text-lg font-bold text-gray-100 border-b border-white/20 pb-2">{firstLine}</h4>
+                                            ) : lines.length > 1 && !firstLine.startsWith('•') ? (
+                                                <h5 className="text-base font-bold text-gray-200">{firstLine}</h5>
+                                            ) : null}
+
+                                            <div className="text-gray-300 text-base leading-relaxed space-y-1">
+                                                {lines.slice(isSectionTitle || (!firstLine.startsWith('•') && lines.length > 1) ? 1 : 0).map((line, lineIdx) => (
+                                                    <div key={lineIdx} className={line.startsWith('•') ? 'flex items-start gap-2 ml-2' : line.match(/^-{3,}/) ? 'border-t border-white/10 my-2' : line.match(/^={3,}/) ? 'border-t-2 border-white/20 my-3' : ''}>
+                                                        {line.startsWith('•') ? (
+                                                            <>
+                                                                <span className="text-blue-400 font-bold shrink-0">•</span>
+                                                                <span className="flex-1">{line.substring(1).trim()}</span>
+                                                            </>
+                                                        ) : !line.match(/^[-=]{3,}/) ? (
+                                                            <span>{line}</span>
+                                                        ) : null}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         ) : (
                             <div className="text-center text-gray-500 py-10 text-base">이력서 내용이 없습니다.</div>
                         )}
