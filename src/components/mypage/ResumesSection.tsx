@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { getAuthTokens } from "@/lib/auth";
+import { useInterviewStore } from "@/store/interviewStore";
 
 interface TechStack {
   id: number;
@@ -23,11 +24,13 @@ const PAGE_SIZE = 4; // 4개씩 보여주기
 
 export default function ResumesSection() {
   const router = useRouter();
+  const { setStep, setAnalysisInfo, startProcess, setProgress } = useInterviewStore();
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+  const [analyzing, setAnalyzing] = useState<number | null>(null); // 분석 중인 이력서 ID
+
   // 페이지 상태 추가
   const [page, setPage] = useState(1);
 
@@ -119,8 +122,50 @@ export default function ResumesSection() {
     }
   };
 
-  const handleGoToAnalysis = (id: number) => {
-    router.push(`/ai-interview?resumeId=${id}`);
+  const handleGoToAnalysis = async (id: number) => {
+    setAnalyzing(id);
+    setError(null);
+
+    try {
+      // 1. 이력서 상세 정보 확인 (이미 분석된 데이터가 있는지 체크)
+      const response = await api.get(`/resumes/${id}/`);
+      const resumeData = response.data;
+
+      // 2. 이미 분석된 데이터가 있으면 바로 결과 페이지로 이동
+      const hasTechStacks = resumeData.tech_stacks && resumeData.tech_stacks.length > 0;
+
+      if (hasTechStacks) {
+        // 이미 분석 완료된 이력서 - 결과 페이지로 이동
+        setStep('result');
+        setAnalysisInfo(null, id);
+        router.push(`/ai-interview?resumeId=${id}`);
+        return;
+      }
+
+      // 3. 분석된 데이터가 없으면 분석 시작
+      setStep('analyzing');
+      startProcess('AI 정밀 분석 중...');
+      setProgress(35);
+
+      // 4. 이력서 분석 API 호출
+      const analyzeResponse = await api.post(`/resumes/${id}/analyze/`);
+
+      // 5. task_id와 resumeId를 스토어에 저장
+      setAnalysisInfo(analyzeResponse.data.task_id, id);
+      setProgress(40);
+
+      // 6. AI 인터뷰 페이지로 이동 (분석 진행 화면 표시됨)
+      router.push(`/ai-interview?resumeId=${id}`);
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.error || "이력서 확인에 실패했습니다.";
+      setError(errorMessage);
+      alert(errorMessage);
+      // 에러 발생 시 상태 초기화
+      setStep('empty');
+      setProgress(0);
+    } finally {
+      setAnalyzing(null);
+    }
   };
 
   if (loading) {
@@ -214,13 +259,32 @@ export default function ResumesSection() {
               <div className="flex items-center gap-2 pl-4">
                 <button
                   onClick={() => handleGoToAnalysis(resume.resume_id)}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-blue-500 hover:shadow-lg hover:shadow-blue-900/20 active:scale-95 whitespace-nowrap"
+                  disabled={analyzing === resume.resume_id}
+                  className={`rounded-lg px-4 py-2 text-xs font-semibold text-white transition-all hover:shadow-lg hover:shadow-blue-900/20 active:scale-95 whitespace-nowrap ${
+                    analyzing === resume.resume_id
+                      ? "bg-blue-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-500"
+                  }`}
                 >
-                  AI 분석 결과
+                  {analyzing === resume.resume_id ? (
+                    <span className="flex items-center gap-2">
+                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                      확인 중...
+                    </span>
+                  ) : resume.tech_stacks && resume.tech_stacks.length > 0 ? (
+                    "AI 분석 결과"
+                  ) : (
+                    "AI 분석 시작"
+                  )}
                 </button>
                 <button
                   onClick={() => handleDelete(resume.resume_id, resume.resume_title)}
-                  className="rounded-lg bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-400 transition-all hover:bg-red-500/10 hover:text-red-400 active:scale-95"
+                  disabled={analyzing === resume.resume_id}
+                  className={`rounded-lg px-3 py-2 text-xs font-medium transition-all active:scale-95 ${
+                    analyzing === resume.resume_id
+                      ? "bg-zinc-900 text-zinc-600 cursor-not-allowed"
+                      : "bg-zinc-800 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
+                  }`}
                 >
                   삭제
                 </button>
@@ -260,7 +324,8 @@ export default function ResumesSection() {
           Tip
         </p>
         <ul className="ml-6 list-disc space-y-1 text-zinc-400">
-          <li>'AI 분석 결과'를 클릭하면 면접 질문 예측과 역량 분석 리포트를 확인할 수 있습니다.</li>
+          <li>이력서를 업로드하면 'AI 분석 시작' 버튼이 표시됩니다. 클릭하여 면접 질문 예측 및 역량 분석을 시작하세요.</li>
+          <li>AI 인터뷰 페이지에서 채용 공고별 세부 분석과 예상 면접 질문을 확인할 수 있습니다.</li>
           <li>최대 10개까지 이력서를 저장할 수 있습니다. 오래된 이력서는 주기적으로 정리해주세요.</li>
         </ul>
       </div>

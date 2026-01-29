@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoginModal from './LoginModal';
-import { getAuthTokens, clearAuthTokens } from '@/lib/auth';
+import { getAuthTokens, logout } from '@/lib/auth';
 import api from '@/lib/api'; 
 import { Check, Loader2 } from 'lucide-react'; 
 import { useInterviewStore } from '@/store/interviewStore'; // ✅ 스토어 임포트
@@ -76,19 +76,21 @@ export default function Navbar() {
     const navItems = [
         { name: '대시보드', href: '/' },
         { name: '채용 지도', href: '/map' },
-        { name: '면접 대비', href: '/ai-interview' },
+        { name: '면접 대비', href: '/ai-interview', special: true },
     ];
 
-    const handleLogout = () => {
-        clearAuthTokens();
-        localStorage.removeItem('user_profile_image');
-        
+    const handleLogout = async () => {
+        setIsLogoutModalOpen(false);
+
+        // 로그아웃 시 진행 중인 분석 상태도 초기화
+        resetProcess();
+
+        // 상태 초기화
         setIsLoggedIn(false);
         setProfileImage(null);
-        setIsLogoutModalOpen(false);
-        // 로그아웃 시 진행 중인 분석 상태도 초기화
-        resetProcess(); 
-        router.push('/');
+
+        // 백엔드 API 호출 및 토큰 삭제 후 리다이렉트
+        await logout();
     };
 
     return (
@@ -109,14 +111,25 @@ export default function Navbar() {
                             <div key={item.name} className="flex items-center">
                                 <Link
                                     href={item.href}
-                                    onClick={() => {
-                                        if (item.href === '/') window.dispatchEvent(new Event('resetDashboard'));
-                                        else if (item.href === '/map') window.dispatchEvent(new Event('resetJobMap'));
-                                        // ai-interview는 resetProcess를 별도로 관리하므로 여기서는 이벤트 제거 가능
+                                    onClick={(e) => {
+                                        if (item.href === '/') {
+                                            window.dispatchEvent(new Event('resetDashboard'));
+                                        } else if (item.href === '/map') {
+                                            window.dispatchEvent(new Event('resetJobMap'));
+                                        } else if (item.href === '/ai-interview') {
+                                            // 결과 페이지에서 '면접 대비' 클릭 시 초기화
+                                            const currentStep = useInterviewStore.getState().step;
+                                            if (currentStep === 'result') {
+                                                e.preventDefault();
+                                                resetProcess();
+                                                router.push('/ai-interview');
+                                            }
+                                            // analyzing 상태일 때는 그대로 유지
+                                        }
                                     }}
                                     className={`text-[18px] transition-all duration-300 hover:text-white py-1 ${
-                                        pathname === item.href 
-                                            ? 'text-white font-bold' 
+                                        pathname === item.href
+                                            ? 'text-white font-bold'
                                             : 'text-[#9FA0A8]'
                                     }`}
                                 >
@@ -223,9 +236,20 @@ export default function Navbar() {
                                 <Link
                                     key={item.name}
                                     href={item.href}
-                                    onClick={() => {
-                                        if (item.href === '/') window.dispatchEvent(new Event('resetDashboard'));
-                                        else if (item.href === '/map') window.dispatchEvent(new Event('resetJobMap'));
+                                    onClick={(e) => {
+                                        if (item.href === '/') {
+                                            window.dispatchEvent(new Event('resetDashboard'));
+                                        } else if (item.href === '/map') {
+                                            window.dispatchEvent(new Event('resetJobMap'));
+                                        } else if (item.href === '/ai-interview') {
+                                            // 결과 페이지에서 '면접 대비' 클릭 시 초기화
+                                            const currentStep = useInterviewStore.getState().step;
+                                            if (currentStep === 'result') {
+                                                e.preventDefault();
+                                                resetProcess();
+                                                router.push('/ai-interview');
+                                            }
+                                        }
                                         setIsOpen(false);
                                     }}
                                     className={`block text-[18px] transition-colors duration-300 hover:text-white ${

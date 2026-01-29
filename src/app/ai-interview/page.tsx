@@ -95,13 +95,13 @@ function AIInterviewContent() {
         };
     };
 
-    // 페이지 진입 시 초기화 (URL 파라미터가 없으면 항상 이력서 선택 화면으로)
+    // 페이지 진입 시 초기화 (URL 파라미터가 없으면 분석중이 아닐 때만 초기화)
     useEffect(() => {
         const resumeIdParam = searchParams?.get('resumeId');
         const pickResumeParam = searchParams?.get('pickResume');
-        
-        // URL 파라미터가 없으면 상태 초기화
-        if (!resumeIdParam && !pickResumeParam) {
+
+        // URL 파라미터가 없고, 분석 중이 아닐 때만 상태 초기화
+        if (!resumeIdParam && !pickResumeParam && step !== 'analyzing') {
             resetProcess();
             setSelectedResume(null);
         }
@@ -242,10 +242,10 @@ function AIInterviewContent() {
             const autoLoad = async () => {
                 try {
                     const detailedResume = await fetchResumeDetails(rid);
-                    if ((detailedResume.techStacks && detailedResume.techStacks.length > 0) || detailedResume.extractedText) {
+                    if (detailedResume.techStacks && detailedResume.techStacks.length > 0) {
                         setSelectedResume(detailedResume);
                         setStep('result');
-                        setAnalysisInfo(null, rid); 
+                        setAnalysisInfo(null, rid);
                         return;
                     }
                 } catch (e) {}
@@ -264,11 +264,16 @@ function AIInterviewContent() {
     // 초기화 및 취소 이벤트 리스너
     useEffect(() => {
         const handleReset = () => {
+            // analyzing 상태일 때는 초기화하지 않음
+            if (step === 'analyzing') {
+                return;
+            }
+
             if (abortControllerRef.current) {
                 abortControllerRef.current.abort();
                 abortControllerRef.current = null;
             }
-            
+
             resetProcess();
             setSelectedResume(null);
             setShowDropdown(false);
@@ -277,7 +282,17 @@ function AIInterviewContent() {
         };
 
         const handleCancelAnalysis = () => {
-            handleReset();
+            // 분석 취소는 무조건 실행
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+                abortControllerRef.current = null;
+            }
+
+            resetProcess();
+            setSelectedResume(null);
+            setShowDropdown(false);
+            setAnalysisError(null);
+            router.replace('/ai-interview');
         };
 
         window.addEventListener('resetAIInterview', handleReset);
@@ -286,16 +301,14 @@ function AIInterviewContent() {
             window.removeEventListener('resetAIInterview', handleReset);
             window.removeEventListener('cancelAnalysis', handleCancelAnalysis);
         };
-    }, [router, resetProcess]);
+    }, [router, resetProcess, step]);
 
     // 분석 시작 (백엔드 요청)
     const handleStartAnalysis = async (resumeId: number) => {
-        if (useInterviewStore.getState().step === 'empty') return;
-
         setAnalysisError(null);
         setStep('analyzing');
         setAnalysisInfo(null, resumeId);
-        startProcess('AI 정밀 분석 중...'); 
+        startProcess('AI 정밀 분석 중...');
         setProgress(35);
         setShowDropdown(false);
         setIsResumePickerOpen(false);
@@ -320,7 +333,7 @@ function AIInterviewContent() {
         setIsResumePickerOpen(false);
         try {
             const detailedResume = await fetchResumeDetails(resume.id);
-            if ((detailedResume.techStacks && detailedResume.techStacks.length > 0) || detailedResume.extractedText) {
+            if (detailedResume.techStacks && detailedResume.techStacks.length > 0) {
                 setSelectedResume(detailedResume);
                 setStep('result');
                 setAnalysisInfo(null, resume.id);

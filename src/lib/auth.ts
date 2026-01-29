@@ -154,10 +154,35 @@ export function clearAuthTokens() {
 }
 
 /**
- * 로그아웃 (토큰 삭제 후 홈으로 이동)
+ * 로그아웃 (백엔드 API 호출 + 토큰 삭제 후 홈으로 이동)
  */
-export function logout() {
-  clearAuthTokens(); // 위에서 만든 함수 재사용
+export async function logout() {
+  const refreshToken = getRefreshToken();
+
+  // 백엔드 API 호출하여 refresh token 블랙리스트 처리
+  if (refreshToken) {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL;
+      const accessToken = getAccessToken();
+
+      await fetch(`${API_URL}/api/v1/users/auth/logout/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+        },
+        body: JSON.stringify({ refresh: refreshToken })
+      });
+
+      // API 호출 성공 여부와 관계없이 로컬 토큰 삭제
+    } catch (error) {
+      console.error('로그아웃 API 호출 실패:', error);
+      // 네트워크 오류 등이 발생해도 로컬 토큰은 삭제
+    }
+  }
+
+  clearAuthTokens(); // 로컬 토큰 삭제
+
   if (typeof window !== "undefined") {
     window.location.href = "/";
   }

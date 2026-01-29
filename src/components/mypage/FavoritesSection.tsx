@@ -296,32 +296,32 @@ export default function FavoritesSection() {
       setCorps((prev) => prev.filter((c) => c.id !== id));
       toggleCorpFavorite(id);
       try {
-        const bookmarks = (await api.get("/jobs/corp-bookmarks/")).data.results || [];
+        // 백엔드는 페이지네이션 없이 배열로 직접 반환
+        const bookmarks = (await api.get("/jobs/corp-bookmarks/")).data || [];
         const target = bookmarks.find(
           (b: any) => b.corp?.id === id || b.corp_id === id
         );
-        if (target)
-          await api.delete(
-            `/jobs/corp-bookmarks/${target.id || target.corp_bookmark_id}/`
-          );
+        if (target && target.corp_bookmark_id) {
+          await api.delete(`/jobs/corp-bookmarks/${target.corp_bookmark_id}/`);
+        }
       } catch (e) {
-        console.error(e);
+        console.error("기업 즐겨찾기 삭제 실패:", e);
         fetchFavoriteCorps();
       }
     } else {
       setTechStacks((prev) => prev.filter((t) => t.id !== id));
       toggleTechFavorite(id);
       try {
-        const bookmarks = (await api.get("/trends/tech-bookmarks/")).data.results || [];
+        // 백엔드는 배열로 직접 반환
+        const bookmarks = (await api.get("/trends/tech-bookmarks/")).data || [];
         const target = bookmarks.find(
-          (b: any) => (b.tech_stack?.id || b.tech_stack?.tech_stack_id) === id
+          (b: any) => b.tech_stack?.tech_stack_id === id
         );
-        if (target)
-          await api.delete(
-            `/trends/tech-bookmarks/${target.id || target.tech_bookmark_id}/`
-          );
+        if (target && target.tech_bookmark_id) {
+          await api.delete(`/trends/tech-bookmarks/${target.tech_bookmark_id}/`);
+        }
       } catch (e) {
-        console.error(e);
+        console.error("기술 스택 즐겨찾기 삭제 실패:", e);
         fetchFavoriteTechStacks();
       }
     }
