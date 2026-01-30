@@ -11,7 +11,7 @@ import {
   Legend,
 } from 'recharts';
 
-export type ChartPeriod = 'weekly' | 'monthly' | 7 | 30 | 90;
+export type ChartPeriod = 'weekly' | 'monthly' | 7 | 30 | 90 | 365;
 
 export interface TrendChartDataItem {
   date: string;
@@ -32,7 +32,7 @@ interface TrendChartProps {
 function formatDateLabel(ref: string, period: ChartPeriod): string {
   if (!ref || ref.length < 10) return ref;
   const [y, m, d] = ref.split('-');
-  if (period === 'monthly' || period === 90) return `${y}.${m}.${d}`;
+  if (period === 'monthly' || period === 90 || period === 365) return `${y}.${m}.${d}`;
   return `${m}.${d}`;
 }
 
@@ -132,6 +132,16 @@ export default function TrendChart({ color, data, period, onPeriodChange, isLoad
             }`}
         >
             월간
+        </button>
+        <button
+            onClick={() => onPeriodChange(365)} 
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+              period === 365
+                ? 'bg-white/10 text-white'
+                : 'bg-white/5 text-white/50 hover:text-white/80'
+            }`}
+        >
+            연간
         </button>
       </div>
 

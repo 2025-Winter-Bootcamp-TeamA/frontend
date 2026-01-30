@@ -70,6 +70,47 @@ const EMPTY_STACK: DashboardStackData = {
     created_at: ""
 };
 
+// Helper function to calculate monthly average for TechTrendChartItem
+function calculateMonthlyAverage(data: TechTrendChartItem[]): TechTrendChartItem[] {
+  const monthlyData: { [key: string]: { sumJobMentions: number; sumJobChangeRate: number; sumArticleMentions: number; sumArticleChangeRate: number; count: number } } = {};
+
+  data.forEach(item => {
+    const date = new Date(item.date);
+    const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`; // YYYY-MM format
+
+    if (!monthlyData[monthKey]) {
+      monthlyData[monthKey] = {
+        sumJobMentions: 0,
+        sumJobChangeRate: 0,
+        sumArticleMentions: 0,
+        sumArticleChangeRate: 0,
+        count: 0
+      };
+    }
+
+    monthlyData[monthKey].sumJobMentions += item.job_mention_count;
+    monthlyData[monthKey].sumJobChangeRate += item.job_change_rate ?? 0;
+    monthlyData[monthKey].sumArticleMentions += item.article_mention_count;
+    monthlyData[monthKey].sumArticleChangeRate += item.article_change_rate ?? 0;
+    monthlyData[monthKey].count++;
+  });
+
+  const averagedData: TechTrendChartItem[] = Object.keys(monthlyData).map(monthKey => {
+    const monthStats = monthlyData[monthKey];
+    const avgDate = new Date(monthKey + '-01'); // Represent as the first day of the month
+    
+    return {
+      date: avgDate.toISOString().slice(0, 10), // YYYY-MM-DD format
+      job_mention_count: monthStats.sumJobMentions / monthStats.count,
+      job_change_rate: monthStats.sumJobChangeRate / monthStats.count,
+      article_mention_count: monthStats.sumArticleMentions / monthStats.count,
+      article_change_rate: monthStats.sumArticleChangeRate / monthStats.count,
+    };
+  });
+
+  return averagedData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
 export default function Dashboard() {
     const [isLanding, setIsLanding] = useState(true); 
     const [activeStack, setActiveStack] = useState<DashboardStackData>(EMPTY_STACK);
@@ -278,12 +319,29 @@ export default function Dashboard() {
         const load = async () => {
             setChartDataLoading(true);
             try {
-                let apiPeriod: 7 | 30 | 90 = 30;
+                let apiPeriod: 7 | 30 | 90 | 365 = 30;
                 if (chartPeriod === 'weekly' || chartPeriod === 7) apiPeriod = 7;
                 else if (chartPeriod === 'monthly' || chartPeriod === 30) apiPeriod = 30;
                 else if (chartPeriod === 90) apiPeriod = 90;
+                else if (chartPeriod === 365) apiPeriod = 365;
 
-                const rows = await fetchTechTrends(activeStack.id, apiPeriod);
+                let rows = await fetchTechTrends(activeStack.id, apiPeriod);
+                if (apiPeriod === 365) {
+                    rows = calculateMonthlyAverage(rows);
+                }
+
+                // Filtering to keep only the last 12 months of data from today
+                const now = new Date();
+                const twelveMonthsAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+
+                rows = rows.filter(item => {
+                    const itemDate = new Date(item.date);
+                    // Compare date parts only, by setting hours to 0 for accurate day comparison
+                    itemDate.setHours(0, 0, 0, 0);
+                    twelveMonthsAgo.setHours(0, 0, 0, 0);
+                    return itemDate >= twelveMonthsAgo;
+                });
+                
                 setChartData(rows);
             } catch (e) {
                 console.error('트렌드 그래프 로드 실패:', e);
