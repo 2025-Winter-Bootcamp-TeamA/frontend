@@ -329,6 +329,19 @@ export default function Dashboard() {
                 if (apiPeriod === 365) {
                     rows = calculateMonthlyAverage(rows);
                 }
+
+                // Filtering to keep only the last 12 months of data from today
+                const now = new Date();
+                const twelveMonthsAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+
+                rows = rows.filter(item => {
+                    const itemDate = new Date(item.date);
+                    // Compare date parts only, by setting hours to 0 for accurate day comparison
+                    itemDate.setHours(0, 0, 0, 0);
+                    twelveMonthsAgo.setHours(0, 0, 0, 0);
+                    return itemDate >= twelveMonthsAgo;
+                });
+                
                 setChartData(rows);
             } catch (e) {
                 console.error('트렌드 그래프 로드 실패:', e);

@@ -230,7 +230,7 @@ export interface TechTrendChartItem {
  */
 export const fetchTechTrends = async (
   techStackId: number,
-  days: 7 | 30 | 90
+  days: 7 | 30 | 90 | 365
 ): Promise<TechTrendChartItem[]> => {
   try {
     const url = `trends/?tech_stack=${techStackId}&days=${days}&ordering=reference_date&page_size=100`;
