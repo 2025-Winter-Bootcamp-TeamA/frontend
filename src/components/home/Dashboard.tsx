@@ -278,10 +278,11 @@ export default function Dashboard() {
         const load = async () => {
             setChartDataLoading(true);
             try {
-                let apiPeriod: 7 | 30 | 90 = 30;
+                let apiPeriod: 7 | 30 | 90 | 365 = 30;
                 if (chartPeriod === 'weekly' || chartPeriod === 7) apiPeriod = 7;
                 else if (chartPeriod === 'monthly' || chartPeriod === 30) apiPeriod = 30;
                 else if (chartPeriod === 90) apiPeriod = 90;
+                else if (chartPeriod === 365) apiPeriod = 365;
 
                 const rows = await fetchTechTrends(activeStack.id, apiPeriod);
                 setChartData(rows);
